@@ -1,0 +1,718 @@
+{
+  "name": "web",
+  "description": "HTTP/1.1, HTTP/2, HTTP/3, gRPC, WebSockets and server-sent events across a 50 ms path (pathlab): ALPN and h2c, a page of 20 resources over 1 vs 6 HTTP/1.1 connections vs one HTTP/2 or HTTP/3 connection, application head-of-line blocking, multiplexed streams in a decrypted capture, HPACK savings, QUIC 1-RTT, resumption and 0-RTT, transport head-of-line blocking from one lost packet in HTTP/2 vs HTTP/3 (and QPACK's own), UDP blocked, gRPC on the wire (trailers, status in HTTP 200, deadlines, streaming, no reflection, an HTTP/1.1 proxy breaking it), the WebSocket handshake and frames, a load balancer idle timeout vs pings, and SSE through a buffering proxy",
+  "nodes": [
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.110.1"
+        }
+      ],
+      "files": {
+        "/etc/hosts": "127.0.0.1\tlocalhost\n198.18.111.10\tweb.test\n"
+      }
+    },
+    {
+      "name": "router",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.default.rp_filter": "0"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "ip tuntap add dev pl-ab mode tun && ip tuntap add dev pl-ba mode tun && ip link set pl-ab up && ip link set pl-ba up && sysctl -qw net.ipv4.conf.pl-ab.rp_filter=0 net.ipv4.conf.pl-ba.rp_filter=0 && ip rule add iif eth0 table 100 && ip route add default dev pl-ab table 100 && ip rule add iif eth1 table 101 && ip route add default dev pl-ba table 101"
+        ]
+      ],
+      "services": [
+        {
+          "name": "pathlab",
+          "run": [
+            "${BIN}/pathlab",
+            "run",
+            "-delay",
+            "25ms",
+            "-control",
+            "0.0.0.0:9911"
+          ],
+          "port": 9911
+        }
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.111.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            ":443",
+            "-plain",
+            ":80",
+            "-name",
+            "web.test",
+            "-pki",
+            "${EVIDENCE}",
+            "-alt-svc",
+            "h3=\":443\"; ma=3600",
+            "-keylog",
+            "${EVIDENCE}/server-keys.log"
+          ],
+          "port": 443
+        },
+        {
+          "name": "h3",
+          "run": [
+            "${PYTHON}",
+            "${LABS}/http3/h3lab.py",
+            "serve",
+            "--cert",
+            "${EVIDENCE}/cert.pem",
+            "--key",
+            "${EVIDENCE}/key.pem",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "443"
+          ],
+          "udp_port": 443
+        },
+        {
+          "name": "proxy-h1",
+          "run": [
+            "${BIN}/weblab",
+            "proxy",
+            "-listen",
+            ":8080",
+            "-to",
+            "http://127.0.0.1:80",
+            "-backend",
+            "h1"
+          ],
+          "port": 8080
+        },
+        {
+          "name": "proxy-buffer",
+          "run": [
+            "${BIN}/weblab",
+            "proxy",
+            "-listen",
+            ":8082",
+            "-to",
+            "http://127.0.0.1:80",
+            "-backend",
+            "h1",
+            "-buffer"
+          ],
+          "port": 8082
+        },
+        {
+          "name": "proxy-h2c",
+          "run": [
+            "${BIN}/weblab",
+            "proxy",
+            "-listen",
+            ":8083",
+            "-to",
+            "http://127.0.0.1:80",
+            "-backend",
+            "h2c"
+          ],
+          "port": 8083
+        },
+        {
+          "name": "relay",
+          "run": [
+            "${BIN}/weblab",
+            "relay",
+            "-listen",
+            ":8081",
+            "-to",
+            "127.0.0.1:80",
+            "-idle",
+            "5s"
+          ],
+          "port": 8081
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.110.10/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth0",
+        "addr": [
+          "198.18.110.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "router",
+        "if": "eth1",
+        "addr": [
+          "198.18.111.1/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.111.10/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "client",
+      "name": "ALPN: curl offers h2 and http/1.1 in the ClientHello, the server picks h2; the response advertises HTTP/3 in Alt-Svc",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; curl -sv --cacert ${EVIDENCE}/ca.pem -o /dev/null https://web.test/ 2>&1 | grep -iE 'ALPN|^< HTTP|alt-svc'"
+      ],
+      "save": "alpn.txt",
+      "expect_contains": [
+        "ALPN: server accepted h2",
+        "< HTTP/2 200",
+        "alt-svc: h3=\":443\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same server with --http1.1: ALPN agrees on http/1.1",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; curl -sv --http1.1 --cacert ${EVIDENCE}/ca.pem -o /dev/null https://web.test/ 2>&1 | grep -iE 'ALPN|^< HTTP'"
+      ],
+      "save": "alpn-h1.txt",
+      "expect_contains": [
+        "ALPN: server accepted http/1.1",
+        "< HTTP/1.1 200"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "cleartext port 80: HTTP/1.1 by default; HTTP/2 only with prior knowledge (h2c) \u2014 no TLS, so no ALPN to negotiate it",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; curl -s http://web.test/; curl -s --http2-prior-knowledge http://web.test/"
+      ],
+      "save": "h2c.txt",
+      "expect_contains": [
+        "proto HTTP/1.1 alpn -",
+        "proto HTTP/2.0 alpn -"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a page and 20 small resources (2 KB each): HTTP/1.1 on 1 connection, on 6 (a browser's limit), HTTP/2 and HTTP/3 on one",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; ${BIN}/weblab get -cacert ${EVIDENCE}/ca.pem -proto h1 -conns 1 -page -n 21 'https://web.test/obj?size=2000' | tail -1; ${BIN}/weblab get -cacert ${EVIDENCE}/ca.pem -proto h1 -conns 6 -page -n 21 'https://web.test/obj?size=2000' | tail -1; ${BIN}/weblab get -cacert ${EVIDENCE}/ca.pem -proto h2  -page -n 21 'https://web.test/obj?size=2000' | tail -1; ${PYTHON} ${LABS}/http3/h3lab.py get --cacert ${EVIDENCE}/ca.pem --page -n 21 'https://web.test/obj?size=2000' | tail -1"
+      ],
+      "save": "page-load.txt",
+      "expect_contains": [
+        "summary: h1, 21 requests, 1 TCP connections",
+        "summary: h1, 21 requests, 6 TCP connections",
+        "summary: h2, 21 requests, 1 TCP connections",
+        "summary: h3, 21 requests, 1 QUIC connection"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "head-of-line blocking in HTTP/1.1: a fast request queued behind a slow one (1 s) on the same connection waits; HTTP/2 answers it at once",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; ${BIN}/weblab get -cacert ${EVIDENCE}/ca.pem -proto h1 -conns 1 -stagger 10ms 'https://web.test/obj?size=2000&delay=1s' 'https://web.test/obj?size=2000'; ${BIN}/weblab get -cacert ${EVIDENCE}/ca.pem -proto h2 -stagger 10ms 'https://web.test/obj?size=2000&delay=1s' 'https://web.test/obj?size=2000'"
+      ],
+      "save": "hol-h1.txt",
+      "expect_contains": [
+        "summary: h1, 2 requests, 1 TCP connections",
+        "summary: h2, 2 requests, 1 TCP connections"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 443",
+      "decode": [
+        "-nn",
+        "-q"
+      ],
+      "save": "h2-mux.pcap",
+      "name": "capture six 20 KB responses on one HTTP/2 connection, with the client's TLS key log",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "rm -f ${EVIDENCE}/client-keys.log; ${BIN}/weblab get -cacert ${EVIDENCE}/ca.pem -proto h2 -page -n 7 -keylog ${EVIDENCE}/client-keys.log 'https://web.test/obj?size=20000' | tail -1"
+        ]
+      },
+      "expect_contains": [
+        "summary: h2, 7 requests, 1 TCP connections"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "decrypted: one TCP connection, client streams 1, 3, 5 \u2026, and packets that carry frames of several streams at once (interleaving)",
+      "run": [
+        "sh",
+        "-c",
+        "tshark -r ${EVIDENCE}/h2-mux.pcap -o tls.keylog_file:${EVIDENCE}/client-keys.log -Y http2 -T fields -e tcp.stream -e ip.src -e http2.streamid -e http2.type 2>/dev/null | awk '{conns[$1]=1; n=split($3,s,\",\"); split($4,t,\",\"); k=0; delete seen; for(i=1;i<=n;i++){ if (s[i]>0) {ids[s[i]]=1; if(!(s[i] in seen)){seen[s[i]]=1;k++}} } if (k>1) mixed++} END{printf \"TCP connections: %d\\nHTTP/2 streams:\", length(conns); m=0; for (i in ids) if (i+0>m) m=i+0; for (i=1;i<=m;i+=2) if (i in ids) printf \" %d\", i; printf \"\\npackets carrying frames of more than one stream: %d\\n\", mixed}'"
+      ],
+      "save": "h2-mux.txt",
+      "expect_contains": [
+        "TCP connections: 1",
+        "HTTP/2 streams: 1 3 5 7 9 11 13",
+        "packets carrying frames of more than one stream:"
+      ],
+      "expect_absent": [
+        "more than one stream: 0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "HPACK: 100 responses' headers cost 588 bytes over HTTP/2 vs 111 bytes each over HTTP/1.1",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; h2load -n 100 -c 1 -m 10 'https://web.test/obj?size=100' 2>&1 | grep -E 'Application protocol|traffic:'; h2load --h1 -n 100 -c 1 'https://web.test/obj?size=100' 2>&1 | grep -E 'Application protocol|traffic:'"
+      ],
+      "save": "hpack.txt",
+      "expect_contains": [
+        "Application protocol: h2",
+        "space savings",
+        "Application protocol: http/1.1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "nghttp shows the HTTP/2 frames: SETTINGS both ways, the request HEADERS (pseudo-headers), the response HEADERS and DATA",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; nghttp -nv 'https://web.test/obj?size=100' 2>&1 | grep -E 'send|recv|^ +:|SETTINGS_'"
+      ],
+      "save": "nghttp.txt",
+      "expect_contains": [
+        "send SETTINGS frame",
+        "send HEADERS frame",
+        "recv HEADERS frame",
+        "recv DATA frame",
+        ":path: /obj?size=100",
+        "SETTINGS_MAX_CONCURRENT_STREAMS"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "first byte: HTTP/2 needs TCP + TLS + request = 3 round trips; HTTP/3 new = 2, resumed = 2, 0-RTT = 1 (the request rides in the first flight)",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; rm -f ${EVIDENCE}/ticket.pkl; curl -s -o /dev/null --cacert ${EVIDENCE}/ca.pem -w 'HTTP/2: tcp %{time_connect} tls %{time_appconnect} first byte %{time_starttransfer}\\n' 'https://web.test/obj?size=2000'; for z in '' '' --zero-rtt; do ${PYTHON} ${LABS}/http3/h3lab.py get --cacert ${EVIDENCE}/ca.pem --ticket ${EVIDENCE}/ticket.pkl $z 'https://web.test/obj?size=2000' | grep -E '^(stream|handshake)'; done"
+      ],
+      "save": "h3-handshakes.txt",
+      "expect_contains": [
+        "HTTP/2: tcp",
+        "resumed=False, 0-RTT: not sent",
+        "resumed=True, 0-RTT: not sent",
+        "resumed=True, 0-RTT: accepted"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "udp port 443",
+      "decode": [
+        "-nn",
+        "-q"
+      ],
+      "save": "h3-0rtt.pcap",
+      "name": "capture a 0-RTT HTTP/3 request",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; ${PYTHON} ${LABS}/http3/h3lab.py get --cacert ${EVIDENCE}/ca.pem --ticket ${EVIDENCE}/ticket.pkl --zero-rtt 'https://web.test/obj?size=2000' | tail -1"
+        ]
+      },
+      "expect_contains": [
+        "summary: h3, 1 requests"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the client's first flight: an Initial (ClientHello) and a 0-RTT packet (the request) leave together, before any reply",
+      "run": [
+        "sh",
+        "-c",
+        "tshark -r ${EVIDENCE}/h3-0rtt.pcap -T fields -e frame.time_relative -e ip.src -e udp.length -e quic.long.packet_type 2>/dev/null | head -6 | awk '{k=split($4,t,\",\"); n=\"\"; for(i=1;i<=k;i++) n=n (t[i]==0?\" Initial\":t[i]==1?\" 0-RTT\":t[i]==2?\" Handshake\":\" \"t[i]); if (k==0) n=\" 1-RTT (short header)\"; printf \"%8.1f ms  %-15s %5d bytes %s\\n\", $1*1000, $2, $3, n}'"
+      ],
+      "save": "h3-0rtt.txt",
+      "expect_contains": [
+        "1208 bytes  Initial 0-RTT"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "one lost packet (the first resource packet; pathlab drop_big=4): HTTP/2 holds EVERY stream until it is retransmitted; HTTP/3 delivers the others (QPACK's dynamic table can re-create the blocking)",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; for k in 0 4; do ${BIN}/pathlab set -c 198.18.110.1:9911 drop_big=$k >/dev/null; ${BIN}/weblab get -cacert ${EVIDENCE}/ca.pem -proto h2 -page -n 11 'https://web.test/obj?size=3000' | awk '/done/{for(i=1;i<=NF;i++) if($i==\"done\") print $(i+1)}' | awk -v L=\"HTTP/2, drop $k\" '{a[NR]=$1} END{s=\"\"; for(i=2;i<=NR;i++) s=s\" \"a[i]; print L\": page \"a[1]\" ms | resources done at\"s\" ms\"}'; ${BIN}/pathlab set -c 198.18.110.1:9911 drop_big=$k >/dev/null; ${PYTHON} ${LABS}/http3/h3lab.py get --cacert ${EVIDENCE}/ca.pem --page -n 11 'https://web.test/obj?size=3000' | awk '/done/{for(i=1;i<=NF;i++) if($i==\"done\") print $(i+1)}' | sort -n | awk -v L=\"HTTP/3 + QPACK dynamic table, drop $k\" '{a[NR]=$1} END{s=\"\"; for(i=2;i<=NR;i++) s=s\" \"a[i]; print L\": page \"a[1]\" ms | resources done at\"s\" ms\"}'; ${BIN}/pathlab set -c 198.18.110.1:9911 drop_big=$k >/dev/null; ${PYTHON} ${LABS}/http3/h3lab.py get --cacert ${EVIDENCE}/ca.pem --qpack-table 0 --page -n 11 'https://web.test/obj?size=3000' | awk '/done/{for(i=1;i<=NF;i++) if($i==\"done\") print $(i+1)}' | sort -n | awk -v L=\"HTTP/3, no QPACK dynamic table, drop $k\" '{a[NR]=$1} END{s=\"\"; for(i=2;i<=NR;i++) s=s\" \"a[i]; print L\": page \"a[1]\" ms | resources done at\"s\" ms\"}'; done"
+      ],
+      "save": "hol-loss.txt",
+      "expect_contains": [
+        "HTTP/2, drop 4: page",
+        "HTTP/3 + QPACK dynamic table, drop 4: page",
+        "HTTP/3, no QPACK dynamic table, drop 4: page"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "pathlab counted the three targeted drops",
+      "run": [
+        "${BIN}/pathlab",
+        "stats"
+      ],
+      "save": "path-hol.txt",
+      "expect_contains": [
+        "\"dropped_targeted\": 3"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "block UDP 443 on the path, as many firewalls do",
+      "run": [
+        "iptables",
+        "-A",
+        "FORWARD",
+        "-p",
+        "udp",
+        "--dport",
+        "443",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "HTTP/3 gets no answer at all (a browser then uses HTTP/2 over TCP, which still works)",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; ${PYTHON} ${LABS}/http3/h3lab.py get --cacert ${EVIDENCE}/ca.pem --timeout 3 'https://web.test/obj?size=2000'; curl -s -o /dev/null --cacert ${EVIDENCE}/ca.pem -w 'TCP fallback: HTTP/%{http_version} %{http_code}\\n' https://web.test/"
+      ],
+      "save": "udp-blocked.txt",
+      "expect_contains": [
+        "no QUIC connection after 3 s",
+        "TCP fallback: HTTP/2 200"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "unblock UDP 443",
+      "run": [
+        "iptables",
+        "-D",
+        "FORWARD",
+        "-p",
+        "udp",
+        "--dport",
+        "443",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a gRPC call is an HTTP/2 POST: content-type application/grpc, te: trailers, a 5-byte prefix + protobuf; the result is in the TRAILERS",
+      "run": [
+        "${BIN}/weblab",
+        "grpc",
+        "web.test:80",
+        "course.Echo/Echo",
+        "hello"
+      ],
+      "save": "grpc-echo.txt",
+      "expect_contains": [
+        "> POST /course.Echo/Echo",
+        "te: trailers",
+        "> DATA 00 00 00 00 07 0a 05 68 65 6c 6c 6f",
+        "< TRAILERS grpc-status: 0",
+        "status: OK (0)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "grpcurl, the standard client, against the same hand-built server \u2014 cleartext and TLS",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; grpcurl -import-path ${LABS}/grpc -proto echo.proto -plaintext -d '\"hello\"' web.test:80 course.Echo/Echo && grpcurl -import-path ${LABS}/grpc -proto echo.proto -cacert ${EVIDENCE}/ca.pem -d '\"over tls\"' web.test:443 course.Echo/Echo"
+      ],
+      "save": "grpcurl.txt",
+      "expect_contains": [
+        "\"hello\"",
+        "\"over tls\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "an error is still HTTP 200: grpc-status 3 (INVALID_ARGUMENT) in a trailers-only response",
+      "run": [
+        "${BIN}/weblab",
+        "grpc",
+        "web.test:80",
+        "course.Echo/Echo",
+        ""
+      ],
+      "save": "grpc-error.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "< HTTP/2.0 200",
+        "grpc-status: 3",
+        "INVALID_ARGUMENT (3) value must not be empty"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "curl sees only HTTP: 200 OK \u2014 the failure (12, UNIMPLEMENTED) is in grpc-status; HTTP status alone says nothing about a gRPC call",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; curl -s --http2-prior-knowledge -D - -o /dev/null -X POST -H 'content-type: application/grpc' -H 'te: trailers' --data-binary '' http://web.test/course.Echo/Nope | grep -iE '^HTTP|grpc'"
+      ],
+      "save": "grpc-curl.txt",
+      "expect_contains": [
+        "HTTP/2 200",
+        "grpc-status: 12"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "deadlines: grpcurl -max-time 0.5 sends grpc-timeout (what is LEFT of 500 ms after connecting); the server stops when it expires",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; grpcurl -import-path ${LABS}/grpc -proto echo.proto -plaintext -max-time 0.5 -d '\"slow\"' web.test:80 course.Echo/Slow; sleep 0.3; grep -a 'Slow' ${EVIDENCE}/service-server-web.log | tail -2"
+      ],
+      "save": "grpc-deadline.txt",
+      "expect_contains": [
+        "Code: DeadlineExceeded",
+        "grpc Slow(\"slow\") timeout=",
+        "grpc Slow: work stopped after"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "server streaming: five messages on one HTTP/2 stream, 300 ms apart, then the trailers",
+      "run": [
+        "${BIN}/weblab",
+        "grpc",
+        "web.test:80",
+        "course.Echo/Watch",
+        "tick"
+      ],
+      "save": "grpc-stream.txt",
+      "expect_contains": [
+        "< DATA message \"tick 5\"",
+        "status: OK (0)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "no reflection: `grpcurl list` needs the server's reflection service; with the .proto file every call above still works",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; grpcurl -plaintext web.test:80 list"
+      ],
+      "save": "grpc-list.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "server does not support the reflection API"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "through a proxy that forwards over HTTP/1.1 (an ALB target group on HTTP1): the server answers HTTP 505, which gRPC reports as UNKNOWN; over h2c it works",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; grpcurl -import-path ${LABS}/grpc -proto echo.proto -plaintext -d '\"via h1\"' web.test:8080 course.Echo/Echo; ${BIN}/weblab grpc web.test:8080 course.Echo/Echo 'via h1' | tail -2; grpcurl -import-path ${LABS}/grpc -proto echo.proto -plaintext -d '\"via h2c\"' web.test:8083 course.Echo/Echo"
+      ],
+      "save": "grpc-proxy.txt",
+      "expect_contains": [
+        "Code: Unknown",
+        "505 (HTTP Version Not Supported)",
+        "gRPC requires HTTP/2",
+        "\"via h2c\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the WebSocket upgrade: 101 Switching Protocols, Sec-WebSocket-Accept derived from the key; client frames masked (6 bytes of header), server frames not (2)",
+      "run": [
+        "${BIN}/weblab",
+        "ws",
+        "ws://web.test/ws",
+        "hello"
+      ],
+      "save": "ws.txt",
+      "expect_contains": [
+        "> Upgrade: websocket",
+        "< 101 Switching Protocols",
+        "accept checks out",
+        "11 bytes on the wire (2 header + 4 mask + 5 payload)",
+        "7 bytes on the wire, masked=false",
+        "close 1000"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "RFC 6455's own example key gives its documented accept value",
+      "run": [
+        "${BIN}/weblab",
+        "accept",
+        "dGhlIHNhbXBsZSBub25jZQ=="
+      ],
+      "expect_contains": [
+        "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "through a relay with a 5 s idle timeout (a load balancer), a quiet WebSocket is cut after 5 s",
+      "run": [
+        "${BIN}/weblab",
+        "ws",
+        "-hold",
+        "8s",
+        "ws://web.test:8081/ws",
+        "hi"
+      ],
+      "save": "ws-idle.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "connection closed by the peer after 5"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same, with a ping every 2 s: the connection survives",
+      "run": [
+        "${BIN}/weblab",
+        "ws",
+        "-hold",
+        "8s",
+        "-ping",
+        "2s",
+        "ws://web.test:8081/ws",
+        "hi"
+      ],
+      "save": "ws-ping.txt",
+      "expect_contains": [
+        "< pong at",
+        "still open after 8s"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "server-sent events: one event every 500 ms on a plain HTTP response; reconnecting with Last-Event-ID resumes after it",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; ${BIN}/weblab sse -cacert ${EVIDENCE}/ca.pem 'https://web.test/events?n=3&every=500ms'; ${BIN}/weblab sse -cacert ${EVIDENCE}/ca.pem -last-id 3 'https://web.test/events?n=2&every=500ms'"
+      ],
+      "save": "sse.txt",
+      "expect_contains": [
+        "content-type text/event-stream",
+        "id 1",
+        "id 3",
+        "id 4",
+        "id 5"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "through a proxy that buffers responses, the same events arrive together at the end",
+      "run": [
+        "${BIN}/weblab",
+        "sse",
+        "http://web.test:8082/events?n=3&every=500ms"
+      ],
+      "save": "sse-buffered.txt",
+      "expect_contains": [
+        "id 3",
+        "stream ended after"
+      ]
+    }
+  ],
+  "requires": {
+    "grpcurl": "install grpcurl 1.9+ from https://github.com/fullstorydev/grpcurl/releases",
+    "h2load": "apt-get install nghttp2-client",
+    "nghttp": "apt-get install nghttp2-client",
+    "tshark": "apt-get install tshark",
+    "${PYTHON}": "create the course venv: python3 -m venv .venv && .venv/bin/pip install -r labs/requirements.txt (HTTP/3 needs aioquic)"
+  }
+}

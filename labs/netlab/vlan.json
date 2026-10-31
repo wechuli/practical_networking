@@ -1,0 +1,28 @@
+{
+  "name": "vlan",
+  "description": "802.1Q on a VLAN-aware bridge: a tagged port and an access port share VLAN 10; VLAN 20 is isolated",
+  "nodes": [
+    { "name": "switch", "bridges": [ { "name": "br0", "vlan_filtering": true } ] },
+    { "name": "tagged", "vlans": [ { "name": "eth0.10", "parent": "eth0", "id": 10, "addr": ["10.42.10.1/24"] } ] },
+    { "name": "access" },
+    { "name": "other" }
+  ],
+  "links": [
+    { "a": { "node": "tagged", "if": "eth0" },
+      "b": { "node": "switch", "if": "tagged", "bridge": "br0", "vlans": [ { "vid": 10 } ] } },
+    { "a": { "node": "access", "if": "eth0", "addr": ["10.42.10.2/24"] },
+      "b": { "node": "switch", "if": "access", "bridge": "br0", "vlans": [ { "vid": 10, "pvid": true, "untagged": true } ] } },
+    { "a": { "node": "other", "if": "eth0", "addr": ["10.42.10.3/24"] },
+      "b": { "node": "switch", "if": "other", "bridge": "br0", "vlans": [ { "vid": 20, "pvid": true, "untagged": true } ] } }
+  ],
+  "checks": [
+    { "type": "ping", "from": "tagged", "to": "10.42.10.2", "expect": "reachable",
+      "name": "tagged host (VLAN 10 on eth0.10) reaches the access host on VLAN 10" },
+    { "type": "ping", "from": "tagged", "to": "10.42.10.3", "expect": "unreachable",
+      "name": "same subnet, different VLAN: the host on VLAN 20 is unreachable" },
+    { "type": "command", "node": "switch", "run": ["bridge", "vlan", "show"], "save": "vlans.txt",
+      "name": "VLAN membership per bridge port" },
+    { "type": "command", "node": "switch", "run": ["bridge", "fdb", "show", "br", "br0"], "save": "fdb.txt",
+      "name": "forwarding database entries carry their VLAN" }
+  ]
+}

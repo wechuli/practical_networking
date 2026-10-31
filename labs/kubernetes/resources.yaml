@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: nginx:1.28-alpine
+          ports:
+            - { name: http, containerPort: 80 }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 2
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector: { app: web }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: allowed
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: denied
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: allowed
+  labels: { role: allowed }
+spec:
+  serviceAccountName: allowed
+  containers:
+    - name: client
+      image: curlimages/curl:8.12.1
+      command: [sleep, "3600"]
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits: { cpu: 100m, memory: 64Mi }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: denied
+  labels: { role: denied }
+spec:
+  serviceAccountName: denied
+  containers:
+    - name: client
+      image: curlimages/curl:8.12.1
+      command: [sleep, "3600"]
+      resources:
+        requests: { cpu: 10m, memory: 16Mi }
+        limits: { cpu: 100m, memory: 64Mi }

@@ -1,0 +1,1148 @@
+{
+  "name": "k8s",
+  "description": "The Kubernetes network model on two namespace 'nodes': pods on per-node bridges with flannel-style VXLAN between nodes (no NAT pod to pod, VXLAN on the wire, 1450 MTU), pod egress masquerade, Services implemented by kube-proxy's iptables rules (written by kproxy), load spreading, an unpingable ClusterIP, hairpin mode, NodePort with externalTrafficPolicy Cluster vs Local, no endpoints (REJECT, refused) vs a policy drop (timeout), and cluster DNS with ndots:5 (query amplification by resolver)",
+  "nodes": [
+    {
+      "name": "lan",
+      "bridges": [
+        {
+          "name": "br0"
+        }
+      ]
+    },
+    {
+      "name": "node1",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "192.168.50.100"
+        }
+      ],
+      "bridges": [
+        {
+          "name": "cni0",
+          "addr": [
+            "10.244.1.1/24"
+          ]
+        }
+      ],
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.default.rp_filter": "0"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "modprobe br_netfilter 2>/dev/null; sysctl -qw net.bridge.bridge-nf-call-iptables=1"
+        ],
+        [
+          "sh",
+          "-c",
+          "ip link add flannel.1 type vxlan id 1 local 192.168.50.11 dev eth0 dstport 8472 nolearning && ip link set flannel.1 address 0a:00:00:00:01:01 mtu 1450 && ip link set flannel.1 up && ip addr add 10.244.1.0/32 dev flannel.1 && ip route add 10.244.2.0/24 via 10.244.2.0 dev flannel.1 onlink && ip neigh add 10.244.2.0 lladdr 0a:00:00:00:02:01 dev flannel.1 nud permanent && bridge fdb append 0a:00:00:00:02:01 dev flannel.1 dst 192.168.50.12"
+        ],
+        [
+          "sh",
+          "-c",
+          "iptables -t nat -N FLANNEL-POSTRTG && iptables -t nat -A POSTROUTING -j FLANNEL-POSTRTG && iptables -t nat -A FLANNEL-POSTRTG -s 10.244.0.0/16 -d 10.244.0.0/16 -j RETURN && iptables -t nat -A FLANNEL-POSTRTG -s 10.244.0.0/16 ! -d 224.0.0.0/4 -j MASQUERADE --random-fully"
+        ],
+        [
+          "${BIN}/kproxy",
+          "sync",
+          "-f",
+          "${LABS}/kubernetes/services.json",
+          "-node",
+          "node1"
+        ]
+      ]
+    },
+    {
+      "name": "node2",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "192.168.50.100"
+        }
+      ],
+      "bridges": [
+        {
+          "name": "cni0",
+          "addr": [
+            "10.244.2.1/24"
+          ]
+        }
+      ],
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.default.rp_filter": "0"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "modprobe br_netfilter 2>/dev/null; sysctl -qw net.bridge.bridge-nf-call-iptables=1"
+        ],
+        [
+          "sh",
+          "-c",
+          "ip link add flannel.1 type vxlan id 1 local 192.168.50.12 dev eth0 dstport 8472 nolearning && ip link set flannel.1 address 0a:00:00:00:02:01 mtu 1450 && ip link set flannel.1 up && ip addr add 10.244.2.0/32 dev flannel.1 && ip route add 10.244.1.0/24 via 10.244.1.0 dev flannel.1 onlink && ip neigh add 10.244.1.0 lladdr 0a:00:00:00:01:01 dev flannel.1 nud permanent && bridge fdb append 0a:00:00:00:01:01 dev flannel.1 dst 192.168.50.11"
+        ],
+        [
+          "sh",
+          "-c",
+          "iptables -t nat -N FLANNEL-POSTRTG && iptables -t nat -A POSTROUTING -j FLANNEL-POSTRTG && iptables -t nat -A FLANNEL-POSTRTG -s 10.244.0.0/16 -d 10.244.0.0/16 -j RETURN && iptables -t nat -A FLANNEL-POSTRTG -s 10.244.0.0/16 ! -d 224.0.0.0/4 -j MASQUERADE --random-fully"
+        ],
+        [
+          "${BIN}/kproxy",
+          "sync",
+          "-f",
+          "${LABS}/kubernetes/services.json",
+          "-node",
+          "node2"
+        ]
+      ]
+    },
+    {
+      "name": "web1",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "10.244.1.1"
+        }
+      ],
+      "files": {
+        "/etc/resolv.conf": "search default.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.96.0.10\noptions ndots:5\n"
+      },
+      "services": [
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "",
+            "-plain",
+            ":8080",
+            "-id",
+            "web1"
+          ],
+          "port": 8080
+        }
+      ]
+    },
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "10.244.1.1"
+        }
+      ],
+      "files": {
+        "/etc/resolv.conf": "search default.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.96.0.10\noptions ndots:5\n"
+      }
+    },
+    {
+      "name": "web2",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "10.244.2.1"
+        }
+      ],
+      "files": {
+        "/etc/resolv.conf": "search default.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.96.0.10\noptions ndots:5\n"
+      },
+      "services": [
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "",
+            "-plain",
+            ":8080",
+            "-id",
+            "web2"
+          ],
+          "port": 8080
+        }
+      ]
+    },
+    {
+      "name": "coredns",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "10.244.2.1"
+        }
+      ],
+      "files": {
+        "/etc/resolv.conf": "search default.svc.cluster.local svc.cluster.local cluster.local\nnameserver 10.96.0.10\noptions ndots:5\n"
+      },
+      "services": [
+        {
+          "name": "dns",
+          "run": [
+            "dnsmasq",
+            "-k",
+            "-u",
+            "root",
+            "--no-resolv",
+            "--no-hosts",
+            "--listen-address=10.244.2.3",
+            "--bind-interfaces",
+            "--server=192.168.50.100",
+            "--local=/cluster.local/",
+            "--no-negcache",
+            "--cache-size=0",
+            "--host-record=web.default.svc.cluster.local,10.96.0.20",
+            "--host-record=kube-dns.kube-system.svc.cluster.local,10.96.0.10",
+            "--log-queries",
+            "--log-facility=${EVIDENCE}/coredns.log"
+          ],
+          "udp_port": 53
+        }
+      ]
+    },
+    {
+      "name": "external",
+      "services": [
+        {
+          "name": "upstream-dns",
+          "run": [
+            "dnsmasq",
+            "-k",
+            "-u",
+            "root",
+            "--no-resolv",
+            "--no-hosts",
+            "--listen-address=192.168.50.100",
+            "--bind-interfaces",
+            "--local=/example.com/",
+            "--host-record=api.example.com,192.168.50.200",
+            "--log-queries",
+            "--log-facility=${EVIDENCE}/upstream-dns.log"
+          ],
+          "udp_port": 53
+        },
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "",
+            "-plain",
+            "192.168.50.100:8080",
+            "-id",
+            "external"
+          ],
+          "port": 8080
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "node1",
+        "if": "eth0",
+        "addr": [
+          "192.168.50.11/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p-node1",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "node2",
+        "if": "eth0",
+        "addr": [
+          "192.168.50.12/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p-node2",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "external",
+        "if": "eth0",
+        "addr": [
+          "192.168.50.100/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p-ext",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "web1",
+        "if": "eth0",
+        "addr": [
+          "10.244.1.2/24"
+        ],
+        "mtu": 1450
+      },
+      "b": {
+        "node": "node1",
+        "if": "veth-web1",
+        "bridge": "cni0",
+        "mtu": 1450
+      }
+    },
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "10.244.1.3/24"
+        ],
+        "mtu": 1450
+      },
+      "b": {
+        "node": "node1",
+        "if": "veth-client",
+        "bridge": "cni0",
+        "mtu": 1450
+      }
+    },
+    {
+      "a": {
+        "node": "web2",
+        "if": "eth0",
+        "addr": [
+          "10.244.2.2/24"
+        ],
+        "mtu": 1450
+      },
+      "b": {
+        "node": "node2",
+        "if": "veth-web2",
+        "bridge": "cni0",
+        "mtu": 1450
+      }
+    },
+    {
+      "a": {
+        "node": "coredns",
+        "if": "eth0",
+        "addr": [
+          "10.244.2.3/24"
+        ],
+        "mtu": 1450
+      },
+      "b": {
+        "node": "node2",
+        "if": "veth-coredns",
+        "bridge": "cni0",
+        "mtu": 1450
+      }
+    }
+  ],
+  "requires": {
+    "dnsmasq": "apt-get install dnsmasq-base",
+    "conntrack": "apt-get install conntrack",
+    "curl": "apt-get install curl",
+    "tcpdump": "apt-get install tcpdump"
+  },
+  "checks": [
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a pod: one interface, MTU 1450 (VXLAN's 50 bytes come off 1500), default route to its node's bridge",
+      "run": [
+        "sh",
+        "-c",
+        "ip -4 -o addr show eth0; ip link show eth0 | grep -o 'mtu [0-9]*'; ip route"
+      ],
+      "save": "pod.txt",
+      "expect_contains": [
+        "10.244.1.3/24",
+        "mtu 1450",
+        "default via 10.244.1.1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "pod to pod across nodes, no NAT: web2 sees the client pod's own address",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://10.244.2.2:8080/"
+      ],
+      "save": "pod-to-pod.txt",
+      "expect_contains": [
+        "from 10.244.1.3:",
+        "served-by web2"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "node1",
+      "if": "eth0",
+      "filter": "udp port 8472",
+      "decode": [
+        "-nn",
+        "-T",
+        "vxlan"
+      ],
+      "save": "vxlan.pcap",
+      "name": "on the wire between nodes: VXLAN (UDP 8472) between node addresses, carrying the pod-to-pod packet",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "curl -s -m 3 --noproxy '*' http://10.244.2.2:8080/ >/dev/null"
+        ]
+      },
+      "expect_contains": [
+        "192.168.50.11.",
+        "> 192.168.50.12.8472: VXLAN",
+        "10.244.1.3.",
+        "> 10.244.2.2.8080:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "how node1 reaches node2's pods: a route via node2's VTEP address on flannel.1, a static neighbour and a forwarding entry pointing at node2",
+      "run": [
+        "sh",
+        "-c",
+        "ip route show 10.244.2.0/24; ip neigh show dev flannel.1; bridge fdb show dev flannel.1; ip -d link show flannel.1 | grep -o 'vxlan id 1.*dstport 8472'"
+      ],
+      "save": "flannel.txt",
+      "expect_contains": [
+        "10.244.2.0/24 via 10.244.2.0 dev flannel.1 onlink",
+        "lladdr 0a:00:00:00:02:01",
+        "dst 192.168.50.12",
+        "vxlan id 1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "node to remote pod: also no NAT, but the source is node1's flannel.1 address",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://10.244.2.2:8080/"
+      ],
+      "save": "node-to-pod.txt",
+      "expect_contains": [
+        "from 10.244.1.0:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the 1450 MTU: a 1422-byte DF ping crosses nodes, 1423 does not even leave the pod",
+      "run": [
+        "sh",
+        "-c",
+        "ping -c1 -W2 -M do -s 1422 10.244.2.2 | grep -E 'bytes from|loss'; ping -c1 -W2 -M do -s 1423 10.244.2.2 2>&1 | grep -E 'too long|loss' | head -1"
+      ],
+      "save": "mtu.txt",
+      "expect_contains": [
+        "1430 bytes from 10.244.2.2",
+        "message too long"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "pod egress to a non-cluster address is masqueraded to the node (flannel's rule): the outside sees 192.168.50.11",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://192.168.50.100:8080/"
+      ],
+      "save": "egress.txt",
+      "expect_contains": [
+        "from 192.168.50.11:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "kube-proxy's rules for the web Service: KUBE-SERVICES \u2192 KUBE-SVC (one random choice per endpoint) \u2192 KUBE-SEP (DNAT)",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -t nat -S | grep -E 'default/web' | grep -E 'KUBE-SERVICES|KUBE-SVC|KUBE-SEP' "
+      ],
+      "save": "kube-proxy-rules.txt",
+      "expect_contains": [
+        "-A KUBE-SERVICES -d 10.96.0.20/32 -p tcp",
+        "--probability 0.50000000000",
+        "-j DNAT --to-destination 10.244.1.2:8080",
+        "-j DNAT --to-destination 10.244.2.2:8080"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "40 requests to the ClusterIP spread over both endpoints (iptables picks at random per connection)",
+      "run": [
+        "sh",
+        "-c",
+        "for i in $(seq 40); do curl -s -m 3 --noproxy '*' http://10.96.0.20/; done | grep -o 'served-by web[12]' | sort | uniq -c"
+      ],
+      "save": "spread.txt",
+      "expect_contains": [
+        "served-by web1",
+        "served-by web2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "conntrack holds each connection's choice: destination 10.96.0.20:80, reply from the pod",
+      "run": [
+        "sh",
+        "-c",
+        "conntrack -L -p tcp --orig-dst 10.96.0.20 2>/dev/null | head -2"
+      ],
+      "save": "conntrack.txt",
+      "expect_contains": [
+        "dst=10.96.0.20",
+        "dport=80",
+        "sport=8080"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a ClusterIP is not an address anywhere: ping gets nothing (only TCP port 80 is translated)",
+      "run": [
+        "sh",
+        "-c",
+        "ip -4 addr | grep -c 10.96 ; ping -c1 -W2 10.96.0.20"
+      ],
+      "save": "ping-vip.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "100% packet loss"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "hairpin mode is off on web1's bridge port",
+      "run": [
+        "sh",
+        "-c",
+        "bridge -d link show dev veth-web1 | grep -o 'hairpin [a-z]*'"
+      ],
+      "expect_contains": [
+        "hairpin off"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "web1",
+      "name": "without it, a pod calling its own Service fails whenever the SYN is sent to the pod itself; the dropped SYN never confirms its conntrack entry, so the retransmission is balanced again",
+      "run": [
+        "sh",
+        "-c",
+        "for i in $(seq 30); do curl -s -m 3 --noproxy '*' -m 2 -o /dev/null -w '%{http_code} %{time_total}\\n' http://10.96.0.20/; done | awk '{ if ($1==\"000\") f++; else if ($2>0.5) s++; else q++ } END {printf \"fast %d, slow (retransmitted SYN, re-balanced) %d, failed (both SYNs picked itself) %d\\nself-picked at least once: %d\\n\", q, s, f, s+f}'"
+      ],
+      "save": "hairpin-off.txt",
+      "expect_contains": [
+        "fast ",
+        "failed (both SYNs picked itself)"
+      ],
+      "expect_absent": [
+        "self-picked at least once: 0\n"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "kubelet's --hairpin-mode=hairpin-veth turns it on",
+      "run": [
+        "bridge",
+        "link",
+        "set",
+        "dev",
+        "veth-web1",
+        "hairpin",
+        "on"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "web1",
+      "name": "now every call works; when it lands on itself, the source is the bridge (KUBE-MARK-MASQ in the SEP chain)",
+      "run": [
+        "sh",
+        "-c",
+        "for i in $(seq 12); do curl -s -m 3 --noproxy '*' http://10.96.0.20/; done | sed 's/:[0-9]* / /' | sort | uniq -c"
+      ],
+      "save": "hairpin-on.txt",
+      "expect_contains": [
+        "from 10.244.1.1 served-by web1"
+      ],
+      "expect_absent": [
+        " 000"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "external",
+      "name": "NodePort, externalTrafficPolicy Cluster: any node forwards to any endpoint, and SNATs \u2014 the backend never sees the client",
+      "run": [
+        "sh",
+        "-c",
+        "for i in $(seq 8); do curl -s -m 3 --noproxy '*' http://192.168.50.11:30080/; done | sed 's/:[0-9]* / /' | sort | uniq -c"
+      ],
+      "save": "nodeport-cluster.txt",
+      "expect_absent": [
+        "from 192.168.50.100"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "external",
+      "name": "prepare externalTrafficPolicy: Local",
+      "run": [
+        "sh",
+        "-c",
+        "python3 -c \"import json; s=json.load(open('${LABS}/kubernetes/services.json')); s['services'][0]['externalTrafficPolicy']='Local'; json.dump(s, open('${EVIDENCE}/local.json','w'))\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "kube-proxy on node1 syncs from ${EVIDENCE}/local.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${EVIDENCE}/local.json",
+        "-node",
+        "node1"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "kube-proxy on node2 syncs from ${EVIDENCE}/local.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${EVIDENCE}/local.json",
+        "-node",
+        "node2"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "external",
+      "name": "Local: each node sends only to its own endpoint, without SNAT \u2014 the client address survives",
+      "run": [
+        "sh",
+        "-c",
+        "for i in 1 2 3; do curl -s -m 3 --noproxy '*' http://192.168.50.11:30080/; curl -s -m 3 --noproxy '*' http://192.168.50.12:30080/; done | sed 's/:[0-9]* / /' | sort | uniq -c"
+      ],
+      "save": "nodeport-local.txt",
+      "expect_contains": [
+        "from 192.168.50.100 served-by web1",
+        "from 192.168.50.100 served-by web2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "external",
+      "name": "scale web to a single pod on node2 (Local)",
+      "run": [
+        "sh",
+        "-c",
+        "python3 -c \"import json; s=json.load(open('${LABS}/kubernetes/services.json')); s['services'][0]['externalTrafficPolicy']='Local'; s['services'][0]['endpoints']=[e for e in s['services'][0]['endpoints'] if e['node']=='node2']; json.dump(s, open('${EVIDENCE}/local-node2.json','w'))\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "kube-proxy on node1 syncs from ${EVIDENCE}/local-node2.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${EVIDENCE}/local-node2.json",
+        "-node",
+        "node1"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "kube-proxy on node2 syncs from ${EVIDENCE}/local-node2.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${EVIDENCE}/local-node2.json",
+        "-node",
+        "node2"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "external",
+      "name": "node1 has no local endpoint: its NodePort drops (a load balancer's health check must stop sending there) \u2014 node2 still answers",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(date +%s%N); curl -s -m 3 --noproxy '*' http://192.168.50.11:30080/; r=$?; e=$(( ($(date +%s%N) - s) / 1000000 )); echo \"exit $r after $e ms\"; curl -s -m 3 --noproxy '*' http://192.168.50.12:30080/"
+      ],
+      "save": "nodeport-local-drop.txt",
+      "expect_contains": [
+        "exit 28 after",
+        "from 192.168.50.100:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "the rule that does it",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -S KUBE-EXTERNAL-SERVICES"
+      ],
+      "expect_contains": [
+        "has no local endpoints",
+        "-j DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "external",
+      "name": "scale web to zero",
+      "run": [
+        "sh",
+        "-c",
+        "python3 -c \"import json; s=json.load(open('${LABS}/kubernetes/services.json')); s['services'][0]['endpoints']=[]; json.dump(s, open('${EVIDENCE}/zero.json','w'))\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "kube-proxy on node1 syncs from ${EVIDENCE}/zero.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${EVIDENCE}/zero.json",
+        "-node",
+        "node1"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "kube-proxy on node2 syncs from ${EVIDENCE}/zero.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${EVIDENCE}/zero.json",
+        "-node",
+        "node2"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "no endpoints: kube-proxy REJECTs, so the client is refused at once",
+      "run": [
+        "${BIN}/tcplab",
+        "dial",
+        "-to",
+        "10.96.0.20:80",
+        "-timeout",
+        "3s"
+      ],
+      "save": "no-endpoints.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "refused"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "the REJECT rule",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -S KUBE-SERVICES | grep 'has no endpoints'"
+      ],
+      "expect_contains": [
+        "default/web:http has no endpoints",
+        "REJECT --reject-with icmp-port-unreachable"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "kube-proxy on node1 syncs from ${LABS}/kubernetes/services.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${LABS}/kubernetes/services.json",
+        "-node",
+        "node1"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "kube-proxy on node2 syncs from ${LABS}/kubernetes/services.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${LABS}/kubernetes/services.json",
+        "-node",
+        "node2"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "a NetworkPolicy denying ingress to web2 becomes a DROP on web2's node (what a policy engine installs)",
+      "run": [
+        "iptables",
+        "-I",
+        "FORWARD",
+        "-d",
+        "10.244.2.2/32",
+        "-p",
+        "tcp",
+        "--dport",
+        "8080",
+        "-m",
+        "conntrack",
+        "--ctstate",
+        "NEW",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "policy drop: the same kind of call now hangs until the client gives up",
+      "run": [
+        "${BIN}/tcplab",
+        "dial",
+        "-to",
+        "10.244.2.2:8080",
+        "-timeout",
+        "3s"
+      ],
+      "save": "policy-drop.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "gave up"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "remove the policy",
+      "run": [
+        "iptables",
+        "-D",
+        "FORWARD",
+        "-d",
+        "10.244.2.2/32",
+        "-p",
+        "tcp",
+        "--dport",
+        "8080",
+        "-m",
+        "conntrack",
+        "--ctstate",
+        "NEW",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the pod's resolv.conf: the cluster DNS Service, three search domains, ndots:5",
+      "run": [
+        "cat",
+        "/etc/resolv.conf"
+      ],
+      "save": "resolv.txt",
+      "expect_contains": [
+        "nameserver 10.96.0.10",
+        "search default.svc.cluster.local svc.cluster.local cluster.local",
+        "options ndots:5"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a short Service name resolves on the first search domain (through the kube-dns ClusterIP)",
+      "run": [
+        "sh",
+        "-c",
+        ": > ${EVIDENCE}/coredns.log; getent ahosts web >/dev/null 2>&1; sleep 0.3; echo \"getent ahosts web: $(grep -c 'query\\[' ${EVIDENCE}/coredns.log) queries\"; grep -o 'query\\[[A-Z]*\\] [^ ]*' ${EVIDENCE}/coredns.log | sed 's/^/  /'"
+      ],
+      "save": "dns-short.txt",
+      "expect_contains": [
+        "1 queries",
+        "web.default.svc.cluster.local"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "an external name with fewer than 5 dots walks the whole search list first: glibc on an IPv4-only pod asks only A (AI_ADDRCONFIG) \u2014 4 queries",
+      "run": [
+        "sh",
+        "-c",
+        ": > ${EVIDENCE}/coredns.log; getent ahosts api.example.com >/dev/null 2>&1; sleep 0.3; echo \"getent ahosts api.example.com: $(grep -c 'query\\[' ${EVIDENCE}/coredns.log) queries\"; grep -o 'query\\[[A-Z]*\\] [^ ]*' ${EVIDENCE}/coredns.log | sed 's/^/  /'"
+      ],
+      "save": "dns-glibc.txt",
+      "expect_contains": [
+        "4 queries",
+        "api.example.com.default.svc.cluster.local",
+        "query[A] api.example.com"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "Go's resolver asks A and AAAA for every name \u2014 8 queries for the same lookup",
+      "run": [
+        "sh",
+        "-c",
+        ": > ${EVIDENCE}/coredns.log; ${BIN}/dnslab lookup api.example.com >/dev/null 2>&1; sleep 0.3; echo \"Go lookup api.example.com: $(grep -c 'query\\[' ${EVIDENCE}/coredns.log) queries\"; grep -o 'query\\[[A-Z]*\\] [^ ]*' ${EVIDENCE}/coredns.log | sed 's/^/  /'"
+      ],
+      "save": "dns-go.txt",
+      "expect_contains": [
+        "8 queries",
+        "query[AAAA] api.example.com.svc.cluster.local"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a trailing dot makes the name absolute: one query",
+      "run": [
+        "sh",
+        "-c",
+        ": > ${EVIDENCE}/coredns.log; getent ahosts api.example.com. >/dev/null 2>&1; sleep 0.3; echo \"getent ahosts api.example.com.: $(grep -c 'query\\[' ${EVIDENCE}/coredns.log) queries\"; grep -o 'query\\[[A-Z]*\\] [^ ]*' ${EVIDENCE}/coredns.log | sed 's/^/  /'"
+      ],
+      "save": "dns-fqdn.txt",
+      "expect_contains": [
+        "1 queries"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "CoreDNS (here dnsmasq) answers cluster names itself and forwards the rest: the upstream saw only the real name, from node2's address",
+      "run": [
+        "sh",
+        "-c",
+        "grep -o 'query\\[A\\] api.example.com from [0-9.]*' ${EVIDENCE}/upstream-dns.log | sort -u"
+      ],
+      "save": "dns-upstream.txt",
+      "expect_contains": [
+        "query[A] api.example.com from 192.168.50.12"
+      ],
+      "expect_absent": [
+        "cluster.local"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "external",
+      "name": "DNS failure signatures, 1: kube-dns with no endpoints",
+      "run": [
+        "sh",
+        "-c",
+        "python3 -c \"import json; s=json.load(open('${LABS}/kubernetes/services.json')); s['services'][1]['endpoints']=[]; json.dump(s, open('${EVIDENCE}/nodns.json','w'))\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "kube-proxy on node1 syncs from ${EVIDENCE}/nodns.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${EVIDENCE}/nodns.json",
+        "-node",
+        "node1"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "kube-proxy on node2 syncs from ${EVIDENCE}/nodns.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${EVIDENCE}/nodns.json",
+        "-node",
+        "node2"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the REJECT comes back as ICMP port unreachable and the lookup fails in milliseconds",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(date +%s%N); getent hosts web; r=$?; e=$(( ($(date +%s%N) - s) / 1000000 )); echo \"exit $r after $e ms\""
+      ],
+      "save": "dns-noendpoints.txt",
+      "expect_contains": [
+        "exit 2 after"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node1",
+      "name": "kube-proxy on node1 syncs from ${LABS}/kubernetes/services.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${LABS}/kubernetes/services.json",
+        "-node",
+        "node1"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "kube-proxy on node2 syncs from ${LABS}/kubernetes/services.json",
+      "run": [
+        "${BIN}/kproxy",
+        "sync",
+        "-f",
+        "${LABS}/kubernetes/services.json",
+        "-node",
+        "node2"
+      ],
+      "expect_contains": [
+        "synced"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "2: a policy that drops DNS to the CoreDNS pod",
+      "run": [
+        "iptables",
+        "-I",
+        "FORWARD",
+        "-d",
+        "10.244.2.3/32",
+        "-p",
+        "udp",
+        "--dport",
+        "53",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a drop costs glibc's timeout (5 s) \u00d7 attempts (2) for each of the 4 names on the search list: 40 s before the error",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(date +%s%N); getent hosts web; r=$?; e=$(( ($(date +%s%N) - s) / 1000000 )); echo \"exit $r after $e ms\""
+      ],
+      "save": "dns-dropped.txt",
+      "expect_contains": [
+        "exit 2 after 40"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "node2",
+      "name": "remove it",
+      "run": [
+        "iptables",
+        "-D",
+        "FORWARD",
+        "-d",
+        "10.244.2.3/32",
+        "-p",
+        "udp",
+        "--dport",
+        "53",
+        "-j",
+        "DROP"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,462 @@
+{
+  "name": "ospf",
+  "description": "Dynamic routing with FRR OSPF: adjacencies, ECMP from equal costs, and convergence after a silent failure vs a link-down",
+  "nodes": [
+    {
+      "name": "r1",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/r1",
+          "/etc/frr/r1"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/r1/vtysh.conf && printf 'interface eth1\\n ip ospf network point-to-point\\n ip ospf hello-interval 1\\n ip ospf dead-interval 4\\ninterface eth2\\n ip ospf network point-to-point\\n ip ospf hello-interval 1\\n ip ospf dead-interval 4\\nrouter ospf\\n ospf router-id 10.0.0.1\\n network 198.18.20.0/22 area 0\\n network 198.18.24.0/22 area 0\\n passive-interface eth0\\n' > /etc/frr/r1/ospfd.conf && chown frr:frr /etc/frr/r1/ospfd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "r1",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "ospfd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/ospfd -N r1 -f /etc/frr/r1/ospfd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "r2",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/r2",
+          "/etc/frr/r2"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/r2/vtysh.conf && printf 'interface eth0\\n ip ospf network point-to-point\\n ip ospf hello-interval 1\\n ip ospf dead-interval 4\\ninterface eth1\\n ip ospf network point-to-point\\n ip ospf hello-interval 1\\n ip ospf dead-interval 4\\nrouter ospf\\n ospf router-id 10.0.0.2\\n network 198.18.20.0/22 area 0\\n network 198.18.24.0/22 area 0\\n' > /etc/frr/r2/ospfd.conf && chown frr:frr /etc/frr/r2/ospfd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "r2",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "ospfd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/ospfd -N r2 -f /etc/frr/r2/ospfd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "r3",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/r3",
+          "/etc/frr/r3"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/r3/vtysh.conf && printf 'interface eth0\\n ip ospf network point-to-point\\n ip ospf hello-interval 1\\n ip ospf dead-interval 4\\ninterface eth1\\n ip ospf network point-to-point\\n ip ospf hello-interval 1\\n ip ospf dead-interval 4\\nrouter ospf\\n ospf router-id 10.0.0.3\\n network 198.18.20.0/22 area 0\\n network 198.18.24.0/22 area 0\\n' > /etc/frr/r3/ospfd.conf && chown frr:frr /etc/frr/r3/ospfd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "r3",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "ospfd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/ospfd -N r3 -f /etc/frr/r3/ospfd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "r4",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/r4",
+          "/etc/frr/r4"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/r4/vtysh.conf && printf 'interface eth0\\n ip ospf network point-to-point\\n ip ospf hello-interval 1\\n ip ospf dead-interval 4\\ninterface eth1\\n ip ospf network point-to-point\\n ip ospf hello-interval 1\\n ip ospf dead-interval 4\\nrouter ospf\\n ospf router-id 10.0.0.4\\n network 198.18.20.0/22 area 0\\n network 198.18.24.0/22 area 0\\n passive-interface eth2\\n' > /etc/frr/r4/ospfd.conf && chown frr:frr /etc/frr/r4/ospfd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "r4",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "ospfd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/ospfd -N r4 -f /etc/frr/r4/ospfd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ha",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.21.1"
+        }
+      ]
+    },
+    {
+      "name": "hb",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.26.1"
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "ha",
+        "if": "eth0",
+        "addr": [
+          "198.18.21.10/24"
+        ]
+      },
+      "b": {
+        "node": "r1",
+        "if": "eth0",
+        "addr": [
+          "198.18.21.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r1",
+        "if": "eth1",
+        "addr": [
+          "198.18.22.1/24"
+        ]
+      },
+      "b": {
+        "node": "r2",
+        "if": "eth0",
+        "addr": [
+          "198.18.22.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r1",
+        "if": "eth2",
+        "addr": [
+          "198.18.23.1/24"
+        ]
+      },
+      "b": {
+        "node": "r3",
+        "if": "eth0",
+        "addr": [
+          "198.18.23.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r2",
+        "if": "eth1",
+        "addr": [
+          "198.18.24.1/24"
+        ]
+      },
+      "b": {
+        "node": "r4",
+        "if": "eth0",
+        "addr": [
+          "198.18.24.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r3",
+        "if": "eth1",
+        "addr": [
+          "198.18.25.1/24"
+        ]
+      },
+      "b": {
+        "node": "r4",
+        "if": "eth1",
+        "addr": [
+          "198.18.25.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r4",
+        "if": "eth2",
+        "addr": [
+          "198.18.26.1/24"
+        ]
+      },
+      "b": {
+        "node": "hb",
+        "if": "eth0",
+        "addr": [
+          "198.18.26.10/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "OSPF adjacencies come up on both router links (hello 1 s, dead 4 s, point-to-point)",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N r1 -c 'show ip ospf neighbor'; echo \"full adjacencies: $(vtysh -N r1 -c 'show ip ospf neighbor' | grep -c Full)\""
+      ],
+      "save": "r1-neighbors.txt",
+      "timeout": "40s",
+      "expect_contains": [
+        "full adjacencies: 2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "r1 learned hb's network from OSPF, with two equal-cost next hops",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N r1 -c 'show ip route 198.18.26.0/24'; ip route show 198.18.26.0/24"
+      ],
+      "save": "r1-route.txt",
+      "timeout": "20s",
+      "expect_contains": [
+        "Known via \"ospf\"",
+        "proto ospf",
+        "nexthop via 198.18.22.2 dev eth1",
+        "nexthop via 198.18.23.2 dev eth2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "the OSPF view: the route, its cost, and its two next hops",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N r1 -c 'show ip ospf route'"
+      ],
+      "save": "r1-ospf.txt",
+      "expect_contains": [
+        "198.18.26.0/24",
+        "via 198.18.22.2",
+        "via 198.18.23.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "ha",
+      "name": "ha reaches hb across three routers (TTL 61)",
+      "run": [
+        "ping",
+        "-c",
+        "2",
+        "198.18.26.10"
+      ],
+      "expect_contains": [
+        "ttl=61"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "ha",
+      "name": "which path does this flow use? (hash policy 0: addresses only, so one path for all ha-to-hb traffic)",
+      "run": [
+        "sh",
+        "-c",
+        "nh=$(ip netns exec nl-ospf-r1 ip route get 198.18.26.10 from 198.18.21.10 iif eth0 | grep -o 'via [0-9.]*' | cut -d' ' -f2); if [ $nh = 198.18.22.2 ]; then r=r2; else r=r3; fi; echo \"r1 forwards ha->hb via $nh ($r)\"; echo $r > /tmp/netlab-ospf-victim"
+      ],
+      "save": "victim.txt",
+      "expect_contains": [
+        "r1 forwards ha->hb via"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "ha",
+      "name": "silent failure: that router keeps its links up but stops forwarding and stops OSPF; neighbours notice only when hellos stop (dead interval 4 s)",
+      "run": [
+        "sh",
+        "-c",
+        "ping -i 0.05 -c 200 -W 1 -q 198.18.26.10 > /tmp/netlab-ospf-ping.txt & sleep 1; r=$(cat /tmp/netlab-ospf-victim); ip netns exec nl-ospf-$r iptables -I FORWARD -j DROP; ip netns exec nl-ospf-$r iptables -I INPUT -p ospf -j DROP; ip netns exec nl-ospf-$r iptables -I OUTPUT -p ospf -j DROP; wait; cat /tmp/netlab-ospf-ping.txt; awk '/transmitted/ {lost=$1-$4; printf \"lost %d of %d probes = about %.2f s without connectivity\\n\", lost, $1, lost*0.05}' /tmp/netlab-ospf-ping.txt"
+      ],
+      "save": "converge-silent.txt",
+      "expect_contains": [
+        "200 packets transmitted",
+        "about"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "after the dead interval r1 has one next hop left",
+      "run": [
+        "ip",
+        "route",
+        "show",
+        "198.18.26.0/24"
+      ],
+      "save": "r1-after-silent.txt",
+      "timeout": "10s",
+      "expect_contains": [
+        "proto ospf"
+      ],
+      "expect_absent": [
+        "nexthop"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "ha",
+      "name": "heal it",
+      "run": [
+        "sh",
+        "-c",
+        "r=$(cat /tmp/netlab-ospf-victim); ip netns exec nl-ospf-$r iptables -F; echo healed $r"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "adjacencies and ECMP return",
+      "run": [
+        "sh",
+        "-c",
+        "echo \"full adjacencies: $(vtysh -N r1 -c 'show ip ospf neighbor' | grep -c Full)\"; ip route show 198.18.26.0/24"
+      ],
+      "save": "r1-healed.txt",
+      "timeout": "30s",
+      "expect_contains": [
+        "full adjacencies: 2",
+        "nexthop via 198.18.22.2",
+        "nexthop via 198.18.23.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "ha",
+      "name": "which path now?",
+      "run": [
+        "sh",
+        "-c",
+        "nh=$(ip netns exec nl-ospf-r1 ip route get 198.18.26.10 from 198.18.21.10 iif eth0 | grep -o 'via [0-9.]*' | cut -d' ' -f2); if [ $nh = 198.18.22.2 ]; then r=r2; else r=r3; fi; echo \"r1 forwards ha->hb via $nh ($r)\"; echo $r > /tmp/netlab-ospf-victim"
+      ],
+      "expect_contains": [
+        "r1 forwards ha->hb via"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "ha",
+      "name": "loud failure: that router's link to r1 goes DOWN; r1 sees the carrier loss and reroutes at once",
+      "run": [
+        "sh",
+        "-c",
+        "ping -i 0.05 -c 100 -W 1 -q 198.18.26.10 > /tmp/netlab-ospf-ping.txt & sleep 1; r=$(cat /tmp/netlab-ospf-victim); ip netns exec nl-ospf-$r ip link set eth0 down; wait; cat /tmp/netlab-ospf-ping.txt; awk '/transmitted/ {lost=$1-$4; printf \"lost %d of %d probes = about %.2f s without connectivity\\n\", lost, $1, lost*0.05}' /tmp/netlab-ospf-ping.txt"
+      ],
+      "save": "converge-linkdown.txt",
+      "expect_contains": [
+        "100 packets transmitted",
+        "about"
+      ]
+    }
+  ]
+}

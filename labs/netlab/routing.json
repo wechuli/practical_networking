@@ -1,0 +1,807 @@
+{
+  "name": "routing",
+  "description": "Routing on Linux: the decision, longest prefix match, route types, ECMP, policy routing and asymmetric paths, SNAT, DNAT, conntrack, and SNAT port exhaustion",
+  "nodes": [
+    {
+      "name": "lan",
+      "bridges": [
+        {
+          "name": "br0"
+        }
+      ]
+    },
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.10.1"
+        }
+      ],
+      "setup": [
+        [
+          "ip",
+          "address",
+          "add",
+          "198.18.10.20/24",
+          "dev",
+          "eth0"
+        ]
+      ]
+    },
+    {
+      "name": "r1",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.fib_multipath_hash_policy": "1"
+      },
+      "setup": [
+        [
+          "ip",
+          "route",
+          "add",
+          "198.19.12.0/24",
+          "nexthop",
+          "via",
+          "198.18.12.2",
+          "nexthop",
+          "via",
+          "198.18.13.2"
+        ],
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-m",
+          "conntrack",
+          "--ctstate",
+          "INVALID",
+          "-j",
+          "DROP"
+        ]
+      ]
+    },
+    {
+      "name": "r9",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      }
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.11.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "web",
+          "port": 8080,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "0.0.0.0:8443",
+            "-http-addr",
+            "0.0.0.0:8080",
+            "-size",
+            "300",
+            "-ca-out",
+            "/tmp/netlab-routing-ca.pem"
+          ]
+        },
+        {
+          "name": "slow",
+          "port": 8090,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "0.0.0.0:8444",
+            "-http-addr",
+            "0.0.0.0:8090",
+            "-delay",
+            "60s",
+            "-ca-out",
+            "/tmp/netlab-routing-ca2.pem"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "r2",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.12.1"
+        }
+      ]
+    },
+    {
+      "name": "r3",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.13.1"
+        }
+      ]
+    },
+    {
+      "name": "far",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.19.12.2"
+        }
+      ],
+      "services": [
+        {
+          "name": "web",
+          "port": 80,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "198.19.12.10:443",
+            "-http-addr",
+            "198.19.12.10:80",
+            "-size",
+            "100",
+            "-ca-out",
+            "/tmp/netlab-routing-ca3.pem"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wan",
+      "bridges": [
+        {
+          "name": "br0"
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.10.10/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p1",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "r1",
+        "if": "eth0",
+        "addr": [
+          "198.18.10.1/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p2",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "r9",
+        "if": "eth0",
+        "addr": [
+          "198.18.10.2/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p3",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "r1",
+        "if": "eth1",
+        "addr": [
+          "198.18.11.1/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.11.10/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r9",
+        "if": "eth1",
+        "addr": [
+          "198.18.14.2/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth1",
+        "addr": [
+          "198.18.14.10/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r1",
+        "if": "eth2",
+        "addr": [
+          "198.18.12.1/24"
+        ]
+      },
+      "b": {
+        "node": "r2",
+        "if": "eth0",
+        "addr": [
+          "198.18.12.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r1",
+        "if": "eth3",
+        "addr": [
+          "198.18.13.1/24"
+        ]
+      },
+      "b": {
+        "node": "r3",
+        "if": "eth0",
+        "addr": [
+          "198.18.13.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r2",
+        "if": "eth1",
+        "addr": [
+          "198.19.12.2/24"
+        ]
+      },
+      "b": {
+        "node": "wan",
+        "if": "p1",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "r3",
+        "if": "eth1",
+        "addr": [
+          "198.19.12.3/24"
+        ]
+      },
+      "b": {
+        "node": "wan",
+        "if": "p2",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "far",
+        "if": "eth0",
+        "addr": [
+          "198.19.12.10/24"
+        ]
+      },
+      "b": {
+        "node": "wan",
+        "if": "p3",
+        "bridge": "br0"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the client's table: one connected route (proto kernel) and a default route netlab added (proto boot, shown with -d)",
+      "run": [
+        "sh",
+        "-c",
+        "ip route; ip -d route show default"
+      ],
+      "save": "client-routes.txt",
+      "expect_contains": [
+        "default via 198.18.10.1 dev eth0",
+        "198.18.10.0/24 dev eth0 proto kernel scope link src 198.18.10.10",
+        "unicast default via 198.18.10.1 dev eth0 proto boot scope global"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the kernel's decision for the server: next hop, interface, source",
+      "run": [
+        "ip",
+        "route",
+        "get",
+        "198.18.11.10"
+      ],
+      "save": "get-server.txt",
+      "expect_contains": [
+        "198.18.11.10 via 198.18.10.1 dev eth0 src 198.18.10.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "and for a host on its own subnet: no 'via' \u2014 deliver directly",
+      "run": [
+        "ip",
+        "route",
+        "get",
+        "198.18.10.2"
+      ],
+      "save": "get-onlink.txt",
+      "expect_contains": [
+        "198.18.10.2 dev eth0 src 198.18.10.10"
+      ],
+      "expect_absent": [
+        "via"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the reply's TTL is 63: one router",
+      "run": [
+        "ping",
+        "-c",
+        "1",
+        "198.18.11.10"
+      ],
+      "expect_contains": [
+        "ttl=63"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "longest prefix match: a stale /32 for the server pointing at a gateway that does not exist",
+      "run": [
+        "ip",
+        "route",
+        "add",
+        "198.18.11.10/32",
+        "via",
+        "198.18.10.99"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the /32 wins for 198.18.11.10 only; its neighbour .11 still uses the default route",
+      "run": [
+        "sh",
+        "-c",
+        "ip route get 198.18.11.10; ip route get 198.18.11.11"
+      ],
+      "save": "lpm.txt",
+      "expect_contains": [
+        "198.18.11.10 via 198.18.10.99 dev eth0",
+        "198.18.11.11 via 198.18.10.1 dev eth0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "one host is now unreachable while the rest of the subnet works: the classic stale-host-route outage",
+      "run": [
+        "ping",
+        "-c",
+        "1",
+        "-W",
+        "5",
+        "198.18.11.10"
+      ],
+      "save": "lpm-ping.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "From 198.18.10.10 icmp_seq=1 Destination Host Unreachable"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "remove the stale route",
+      "run": [
+        "ip",
+        "route",
+        "del",
+        "198.18.11.10/32"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "routes that refuse instead of forward: blackhole, unreachable, prohibit",
+      "run": [
+        "sh",
+        "-c",
+        "ip route add blackhole 203.0.113.0/26 && ip route add unreachable 203.0.113.64/26 && ip route add prohibit 203.0.113.128/26 && ip route show type blackhole; ip route show type unreachable; ip route show type prohibit"
+      ],
+      "save": "route-types.txt",
+      "expect_contains": [
+        "blackhole 203.0.113.0/26",
+        "unreachable 203.0.113.64/26",
+        "prohibit 203.0.113.128/26"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "what an application sees for each: EINVAL, EHOSTUNREACH, EACCES \u2014 instantly, nothing is sent",
+      "run": [
+        "sh",
+        "-c",
+        "for a in 203.0.113.5 203.0.113.70 203.0.113.130; do ${BIN}/phases -noproxy -timeout 2s http://$a/ 2>&1 | grep 'error:'; done; ping -c 1 203.0.113.130 2>&1 | tail -1"
+      ],
+      "save": "route-types-errno.txt",
+      "expect_contains": [
+        "connect: invalid argument",
+        "connect: no route to host",
+        "connect: permission denied",
+        "Do you want to ping broadcast?"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "ECMP: r1 has two equal next hops for 198.19.12.0/24 and hashes each flow's ports (fib_multipath_hash_policy=1)",
+      "run": [
+        "sh",
+        "-c",
+        "ip route show 198.19.12.0/24; for p in 1000 1001 1002 1003 1004 1005 1006 1007 1008 1009; do ip route get 198.19.12.10 from 198.18.10.10 iif eth0 ipproto tcp sport $p dport 80 | head -1; done | sort | uniq -c"
+      ],
+      "save": "ecmp.txt",
+      "expect_contains": [
+        "nexthop via 198.18.12.2 dev eth2 weight 1",
+        "nexthop via 198.18.13.2 dev eth3 weight 1",
+        "via 198.18.12.2 dev eth2",
+        "via 198.18.13.2 dev eth3"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "traceroute uses a new flow for every probe, so hop 2 shows both routers",
+      "run": [
+        "traceroute",
+        "-n",
+        "-f",
+        "2",
+        "-m",
+        "2",
+        "-q",
+        "10",
+        "-N",
+        "1",
+        "-w",
+        "1",
+        "198.19.12.10"
+      ],
+      "save": "ecmp-traceroute.txt",
+      "expect_contains": [
+        "198.18.12.2",
+        "198.18.13.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "gotrace -fixed sends every probe in one flow, so it sees one consistent path",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/gotrace -fixed -q 1 -w 1s 198.19.12.10; ${BIN}/gotrace -fixed -f 2 -m 2 -q 6 -w 500ms 198.19.12.10 | grep -oE '198\\.18\\.1[23]\\.2' | sort -u | wc -l | sed 's/^/distinct hop-2 routers: /'"
+      ],
+      "save": "ecmp-fixed.txt",
+      "expect_contains": [
+        " 3  198.19.12.10",
+        "distinct hop-2 routers: 1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "policy routing: traffic FROM 198.18.10.20 uses table 100, whose default route is r9",
+      "run": [
+        "sh",
+        "-c",
+        "ip rule add from 198.18.10.20 lookup 100 priority 100 && ip route add default via 198.18.10.2 table 100 && ip rule; ip route get 198.18.14.10 from 198.18.10.20; ip route get 198.18.14.10"
+      ],
+      "save": "policy.txt",
+      "expect_contains": [
+        "100:\tfrom 198.18.10.20 lookup 100",
+        "198.18.14.10 from 198.18.10.20 via 198.18.10.2 dev eth0 table 100",
+        "198.18.14.10 via 198.18.10.1 dev eth0 src 198.18.10.10"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "server",
+      "if": "eth0",
+      "filter": "tcp port 8080",
+      "decode": [
+        "-nn"
+      ],
+      "save": "asymmetric.pcap",
+      "name": "asymmetric path: the SYN goes via r9 to the server's eth1, the SYN-ACK leaves eth0 toward r1 (the server's default route) \u2026",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "curl -sS --noproxy '*' -o /dev/null --max-time 3 -w '%{http_code} in %{time_total}s\\n' --interface 198.18.10.20 http://198.18.14.10:8080/"
+        ]
+      },
+      "expect_contains": [
+        "198.18.14.10.8080 > 198.18.10.20",
+        "Flags [S.]",
+        "Connection timed out"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "\u2026 where r1's stateful firewall has never seen the SYN, calls the SYN-ACK INVALID, and drops it",
+      "run": [
+        "iptables",
+        "-L",
+        "FORWARD",
+        "-v",
+        "-n",
+        "-x"
+      ],
+      "save": "r1-invalid.txt",
+      "expect_contains": [
+        "DROP",
+        "ctstate INVALID"
+      ],
+      "expect_absent": [
+        "     0        0 DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r9",
+      "name": "fix 1: SNAT on r9 makes the server reply to r9, so both directions use one path",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-A",
+        "POSTROUTING",
+        "-o",
+        "eth1",
+        "-j",
+        "MASQUERADE"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same request from 198.18.10.20 now works",
+      "run": [
+        "sh",
+        "-c",
+        "curl -sS --noproxy '*' -o /dev/null --max-time 3 -w '%{http_code} in %{time_total}s\\n' --interface 198.18.10.20 http://198.18.14.10:8080/"
+      ],
+      "save": "asymmetric-fixed.txt",
+      "expect_exit": 0,
+      "expect_contains": [
+        "200 in"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "DNAT (port forwarding): connections to r1's 198.18.10.1:8080 go to the server",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-A",
+        "PREROUTING",
+        "-i",
+        "eth0",
+        "-d",
+        "198.18.10.1",
+        "-p",
+        "tcp",
+        "--dport",
+        "8080",
+        "-j",
+        "DNAT",
+        "--to-destination",
+        "198.18.11.10:8080"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "server",
+      "if": "eth0",
+      "filter": "tcp port 8080 and tcp[tcpflags] & tcp-syn != 0 and host 198.18.10.10",
+      "decode": [
+        "-nn"
+      ],
+      "save": "dnat.pcap",
+      "name": "the client asks r1; the server receives a SYN addressed to itself, still from the client's real address",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "curl -sS --noproxy '*' -o /dev/null --max-time 3 -w '%{http_code} in %{time_total}s\\n' http://198.18.10.1:8080/"
+        ]
+      },
+      "expect_contains": [
+        "198.18.10.10.",
+        "> 198.18.11.10.8080: Flags [S]",
+        "200 in"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "conntrack holds both tuples: what the client sent, and what the reply must look like",
+      "run": [
+        "conntrack",
+        "-L",
+        "-p",
+        "tcp",
+        "--orig-dst",
+        "198.18.10.1"
+      ],
+      "save": "dnat-conntrack.txt",
+      "expect_contains": [
+        "src=198.18.10.10 dst=198.18.10.1",
+        "dport=8080 src=198.18.11.10 dst=198.18.10.10 sport=8080"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "SNAT port exhaustion, part 1: r1 may use only 4 source ports (40000\u201340003) for connections to the slow service",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-A",
+        "POSTROUTING",
+        "-o",
+        "eth1",
+        "-p",
+        "tcp",
+        "--dport",
+        "8090",
+        "-j",
+        "SNAT",
+        "--to-source",
+        "198.18.11.1:40000-40003"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "part 2: four long-lived connections take all four ports",
+      "run": [
+        "sh",
+        "-c",
+        "for i in 1 2 3 4; do curl -s --noproxy '*' --max-time 50 http://198.18.11.10:8090/ >/dev/null 2>&1 & sleep 0.3; done; sleep 0.5"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "conntrack shows the four translations: server replies to 198.18.11.1:40000\u201340003",
+      "run": [
+        "conntrack",
+        "-L",
+        "-p",
+        "tcp",
+        "--dport",
+        "8090"
+      ],
+      "save": "snat-held.txt",
+      "expect_contains": [
+        "dport=40000",
+        "dport=40001",
+        "dport=40002",
+        "dport=40003"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a fifth connection cannot get a port: its SYN is dropped and the connect times out",
+      "run": [
+        "timeout",
+        "3",
+        "bash",
+        "-c",
+        "</dev/tcp/198.18.11.10/8090"
+      ],
+      "save": "snat-fifth.txt",
+      "expect_exit": 124
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "the evidence on the NAT box: conntrack insert failures (summed across CPUs)",
+      "run": [
+        "sh",
+        "-c",
+        "conntrack -S | tee /dev/stderr | grep -o 'insert_failed=[0-9]*' | awk -F= '{s+=$2} END {print \"insert_failed total: \" s; if (s>0) print \"SNAT ran out of ports\"}'"
+      ],
+      "save": "snat-stats.txt",
+      "expect_contains": [
+        "SNAT ran out of ports"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "part 3: widen the port range",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-R",
+        "POSTROUTING",
+        "1",
+        "-o",
+        "eth1",
+        "-p",
+        "tcp",
+        "--dport",
+        "8090",
+        "-j",
+        "SNAT",
+        "--to-source",
+        "198.18.11.1:40000-40127"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the next connection succeeds at once",
+      "run": [
+        "timeout",
+        "3",
+        "bash",
+        "-c",
+        "</dev/tcp/198.18.11.10/8090"
+      ],
+      "save": "snat-after.txt",
+      "expect_exit": 0
+    }
+  ]
+}

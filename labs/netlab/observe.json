@@ -1,0 +1,334 @@
+{
+  "name": "observe",
+  "description": "A two-service application (obslab: W3C trace context, spans, Prometheus-format histograms, JSON logs with trace IDs) behind a router whose connection tracking serves as flow records: a baseline, then a slow dependency, a lossy network, an error burst with head vs tail sampling, a dropped port and a refused port \u2014 what metrics, logs, traces, host counters and flow records each show.",
+  "nodes": [
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.220.20"
+        }
+      ]
+    },
+    {
+      "name": "frontend",
+      "sysctls": {
+        "net.ipv4.ip_forward": "0"
+      },
+      "routes": [
+        {
+          "dst": "198.18.222.0/24",
+          "via": "198.18.221.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "frontend",
+          "run": [
+            "${BIN}/obslab",
+            "serve",
+            "-name",
+            "frontend",
+            "-addr",
+            "198.18.220.20:8080",
+            "-backend",
+            "http://198.18.222.10:8081",
+            "-spans",
+            "${EVIDENCE}/spans-frontend.jsonl",
+            "-log",
+            "${EVIDENCE}/log-frontend.jsonl"
+          ],
+          "port": 8080
+        }
+      ]
+    },
+    {
+      "name": "router",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.default.rp_filter": "0",
+        "net.netfilter.nf_conntrack_acct": "1"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "iptables -A FORWARD -m conntrack --ctstate NEW -j ACCEPT && ip tuntap add dev pl-ab mode tun && ip tuntap add dev pl-ba mode tun && ip link set pl-ab up && ip link set pl-ba up && sysctl -qw net.ipv4.conf.pl-ab.rp_filter=0 net.ipv4.conf.pl-ba.rp_filter=0 && ip rule add iif eth0 table 100 && ip route add default dev pl-ab table 100 && ip rule add iif eth1 table 101 && ip route add default dev pl-ba table 101"
+        ]
+      ],
+      "services": [
+        {
+          "name": "pathlab",
+          "run": [
+            "${BIN}/pathlab",
+            "run",
+            "-control",
+            "0.0.0.0:9911"
+          ],
+          "port": 9911
+        }
+      ]
+    },
+    {
+      "name": "backend",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.222.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "backend",
+          "run": [
+            "${BIN}/obslab",
+            "serve",
+            "-name",
+            "backend",
+            "-addr",
+            "198.18.222.10:8081",
+            "-spans",
+            "${EVIDENCE}/spans-backend.jsonl",
+            "-log",
+            "${EVIDENCE}/log-backend.jsonl"
+          ],
+          "port": 8081
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.220.10/24"
+        ]
+      },
+      "b": {
+        "node": "frontend",
+        "if": "eth0",
+        "addr": [
+          "198.18.220.20/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "frontend",
+        "if": "eth1",
+        "addr": [
+          "198.18.221.10/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth0",
+        "addr": [
+          "198.18.221.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "backend",
+        "if": "eth0",
+        "addr": [
+          "198.18.222.10/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth1",
+        "addr": [
+          "198.18.222.1/24"
+        ]
+      }
+    }
+  ],
+  "requires": {
+    "conntrack": "apt-get install conntrack",
+    "nstat": "apt-get install iproute2",
+    "curl": "apt-get install curl"
+  },
+  "checks": [
+    {
+      "type": "command",
+      "node": "client",
+      "name": "baseline first: 1000 requests through frontend \u2192 backend, all 200; the three signals agree, and every span has its parent",
+      "run": [
+        "sh",
+        "-c",
+        "for f in ${EVIDENCE}/spans-*.jsonl ${EVIDENCE}/log-*.jsonl; do : > $f; done; rm -f ${EVIDENCE}/spans-load.jsonl; ${BIN}/obslab load -url http://198.18.220.20:8080/ -n 1000 -c 20 -spans ${EVIDENCE}/spans-load.jsonl ; ${BIN}/obslab spans -slowest 1 ${EVIDENCE}/spans-load.jsonl ${EVIDENCE}/spans-frontend.jsonl ${EVIDENCE}/spans-backend.jsonl; ip netns exec nl-observe-client ${BIN}/obslab metrics -url http://198.18.220.20:8080/metrics "
+      ],
+      "save": "baseline.txt",
+      "expect_contains": [
+        "1000 \u00d7 200",
+        "4000 spans in 1000 traces, 0 with an error, 0 spans whose parent is missing",
+        "1000 requests, 200: 1000"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the backend delays 10 % of requests by 300 ms: the client's p99 jumps; the slowest traces put all of it in the backend span",
+      "run": [
+        "sh",
+        "-c",
+        "for f in ${EVIDENCE}/spans-*.jsonl ${EVIDENCE}/log-*.jsonl; do : > $f; done; rm -f ${EVIDENCE}/spans-load.jsonl; ip netns exec nl-observe-client ${BIN}/obslab metrics -url http://198.18.220.20:8080/metrics -save ${EVIDENCE}/m-slow-before.txt >/dev/null; ip netns exec nl-observe-backend curl -s --noproxy '*' 'http://198.18.222.10:8081/admin/faults?slow=0.1&delay=300ms'; ${BIN}/obslab load -url http://198.18.220.20:8080/ -n 1000 -c 20 -spans ${EVIDENCE}/spans-load.jsonl ; ${BIN}/obslab spans -slowest 3 ${EVIDENCE}/spans-load.jsonl ${EVIDENCE}/spans-frontend.jsonl ${EVIDENCE}/spans-backend.jsonl"
+      ],
+      "save": "slow-backend.txt",
+      "expect_contains": [
+        "slow 10% of requests by 300ms",
+        "| backend 30"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same incident in metrics \u2014 counters only grow, so take the increase over the incident window: the histogram's p99 (interpolated inside the 250\u2013500 ms bucket) overstates the spans' true p99, and the mean (~30 ms) describes no actual request",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-observe-client ${BIN}/obslab metrics -url http://198.18.220.20:8080/metrics -since ${EVIDENCE}/m-slow-before.txt; ip netns exec nl-observe-client ${BIN}/obslab metrics -url http://198.18.220.20:8080/metrics ; echo 'true percentiles of the frontend server spans:'; ${BIN}/obslab spans -slowest 0 ${EVIDENCE}/spans-frontend.jsonl | grep 'frontend server'"
+      ],
+      "save": "slow-metrics.txt",
+      "expect_contains": [
+        "histogram_quantile(0.99)",
+        "frontend server  spans:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "logs and traces join on the trace ID: the slowest trace's ID finds its log line in both services",
+      "run": [
+        "sh",
+        "-c",
+        "id=$(${BIN}/obslab spans -slowest 1 ${EVIDENCE}/spans-load.jsonl ${EVIDENCE}/spans-frontend.jsonl ${EVIDENCE}/spans-backend.jsonl | grep -o 'trace [0-9a-f]*' | head -1 | cut -d' ' -f2); echo \"slowest trace: $id\"; grep -h \"$id\" ${EVIDENCE}/log-frontend.jsonl ${EVIDENCE}/log-backend.jsonl"
+      ],
+      "save": "correlate.txt",
+      "expect_contains": [
+        "slowest trace:",
+        "\"service\":\"frontend\"",
+        "\"service\":\"backend\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "now the backend is fast but the frontend\u2194backend path loses 5 % (and adds 5 ms each way): the time sits between the frontend's client span and the backend's server span \u2014 the network",
+      "run": [
+        "sh",
+        "-c",
+        "for f in ${EVIDENCE}/spans-*.jsonl ${EVIDENCE}/log-*.jsonl; do : > $f; done; rm -f ${EVIDENCE}/spans-load.jsonl; ip netns exec nl-observe-backend curl -s --noproxy '*' 'http://198.18.222.10:8081/admin/faults?slow=0'; ip netns exec nl-observe-router ${BIN}/pathlab set delay=5ms loss=0.05 >/dev/null; ip netns exec nl-observe-frontend nstat -n; ${BIN}/obslab load -url http://198.18.220.20:8080/ -n 1000 -c 20 -spans ${EVIDENCE}/spans-load.jsonl ; ${BIN}/obslab spans -slowest 3 ${EVIDENCE}/spans-load.jsonl ${EVIDENCE}/spans-frontend.jsonl ${EVIDENCE}/spans-backend.jsonl; echo \"frontend host counters: $(ip netns exec nl-observe-frontend nstat TcpRetransSegs TcpExtTCPTimeouts TcpExtTCPLossProbes | tail -n +2 | awk '{printf \"%s %s  \", $1, $2}')\"; ip netns exec nl-observe-router ${BIN}/pathlab set delay=0 loss=0 >/dev/null"
+      ],
+      "save": "lossy-network.txt",
+      "expect_contains": [
+        "slow 0% of requests",
+        "frontend\u2192backend network+queue",
+        "TcpRetransSegs"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the backend fails 2 % of requests with 503: metrics count them at both services; with every trace kept, a tail-sampling rule (errors, or \u2265 250 ms) would keep only those traces",
+      "run": [
+        "sh",
+        "-c",
+        "for f in ${EVIDENCE}/spans-*.jsonl ${EVIDENCE}/log-*.jsonl; do : > $f; done; rm -f ${EVIDENCE}/spans-load.jsonl; ip netns exec nl-observe-client ${BIN}/obslab metrics -url http://198.18.220.20:8080/metrics -save ${EVIDENCE}/m-err-fe.txt >/dev/null; ip netns exec nl-observe-backend ${BIN}/obslab metrics -url http://198.18.222.10:8081/metrics -save ${EVIDENCE}/m-err-be.txt >/dev/null; ip netns exec nl-observe-backend curl -s --noproxy '*' 'http://198.18.222.10:8081/admin/faults?fail=0.02'; ${BIN}/obslab load -url http://198.18.220.20:8080/ -n 2000 -c 20 -spans ${EVIDENCE}/spans-load.jsonl ; ${BIN}/obslab spans -slowest 0 -tail-slow 250ms ${EVIDENCE}/spans-load.jsonl ${EVIDENCE}/spans-frontend.jsonl ${EVIDENCE}/spans-backend.jsonl; ip netns exec nl-observe-client ${BIN}/obslab metrics -url http://198.18.220.20:8080/metrics -since ${EVIDENCE}/m-err-fe.txt; ip netns exec nl-observe-backend ${BIN}/obslab metrics -url http://198.18.222.10:8081/metrics -since ${EVIDENCE}/m-err-be.txt"
+      ],
+      "save": "errors-all.txt",
+      "expect_contains": [
+        "fail 2% with 503",
+        "\u00d7 503",
+        "a tail-sampling rule",
+        "503:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same at 10 % head sampling (decided before anyone knew the outcome): only the sampled tenth of requests have traces, so only their errors can be found \u2014 while the logs still hold every 503",
+      "run": [
+        "sh",
+        "-c",
+        "for f in ${EVIDENCE}/spans-*.jsonl ${EVIDENCE}/log-*.jsonl; do : > $f; done; rm -f ${EVIDENCE}/spans-load.jsonl; ${BIN}/obslab load -url http://198.18.220.20:8080/ -n 2000 -c 20 -spans ${EVIDENCE}/spans-load.jsonl -sample 0.1; ${BIN}/obslab spans -slowest 0 ${EVIDENCE}/spans-load.jsonl ${EVIDENCE}/spans-frontend.jsonl ${EVIDENCE}/spans-backend.jsonl; echo \"frontend log: $(grep -c . ${EVIDENCE}/log-frontend.jsonl) requests, $(grep -c '\"status\":503' ${EVIDENCE}/log-frontend.jsonl) of them 503; traces kept: $(grep -c '\"kind\":\"server\"' ${EVIDENCE}/spans-frontend.jsonl)\"; ip netns exec nl-observe-backend curl -s --noproxy '*' 'http://198.18.222.10:8081/admin/faults?fail=0'"
+      ],
+      "save": "errors-sampled.txt",
+      "expect_contains": [
+        "traces sampled at the head:",
+        "frontend log: 2000 requests,",
+        "traces kept:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the backend's host firewall DROPs its port: every request ends in a 504 after the frontend's 1 s timeout; the traces have no backend span; the backend logged nothing; Go's error text says 'awaiting headers' whether it was still dialing or waiting for a reply",
+      "run": [
+        "sh",
+        "-c",
+        "for f in ${EVIDENCE}/spans-*.jsonl ${EVIDENCE}/log-*.jsonl; do : > $f; done; rm -f ${EVIDENCE}/spans-load.jsonl; ip netns exec nl-observe-backend iptables -I INPUT -p tcp --dport 8081 -j DROP; ip netns exec nl-observe-router conntrack -F 2>/dev/null; ${BIN}/obslab load -url http://198.18.220.20:8080/ -n 40 -c 20 -spans ${EVIDENCE}/spans-load.jsonl ; ${BIN}/obslab spans -slowest 1 ${EVIDENCE}/spans-load.jsonl ${EVIDENCE}/spans-frontend.jsonl ${EVIDENCE}/spans-backend.jsonl; echo \"backend log lines: $(grep -c . ${EVIDENCE}/log-backend.jsonl)\"; ${BIN}/obslab logs ${EVIDENCE}/log-frontend.jsonl"
+      ],
+      "save": "dropped.txt",
+      "expect_contains": [
+        "40 \u00d7 504",
+        "with NO backend span",
+        "backend log lines: 0",
+        "Client.Timeout exceeded"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "the router's connection tracking as flow records: the new connection attempts passed through (1 packet, 60 bytes) and nothing came back; the pooled connections still say 'two-way' \u2014 flow counters cover a flow's whole life, so they cannot say when it stopped working",
+      "run": [
+        "sh",
+        "-c",
+        "conntrack -L -o extended -p tcp --dport 8081 2>/dev/null | ${BIN}/obslab flows | awk 'NR==1 || (/SYN_SENT/ && s++<3) || (/ESTABLISHED/ && e++<3)'; echo \"flows to :8081 with no reply: $(conntrack -L -p tcp --dport 8081 2>/dev/null | grep -c UNREPLIED)\"; ip netns exec nl-observe-backend iptables -D INPUT -p tcp --dport 8081 -j DROP"
+      ],
+      "save": "flows-dropped.txt",
+      "expect_contains": [
+        "SYN_SENT",
+        "1/60",
+        "NO REPLY",
+        "ESTABLISHED"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same port REJECTed with a TCP reset instead: 502 within milliseconds, error 'connection refused' \u2014 the error text and the timing name the failure",
+      "run": [
+        "sh",
+        "-c",
+        "for f in ${EVIDENCE}/spans-*.jsonl ${EVIDENCE}/log-*.jsonl; do : > $f; done; rm -f ${EVIDENCE}/spans-load.jsonl; ip netns exec nl-observe-backend iptables -I INPUT -p tcp --dport 8081 -j REJECT --reject-with tcp-reset; ${BIN}/obslab load -url http://198.18.220.20:8080/ -n 40 -c 20 -spans ${EVIDENCE}/spans-load.jsonl ; ${BIN}/obslab logs ${EVIDENCE}/log-frontend.jsonl; ip netns exec nl-observe-backend iptables -D INPUT -p tcp --dport 8081 -j REJECT --reject-with tcp-reset"
+      ],
+      "save": "refused.txt",
+      "expect_contains": [
+        "40 \u00d7 502",
+        "connection refused"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "repaired: back to all 200 \u2014 verify the fix with the same measurement that showed the failure",
+      "run": [
+        "sh",
+        "-c",
+        "for f in ${EVIDENCE}/spans-*.jsonl ${EVIDENCE}/log-*.jsonl; do : > $f; done; rm -f ${EVIDENCE}/spans-load.jsonl; ${BIN}/obslab load -url http://198.18.220.20:8080/ -n 200 -c 20 -spans ${EVIDENCE}/spans-load.jsonl ; ${BIN}/obslab spans -slowest 0 ${EVIDENCE}/spans-load.jsonl ${EVIDENCE}/spans-frontend.jsonl ${EVIDENCE}/spans-backend.jsonl"
+      ],
+      "save": "repaired.txt",
+      "expect_contains": [
+        "200 \u00d7 200",
+        "0 with an error"
+      ]
+    }
+  ]
+}

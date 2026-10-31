@@ -1,0 +1,974 @@
+{
+  "name": "bgp",
+  "description": "BGP with FRR: eBGP sessions, best-path selection (AS_PATH, LOCAL_PREF, prepending), anycast failover measured, a prefix hijack and the filter that stops it",
+  "nodes": [
+    {
+      "name": "you",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/you",
+          "/etc/frr/you"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/you/vtysh.conf && printf 'router bgp 64500\\n bgp router-id 10.0.1.1\\n no bgp ebgp-requires-policy\\n no bgp network import-check\\n timers bgp 1 3\\n neighbor 198.18.31.2 remote-as 64510\\n neighbor 198.18.31.2 description t1\\n neighbor 198.18.32.2 remote-as 64520\\n neighbor 198.18.32.2 description t2\\n address-family ipv4 unicast\\n  network 198.18.30.0/24\\n exit-address-family\\n' > /etc/frr/you/bgpd.conf && chown frr:frr /etc/frr/you/bgpd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "you",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "bgpd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/bgpd -N you -f /etc/frr/you/bgpd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "t1",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/t1",
+          "/etc/frr/t1"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/t1/vtysh.conf && printf 'router bgp 64510\\n bgp router-id 10.0.1.10\\n no bgp ebgp-requires-policy\\n no bgp network import-check\\n timers bgp 1 3\\n neighbor 198.18.31.1 remote-as 64500\\n neighbor 198.18.31.1 description you\\n neighbor 198.18.33.2 remote-as 64530\\n neighbor 198.18.33.2 description origin\\n neighbor 198.18.36.2 remote-as 64550\\n neighbor 198.18.36.2 description anya\\n address-family ipv4 unicast\\n exit-address-family\\n' > /etc/frr/t1/bgpd.conf && chown frr:frr /etc/frr/t1/bgpd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "t1",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "bgpd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/bgpd -N t1 -f /etc/frr/t1/bgpd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "t2",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/t2",
+          "/etc/frr/t2"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/t2/vtysh.conf && printf 'router bgp 64520\\n bgp router-id 10.0.1.20\\n no bgp ebgp-requires-policy\\n no bgp network import-check\\n timers bgp 1 3\\n neighbor 198.18.32.1 remote-as 64500\\n neighbor 198.18.32.1 description you\\n neighbor 198.18.34.2 remote-as 64540\\n neighbor 198.18.34.2 description t3\\n neighbor 198.18.37.2 remote-as 64550\\n neighbor 198.18.37.2 description anyb\\n neighbor 198.18.38.2 remote-as 64566\\n neighbor 198.18.38.2 description rogue\\n address-family ipv4 unicast\\n exit-address-family\\n' > /etc/frr/t2/bgpd.conf && chown frr:frr /etc/frr/t2/bgpd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "t2",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "bgpd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/bgpd -N t2 -f /etc/frr/t2/bgpd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "t3",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/t3",
+          "/etc/frr/t3"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/t3/vtysh.conf && printf 'router bgp 64540\\n bgp router-id 10.0.1.40\\n no bgp ebgp-requires-policy\\n no bgp network import-check\\n timers bgp 1 3\\n neighbor 198.18.34.1 remote-as 64520\\n neighbor 198.18.34.1 description t2\\n neighbor 198.18.35.2 remote-as 64530\\n neighbor 198.18.35.2 description origin\\n address-family ipv4 unicast\\n exit-address-family\\n' > /etc/frr/t3/bgpd.conf && chown frr:frr /etc/frr/t3/bgpd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "t3",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "bgpd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/bgpd -N t3 -f /etc/frr/t3/bgpd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "origin",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/origin",
+          "/etc/frr/origin"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/origin/vtysh.conf && printf 'router bgp 64530\\n bgp router-id 10.0.1.30\\n no bgp ebgp-requires-policy\\n no bgp network import-check\\n timers bgp 1 3\\n neighbor 198.18.33.1 remote-as 64510\\n neighbor 198.18.33.1 description t1\\n neighbor 198.18.35.1 remote-as 64540\\n neighbor 198.18.35.1 description t3\\n address-family ipv4 unicast\\n  network 203.0.113.0/24\\n exit-address-family\\n' > /etc/frr/origin/bgpd.conf && chown frr:frr /etc/frr/origin/bgpd.conf"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "origin",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "bgpd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/bgpd -N origin -f /etc/frr/origin/bgpd.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "anya",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/anya",
+          "/etc/frr/anya"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/anya/vtysh.conf && printf 'router bgp 64550\\n bgp router-id 10.0.1.51\\n no bgp ebgp-requires-policy\\n no bgp network import-check\\n timers bgp 1 3\\n neighbor 198.18.36.1 remote-as 64510\\n neighbor 198.18.36.1 description t1\\n address-family ipv4 unicast\\n  network 198.51.100.0/24\\n exit-address-family\\n' > /etc/frr/anya/bgpd.conf && chown frr:frr /etc/frr/anya/bgpd.conf"
+        ],
+        [
+          "ip",
+          "address",
+          "add",
+          "198.51.100.53/32",
+          "dev",
+          "lo"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "anya",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "bgpd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/bgpd -N anya -f /etc/frr/anya/bgpd.conf"
+          ]
+        },
+        {
+          "name": "web",
+          "port": 80,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "198.51.100.53:443",
+            "-http-addr",
+            "198.51.100.53:80",
+            "-id",
+            "site-A",
+            "-ca-out",
+            "/tmp/netlab-bgp-anya.pem"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "anyb",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/anyb",
+          "/etc/frr/anyb"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/anyb/vtysh.conf && printf 'router bgp 64550\\n bgp router-id 10.0.1.52\\n no bgp ebgp-requires-policy\\n no bgp network import-check\\n timers bgp 1 3\\n neighbor 198.18.37.1 remote-as 64520\\n neighbor 198.18.37.1 description t2\\n address-family ipv4 unicast\\n  network 198.51.100.0/24\\n exit-address-family\\n' > /etc/frr/anyb/bgpd.conf && chown frr:frr /etc/frr/anyb/bgpd.conf"
+        ],
+        [
+          "ip",
+          "address",
+          "add",
+          "198.51.100.53/32",
+          "dev",
+          "lo"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "anyb",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "bgpd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/bgpd -N anyb -f /etc/frr/anyb/bgpd.conf"
+          ]
+        },
+        {
+          "name": "web",
+          "port": 80,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "198.51.100.53:443",
+            "-http-addr",
+            "198.51.100.53:80",
+            "-id",
+            "site-B",
+            "-ca-out",
+            "/tmp/netlab-bgp-anyb.pem"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rogue",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "install",
+          "-d",
+          "-o",
+          "frr",
+          "-g",
+          "frr",
+          "/var/run/frr/rogue",
+          "/etc/frr/rogue"
+        ],
+        [
+          "sh",
+          "-c",
+          "touch /etc/frr/rogue/vtysh.conf && printf 'router bgp 64566\\n bgp router-id 10.0.1.66\\n no bgp ebgp-requires-policy\\n no bgp network import-check\\n timers bgp 1 3\\n neighbor 198.18.38.1 remote-as 64520\\n neighbor 198.18.38.1 description t2\\n address-family ipv4 unicast\\n exit-address-family\\n' > /etc/frr/rogue/bgpd.conf && chown frr:frr /etc/frr/rogue/bgpd.conf"
+        ],
+        [
+          "ip",
+          "address",
+          "add",
+          "203.0.113.10/32",
+          "dev",
+          "lo"
+        ]
+      ],
+      "services": [
+        {
+          "name": "zebra",
+          "run": [
+            "/usr/lib/frr/zebra",
+            "-N",
+            "rogue",
+            "-f",
+            "/dev/null"
+          ]
+        },
+        {
+          "name": "bgpd",
+          "run": [
+            "sh",
+            "-c",
+            "sleep 1; exec /usr/lib/frr/bgpd -N rogue -f /etc/frr/rogue/bgpd.conf"
+          ]
+        },
+        {
+          "name": "web",
+          "port": 80,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "203.0.113.10:443",
+            "-http-addr",
+            "203.0.113.10:80",
+            "-id",
+            "ROGUE",
+            "-ca-out",
+            "/tmp/netlab-bgp-rogue.pem"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "user",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.30.1"
+        }
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "203.0.113.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "web",
+          "port": 80,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "203.0.113.10:443",
+            "-http-addr",
+            "203.0.113.10:80",
+            "-id",
+            "origin-server",
+            "-ca-out",
+            "/tmp/netlab-bgp-server.pem"
+          ]
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "user",
+        "if": "eth0",
+        "addr": [
+          "198.18.30.10/24"
+        ]
+      },
+      "b": {
+        "node": "you",
+        "if": "eth0",
+        "addr": [
+          "198.18.30.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "you",
+        "if": "eth1",
+        "addr": [
+          "198.18.31.1/24"
+        ]
+      },
+      "b": {
+        "node": "t1",
+        "if": "eth0",
+        "addr": [
+          "198.18.31.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "you",
+        "if": "eth2",
+        "addr": [
+          "198.18.32.1/24"
+        ]
+      },
+      "b": {
+        "node": "t2",
+        "if": "eth0",
+        "addr": [
+          "198.18.32.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "t1",
+        "if": "eth1",
+        "addr": [
+          "198.18.33.1/24"
+        ]
+      },
+      "b": {
+        "node": "origin",
+        "if": "eth0",
+        "addr": [
+          "198.18.33.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "t2",
+        "if": "eth1",
+        "addr": [
+          "198.18.34.1/24"
+        ]
+      },
+      "b": {
+        "node": "t3",
+        "if": "eth0",
+        "addr": [
+          "198.18.34.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "t3",
+        "if": "eth1",
+        "addr": [
+          "198.18.35.1/24"
+        ]
+      },
+      "b": {
+        "node": "origin",
+        "if": "eth1",
+        "addr": [
+          "198.18.35.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "t1",
+        "if": "eth2",
+        "addr": [
+          "198.18.36.1/24"
+        ]
+      },
+      "b": {
+        "node": "anya",
+        "if": "eth0",
+        "addr": [
+          "198.18.36.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "t2",
+        "if": "eth2",
+        "addr": [
+          "198.18.37.1/24"
+        ]
+      },
+      "b": {
+        "node": "anyb",
+        "if": "eth0",
+        "addr": [
+          "198.18.37.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "t2",
+        "if": "eth3",
+        "addr": [
+          "198.18.38.1/24"
+        ]
+      },
+      "b": {
+        "node": "rogue",
+        "if": "eth0",
+        "addr": [
+          "198.18.38.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "origin",
+        "if": "eth2",
+        "addr": [
+          "203.0.113.1/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "203.0.113.10/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "you",
+      "name": "eBGP sessions to both transit providers are Established (keepalive 1 s, hold 3 s)",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N you -c 'show bgp summary'; echo \"established: $(vtysh -N you -c 'show bgp neighbors' | grep -c 'BGP state = Established')\""
+      ],
+      "save": "you-summary.txt",
+      "timeout": "60s",
+      "expect_contains": [
+        "established: 2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "two paths to the origin's 203.0.113.0/24: via t1 (2 ASes) and via t2 (3 ASes); the shorter AS_PATH is best",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N you -c 'show bgp ipv4 unicast 203.0.113.0/24'"
+      ],
+      "save": "you-203.txt",
+      "timeout": "30s",
+      "expect_contains": [
+        "64510 64530",
+        "64520 64540 64530",
+        "best (AS Path)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "the best path is what reaches the kernel",
+      "run": [
+        "ip",
+        "route",
+        "show",
+        "203.0.113.0/24"
+      ],
+      "save": "you-kernel.txt",
+      "expect_contains": [
+        "203.0.113.0/24 nhid",
+        "via 198.18.31.2 dev eth1 proto bgp"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "the user's traffic crosses t1",
+      "run": [
+        "traceroute",
+        "-n",
+        "-q",
+        "1",
+        "-N",
+        "1",
+        "-w",
+        "1",
+        "203.0.113.10"
+      ],
+      "save": "trace-t1.txt",
+      "expect_contains": [
+        " 1  198.18.30.1",
+        " 2  198.18.31.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "LOCAL_PREF beats AS_PATH: prefer everything from t2 (local-preference 200)",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N you -c 'configure terminal' -c 'route-map PREFER-T2 permit 10' -c 'set local-preference 200' -c 'exit' -c 'router bgp 64500' -c 'address-family ipv4 unicast' -c 'neighbor 198.18.32.2 route-map PREFER-T2 in' -c 'end' -c 'clear bgp ipv4 unicast 198.18.32.2 soft in'"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "now the longer path via t2 is best",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N you -c 'show bgp ipv4 unicast 203.0.113.0/24'; ip route show 203.0.113.0/24"
+      ],
+      "save": "you-localpref.txt",
+      "timeout": "15s",
+      "expect_contains": [
+        "localpref 200, valid, external, best (Local Pref)",
+        "via 198.18.32.2 dev eth2 proto bgp"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "undo the preference",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N you -c 'configure terminal' -c 'router bgp 64500' -c 'address-family ipv4 unicast' -c 'no neighbor 198.18.32.2 route-map PREFER-T2 in' -c 'end' -c 'clear bgp ipv4 unicast 198.18.32.2 soft in'"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "origin",
+      "name": "AS_PATH prepending: the origin makes its path via t1 look longer (64530 x3)",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N origin -c 'configure terminal' -c 'route-map PREPEND permit 10' -c 'set as-path prepend 64530 64530' -c 'exit' -c 'router bgp 64530' -c 'address-family ipv4 unicast' -c 'neighbor 198.18.33.1 route-map PREPEND out' -c 'end' -c 'clear bgp ipv4 unicast 198.18.33.1 soft out'"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "inbound traffic engineering worked: you now prefer t2 (3 ASes) over t1 (4 ASes)",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N you -c 'show bgp ipv4 unicast 203.0.113.0/24'; ip route show 203.0.113.0/24"
+      ],
+      "save": "you-prepend.txt",
+      "timeout": "15s",
+      "expect_contains": [
+        "64510 64530 64530 64530",
+        "via 198.18.32.2 dev eth2 proto bgp"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "origin",
+      "name": "undo the prepend",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N origin -c 'configure terminal' -c 'router bgp 64530' -c 'address-family ipv4 unicast' -c 'no neighbor 198.18.33.1 route-map PREPEND out' -c 'end' -c 'clear bgp ipv4 unicast 198.18.33.1 soft out'"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "anycast: 198.51.100.0/24 is announced by two sites of AS64550; you sees two equal-length paths",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N you -c 'show bgp ipv4 unicast 198.51.100.0/24'"
+      ],
+      "save": "you-anycast.txt",
+      "timeout": "15s",
+      "expect_contains": [
+        "64510 64550",
+        "64520 64550"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "the user reaches whichever site its path leads to",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s --noproxy '*' -o /dev/null -D - --max-time 3 http://198.51.100.53/ | grep -i x-served-by"
+      ],
+      "save": "anycast-before.txt",
+      "expect_contains": [
+        "X-Served-By: site-"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "which site served? remember it",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(curl -s --noproxy '*' -o /dev/null -D - --max-time 3 http://198.51.100.53/ | grep -i x-served-by | tr -d '\\r' | awk '{print $2}'); echo \"serving: $s\"; echo $s > /tmp/netlab-bgp-site"
+      ],
+      "expect_contains": [
+        "serving: site-"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "planned maintenance: the serving site withdraws its announcement; measure the gap",
+      "run": [
+        "sh",
+        "-c",
+        "ping -i 0.05 -c 100 -W 1 -q 198.51.100.53 > /tmp/netlab-bgp-ping.txt & sleep 1; s=$(cat /tmp/netlab-bgp-site); n=any$(echo ${s#site-} | tr A-Z a-z); ip netns exec nl-bgp-$n vtysh -N $n -c 'configure terminal' -c 'router bgp 64550' -c 'address-family ipv4 unicast' -c 'no network 198.51.100.0/24'; wait; awk '/transmitted/ {lost=$1-$4; printf \"lost %d of %d probes = about %.2f s without the service\\n\", lost, $1, lost*0.05}' /tmp/netlab-bgp-ping.txt"
+      ],
+      "save": "anycast-withdraw.txt",
+      "expect_contains": [
+        "about"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "the other site serves now",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s --noproxy '*' -o /dev/null -D - --max-time 3 http://198.51.100.53/ | grep -i x-served-by"
+      ],
+      "save": "anycast-after.txt",
+      "timeout": "10s",
+      "expect_contains": [
+        "X-Served-By: site-"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "restore the withdrawn site",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(cat /tmp/netlab-bgp-site); n=any$(echo ${s#site-} | tr A-Z a-z); ip netns exec nl-bgp-$n vtysh -N $n -c 'configure terminal' -c 'router bgp 64550' -c 'address-family ipv4 unicast' -c 'network 198.51.100.0/24'; sleep 2; curl -s --noproxy '*' -o /dev/null -D - --max-time 3 http://198.51.100.53/ | grep -i x-served-by"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "which site serves now?",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(curl -s --noproxy '*' -o /dev/null -D - --max-time 3 http://198.51.100.53/ | grep -i x-served-by | tr -d '\\r' | awk '{print $2}'); echo \"serving: $s\"; echo $s > /tmp/netlab-bgp-site"
+      ],
+      "timeout": "10s",
+      "expect_contains": [
+        "serving: site-"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "unplanned failure: that site's router hangs (BGP silent, packets dropped); only the 3 s hold timer notices",
+      "run": [
+        "sh",
+        "-c",
+        "ping -i 0.05 -c 200 -W 1 -q 198.51.100.53 > /tmp/netlab-bgp-ping.txt & sleep 1; s=$(cat /tmp/netlab-bgp-site); n=any$(echo ${s#site-} | tr A-Z a-z); ip netns exec nl-bgp-$n iptables -I INPUT -j DROP; ip netns exec nl-bgp-$n iptables -I OUTPUT -j DROP; ip netns exec nl-bgp-$n iptables -I FORWARD -j DROP; wait; awk '/transmitted/ {lost=$1-$4; printf \"lost %d of %d probes = about %.2f s without the service\\n\", lost, $1, lost*0.05}' /tmp/netlab-bgp-ping.txt"
+      ],
+      "save": "anycast-silent.txt",
+      "expect_contains": [
+        "about"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "heal the site",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(cat /tmp/netlab-bgp-site); n=any$(echo ${s#site-} | tr A-Z a-z); ip netns exec nl-bgp-$n iptables -F; echo healed $n"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "before the hijack: 203.0.113.10 is the origin's server",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s --noproxy '*' -o /dev/null -D - --max-time 3 http://203.0.113.10/ | grep -i x-served-by"
+      ],
+      "save": "hijack-before.txt",
+      "expect_contains": [
+        "X-Served-By: origin-server"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "rogue",
+      "name": "hijack: AS64566 announces 203.0.113.0/25, more specific than the origin's /24",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N rogue -c 'configure terminal' -c 'router bgp 64566' -c 'address-family ipv4 unicast' -c 'network 203.0.113.0/25'"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "you now has both; longest prefix match picks the /25 before BGP attributes matter",
+      "run": [
+        "sh",
+        "-c",
+        "sleep 2; ip route show 203.0.113.0/24; ip route show 203.0.113.0/25; ip route get 203.0.113.10"
+      ],
+      "save": "hijack-routes.txt",
+      "timeout": "15s",
+      "expect_contains": [
+        "203.0.113.0/25",
+        "via 198.18.32.2",
+        "203.0.113.10 via 198.18.32.2 dev eth2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "the user's request is answered by the hijacker, and nothing looks wrong to the application",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s --noproxy '*' -o /dev/null -D - --max-time 3 http://203.0.113.10/ | grep -i x-served-by"
+      ],
+      "save": "hijack-served.txt",
+      "expect_contains": [
+        "X-Served-By: ROGUE"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "t2",
+      "name": "the defense: t2 filters what its customer may announce (an IRR- or RPKI-derived allowlist; here: nothing in 203.0.113.0/24)",
+      "run": [
+        "sh",
+        "-c",
+        "vtysh -N t2 -c 'configure terminal' -c 'ip prefix-list ROGUE-ALLOWED seq 5 permit 198.18.99.0/24' -c 'route-map FROM-ROGUE permit 10' -c 'match ip address prefix-list ROGUE-ALLOWED' -c 'exit' -c 'router bgp 64520' -c 'address-family ipv4 unicast' -c 'neighbor 198.18.38.2 route-map FROM-ROGUE in' -c 'end' -c 'clear bgp ipv4 unicast 198.18.38.2 soft in'"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "you",
+      "name": "the /25 is gone everywhere downstream of t2",
+      "run": [
+        "ip",
+        "route",
+        "get",
+        "203.0.113.10"
+      ],
+      "save": "hijack-filtered.txt",
+      "timeout": "15s",
+      "expect_contains": [
+        "203.0.113.10 via 198.18.31.2 dev eth1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "user",
+      "name": "and the real server answers again",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s --noproxy '*' -o /dev/null -D - --max-time 3 http://203.0.113.10/ | grep -i x-served-by"
+      ],
+      "save": "hijack-after.txt",
+      "expect_contains": [
+        "X-Served-By: origin-server"
+      ]
+    }
+  ]
+}

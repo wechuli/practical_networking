@@ -1,0 +1,11 @@
+{
+  "provenance": "Synthetic teaching observations, not a captured operator incident",
+  "date": "2026-09-10",
+  "prefix": "203.0.113.0/24",
+  "observer_as": 64500,
+  "before": { "as_path": [64501, 64503], "probe_rtt_ms": 20 },
+  "after": { "as_path": [64502, 64504, 64503], "probe_rtt_ms": 65 },
+  "affected_customer_as": 64510,
+  "customer_local_pref": null,
+  "origin_validation": "unknown"
+}

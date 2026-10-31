@@ -1,0 +1,12 @@
+{
+  "provenance": "Synthetic teaching fixture, not an exported customer incident",
+  "window": { "start": 1789027200, "end": 1789027259 },
+  "attempts": 20,
+  "timeouts": 3,
+  "nat_ipv4_addresses": 1,
+  "destination": { "ip": "203.0.113.80", "port": 443, "protocol": 6 },
+  "ErrorPortAllocation": 3,
+  "ActiveConnectionCount": 61000,
+  "connections_to_destination": 55000,
+  "healthy_comparison_subnet": "10.0.1.0/24"
+}

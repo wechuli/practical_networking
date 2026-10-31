@@ -1,0 +1,587 @@
+{
+  "name": "containers",
+  "description": "A container network built by hand, the way Docker builds one: namespaces as containers, veth pairs into a bridge that is their gateway, MASQUERADE for egress (and what happens without it), DNAT port publishing from outside, from the host itself and from 127.0.0.1, hairpin NAT with and without br_netfilter, and SNAT port exhaustion with conntrack's evidence",
+  "nodes": [
+    {
+      "name": "host",
+      "bridges": [
+        {
+          "name": "cbr0",
+          "addr": [
+            "10.88.0.1/24"
+          ]
+        }
+      ],
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      }
+    },
+    {
+      "name": "c1",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "10.88.0.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "",
+            "-plain",
+            "10.88.0.2:80"
+          ],
+          "port": 80
+        }
+      ]
+    },
+    {
+      "name": "c2",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "10.88.0.1"
+        }
+      ]
+    },
+    {
+      "name": "internet",
+      "services": [
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "",
+            "-plain",
+            "198.18.140.10:8080"
+          ],
+          "port": 8080
+        },
+        {
+          "name": "hold",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.140.10:9000",
+            "-mode",
+            "hold"
+          ],
+          "port": 9000
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "c1",
+        "if": "eth0",
+        "addr": [
+          "10.88.0.2/24"
+        ]
+      },
+      "b": {
+        "node": "host",
+        "if": "veth-c1",
+        "bridge": "cbr0"
+      }
+    },
+    {
+      "a": {
+        "node": "c2",
+        "if": "eth0",
+        "addr": [
+          "10.88.0.3/24"
+        ]
+      },
+      "b": {
+        "node": "host",
+        "if": "veth-c2",
+        "bridge": "cbr0"
+      }
+    },
+    {
+      "a": {
+        "node": "host",
+        "if": "eth1",
+        "addr": [
+          "198.18.140.1/24"
+        ]
+      },
+      "b": {
+        "node": "internet",
+        "if": "eth0",
+        "addr": [
+          "198.18.140.10/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "c1",
+      "name": "a 'container' is a namespace with one interface, a veth whose peer is a port of the host's bridge",
+      "run": [
+        "ip",
+        "-d",
+        "link",
+        "show",
+        "eth0"
+      ],
+      "save": "c1-link.txt",
+      "expect_contains": [
+        "veth"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "on the host: the veth peers are bridge ports; the bridge holds the containers' gateway address",
+      "run": [
+        "sh",
+        "-c",
+        "bridge link show; ip -4 addr show cbr0"
+      ],
+      "save": "host-bridge.txt",
+      "expect_contains": [
+        "veth-c1",
+        "master cbr0",
+        "veth-c2",
+        "inet 10.88.0.1/24"
+      ]
+    },
+    {
+      "type": "ping",
+      "from": "c1",
+      "to": "10.88.0.3",
+      "expect": "reachable"
+    },
+    {
+      "type": "fdb",
+      "node": "host",
+      "bridge": "cbr0",
+      "port": "veth-c2",
+      "learns": "c2:eth0"
+    },
+    {
+      "type": "command",
+      "node": "c1",
+      "name": "container to container on one bridge is switched, not routed: no TTL decrement, the peer's MAC is in c1's neighbour table",
+      "run": [
+        "sh",
+        "-c",
+        "ping -c1 10.88.0.3 | grep ttl; ip neigh show 10.88.0.3"
+      ],
+      "save": "c1-to-c2.txt",
+      "expect_contains": [
+        "ttl=64",
+        "lladdr"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "internet",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn"
+      ],
+      "save": "no-masq.pcap",
+      "name": "egress WITHOUT source NAT: the request reaches the internet from 10.88.0.2 \u2014 and the reply has no route back",
+      "during": {
+        "node": "c1",
+        "run": [
+          "ping",
+          "-c",
+          "2",
+          "-W",
+          "1",
+          "198.18.140.10"
+        ]
+      },
+      "expect_contains": [
+        "10.88.0.2 > 198.18.140.10: ICMP echo request"
+      ],
+      "expect_absent": [
+        "198.18.140.10 > 10.88.0.2: ICMP echo reply"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "internet",
+      "name": "the internet side has no route to private container addresses",
+      "run": [
+        "ip",
+        "route",
+        "get",
+        "10.88.0.2"
+      ],
+      "save": "internet-route.txt",
+      "expect_exit": 2,
+      "expect_contains": [
+        "unreachable"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "add Docker's egress rule: MASQUERADE what leaves from the container subnet through any interface but the bridge",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-A",
+        "POSTROUTING",
+        "-s",
+        "10.88.0.0/24",
+        "!",
+        "-o",
+        "cbr0",
+        "-j",
+        "MASQUERADE"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "internet",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn"
+      ],
+      "save": "masq.pcap",
+      "name": "with MASQUERADE the internet sees the host's address, and replies come back",
+      "during": {
+        "node": "c1",
+        "run": [
+          "ping",
+          "-c",
+          "2",
+          "-W",
+          "1",
+          "198.18.140.10"
+        ]
+      },
+      "expect_contains": [
+        "198.18.140.1 > 198.18.140.10: ICMP echo request",
+        "198.18.140.10 > 198.18.140.1: ICMP echo reply"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "conntrack holds the translation: original tuple from 10.88.0.2, reply tuple to 198.18.140.1",
+      "run": [
+        "sh",
+        "-c",
+        "conntrack -L -p icmp 2>/dev/null"
+      ],
+      "save": "conntrack-icmp.txt",
+      "expect_contains": [
+        "src=10.88.0.2 dst=198.18.140.10",
+        "dst=198.18.140.1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "internet",
+      "name": "before publishing: nothing listens on the host's port 8080",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 2 --noproxy '*' http://198.18.140.1:8080/"
+      ],
+      "expect_exit": 7
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "publish c1:80 as host:8080, Docker's way: DNAT in PREROUTING for any local address",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-A",
+        "PREROUTING",
+        "-m",
+        "addrtype",
+        "--dst-type",
+        "LOCAL",
+        "-p",
+        "tcp",
+        "--dport",
+        "8080",
+        "-j",
+        "DNAT",
+        "--to-destination",
+        "10.88.0.2:80"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "internet",
+      "name": "from outside it works, and the container sees the real client address (DNAT only changes the destination)",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 2 --noproxy '*' http://198.18.140.1:8080/"
+      ],
+      "save": "publish-outside.txt",
+      "expect_contains": [
+        "from 198.18.140.10:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "from the host itself it does not: locally generated packets never pass PREROUTING",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 2 --noproxy '*' http://198.18.140.1:8080/"
+      ],
+      "expect_exit": 7
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "Docker's second rule: the same DNAT in OUTPUT (for non-loopback destinations)",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-A",
+        "OUTPUT",
+        "!",
+        "-d",
+        "127.0.0.0/8",
+        "-m",
+        "addrtype",
+        "--dst-type",
+        "LOCAL",
+        "-p",
+        "tcp",
+        "--dport",
+        "8080",
+        "-j",
+        "DNAT",
+        "--to-destination",
+        "10.88.0.2:80"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "now the host reaches it on its own address \u2014 but 127.0.0.1:8080 still fails: a 127/8 source cannot leave towards the bridge",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 2 --noproxy '*' http://198.18.140.1:8080/; curl -s -m 2 --noproxy '*' http://127.0.0.1:8080/; echo \"127.0.0.1: exit $?\""
+      ],
+      "save": "publish-host.txt",
+      "expect_contains": [
+        "from 198.18.140.1:",
+        "127.0.0.1: exit 7"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "what it takes in the kernel for 127.0.0.1 \u2014 route_localnet, DNAT in OUTPUT, and SNAT away from 127/8 (why Docker runs docker-proxy instead by default)",
+      "run": [
+        "sh",
+        "-c",
+        "sysctl -qw net.ipv4.conf.cbr0.route_localnet=1 && iptables -t nat -A OUTPUT -d 127.0.0.1 -p tcp --dport 8080 -j DNAT --to-destination 10.88.0.2:80 && iptables -t nat -I POSTROUTING -s 127.0.0.0/8 -o cbr0 -j MASQUERADE && curl -s -m 2 --noproxy '*' http://127.0.0.1:8080/"
+      ],
+      "save": "publish-loopback.txt",
+      "expect_contains": [
+        "from 10.88.0.1:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "hairpin, without br_netfilter: turn off iptables for bridged frames in this namespace",
+      "run": [
+        "sh",
+        "-c",
+        "modprobe br_netfilter 2>/dev/null; sysctl -w net.bridge.bridge-nf-call-iptables=0"
+      ],
+      "expect_contains": [
+        "= 0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c2",
+      "name": "c2 calls c1 through the host's published port: DNAT sends it to c1, c1 answers c2 directly over the bridge, from an address c2 never called \u2014 it fails",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 2 --noproxy '*' http://198.18.140.1:8080/"
+      ],
+      "save": "hairpin-off.txt",
+      "expect_exit": 28
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "with br_netfilter (Docker loads it and turns this on), the bridged reply passes conntrack and is un-NATed",
+      "run": [
+        "sysctl",
+        "-w",
+        "net.bridge.bridge-nf-call-iptables=1"
+      ],
+      "expect_contains": [
+        "= 1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c2",
+      "name": "the same call now works, and c1 sees c2's own address",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 2 --noproxy '*' http://198.18.140.1:8080/"
+      ],
+      "save": "hairpin-on.txt",
+      "expect_contains": [
+        "from 10.88.0.3:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "SNAT to a tiny port range: four source ports for connections to 198.18.140.10:9000",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-I",
+        "POSTROUTING",
+        "-s",
+        "10.88.0.0/24",
+        "-p",
+        "tcp",
+        "--dport",
+        "9000",
+        "-j",
+        "SNAT",
+        "--to-source",
+        "198.18.140.1:40000-40003"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c1",
+      "name": "c1 opens four long-lived connections, using all four translated ports",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/tcplab dial -to 198.18.140.10:9000 -n 4 -hold 30s > /dev/null 2>&1 & sleep 1; ss -Htn state established dst 198.18.140.10 | wc -l"
+      ],
+      "save": "snat-held.txt",
+      "expect_contains": [
+        "4"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "conntrack: four translated flows, reply ports 40000\u201340003",
+      "run": [
+        "sh",
+        "-c",
+        "conntrack -L -p tcp --dport 9000 2>/dev/null | grep -o 'dport=4000[0-3]' | sort"
+      ],
+      "save": "snat-conntrack.txt",
+      "expect_contains": [
+        "dport=40000",
+        "dport=40001",
+        "dport=40002",
+        "dport=40003"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c2",
+      "name": "a fifth connection \u2014 from another container \u2014 cannot get a translation: its SYNs are dropped and it times out",
+      "run": [
+        "${BIN}/tcplab",
+        "dial",
+        "-to",
+        "198.18.140.10:9000",
+        "-timeout",
+        "3s"
+      ],
+      "save": "snat-fifth.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "gave up"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "the evidence is in conntrack's statistics: insert_failed and drop count the SYNs that found no free tuple",
+      "run": [
+        "sh",
+        "-c",
+        "conntrack -S | awk '{for(i=1;i<=NF;i++) if ($i ~ /^(insert_failed|drop)=/) {split($i,a,\"=\"); s[a[1]]+=a[2]}} END {print \"insert_failed=\" s[\"insert_failed\"], \"drop=\" s[\"drop\"]}'"
+      ],
+      "save": "snat-stats.txt",
+      "expect_absent": [
+        "insert_failed=0 "
+      ]
+    },
+    {
+      "type": "command",
+      "node": "host",
+      "name": "widen the range to 128 ports",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-R",
+        "POSTROUTING",
+        "1",
+        "-s",
+        "10.88.0.0/24",
+        "-p",
+        "tcp",
+        "--dport",
+        "9000",
+        "-j",
+        "SNAT",
+        "--to-source",
+        "198.18.140.1:40000-40127"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c2",
+      "name": "and the fifth connection succeeds at once",
+      "run": [
+        "${BIN}/tcplab",
+        "dial",
+        "-to",
+        "198.18.140.10:9000",
+        "-timeout",
+        "3s"
+      ],
+      "save": "snat-wider.txt",
+      "expect_contains": [
+        "connected"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "name": "stp",
+  "description": "Two switches joined by two links: STP blocks one, then fails over when the forwarding link breaks",
+  "nodes": [
+    { "name": "left",  "bridges": [ { "name": "br0", "stp": true, "forward_delay": "4s" } ] },
+    { "name": "right", "bridges": [ { "name": "br0", "stp": true, "forward_delay": "4s" } ] },
+    { "name": "hosta" },
+    { "name": "hostb" }
+  ],
+  "links": [
+    { "a": { "node": "left", "if": "path1", "bridge": "br0" }, "b": { "node": "right", "if": "path1", "bridge": "br0" } },
+    { "a": { "node": "left", "if": "path2", "bridge": "br0" }, "b": { "node": "right", "if": "path2", "bridge": "br0" } },
+    { "a": { "node": "hosta", "if": "eth0", "addr": ["198.18.1.1/24"] }, "b": { "node": "left",  "if": "host", "bridge": "br0" } },
+    { "a": { "node": "hostb", "if": "eth0", "addr": ["198.18.1.2/24"] }, "b": { "node": "right", "if": "host", "bridge": "br0" } }
+  ],
+  "checks": [
+    { "type": "stp", "nodes": ["left", "right"], "bridge": "br0", "forwarding": 5, "blocking": 1, "timeout": "60s",
+      "name": "STP converges: one of the two parallel links is blocked, everything else forwards" },
+    { "type": "command", "node": "left",  "run": ["bridge", "link", "show"], "save": "left-stp.txt" },
+    { "type": "command", "node": "right", "run": ["bridge", "link", "show"], "save": "right-stp.txt" },
+    { "type": "ping", "from": "hosta", "to": "198.18.1.2", "expect": "reachable",
+      "name": "hosts on the two switches reach each other across the loop-free tree" },
+    { "type": "command", "node": "right", "run": ["ip", "link", "set", "path1", "down"],
+      "name": "break link path1 (both ends lose carrier)" },
+    { "type": "stp", "nodes": ["left", "right"], "bridge": "br0", "forwarding": 4, "blocking": 0, "timeout": "60s",
+      "name": "STP fails over: path2 forwards; nothing is blocked any more" },
+    { "type": "ping", "from": "hosta", "to": "198.18.1.2", "expect": "reachable",
+      "name": "hosts reach each other again over path2" }
+  ]
+}

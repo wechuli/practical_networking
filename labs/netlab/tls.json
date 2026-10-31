@@ -1,0 +1,753 @@
+{
+  "name": "tls",
+  "description": "TLS with a private PKI: cleartext vs TLS on the wire, TLS 1.2 vs 1.3 handshakes (what is visible), decryption with a key log, round trips measured through a 50 ms relay (1.3, 1.2, resumption, HelloRetryRequest), ten certificate failures in Go and curl, SNI and the default certificate, protocol-version mismatch, mTLS, and a TLS-inspecting middlebox across curl, Go and Python",
+  "nodes": [
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.91.1"
+        }
+      ],
+      "setup": [
+        [
+          "${BIN}/tlslab",
+          "pki",
+          "-dir",
+          "${EVIDENCE}/pki"
+        ]
+      ],
+      "services": [
+        {
+          "name": "https",
+          "run": [
+            "${BIN}/tlslab",
+            "serve",
+            "-addr",
+            "198.18.91.10:443",
+            "-plain",
+            "198.18.91.10:80",
+            "-default",
+            "${EVIDENCE}/pki/default-chain.pem,${EVIDENCE}/pki/default.key",
+            "-site",
+            "shop.test=${EVIDENCE}/pki/shop-chain.pem,${EVIDENCE}/pki/shop.key",
+            "-site",
+            "www.shop.test=${EVIDENCE}/pki/shop-chain.pem,${EVIDENCE}/pki/shop.key",
+            "-site",
+            "rsa.shop.test=${EVIDENCE}/pki/rsa-chain.pem,${EVIDENCE}/pki/rsa.key",
+            "-site",
+            "expired.shop.test=${EVIDENCE}/pki/expired-chain.pem,${EVIDENCE}/pki/expired.key",
+            "-site",
+            "future.shop.test=${EVIDENCE}/pki/future-chain.pem,${EVIDENCE}/pki/future.key",
+            "-site",
+            "wrong.shop.test=${EVIDENCE}/pki/other-chain.pem,${EVIDENCE}/pki/other.key",
+            "-site",
+            "a.wild.test=${EVIDENCE}/pki/wild-chain.pem,${EVIDENCE}/pki/wild.key",
+            "-site",
+            "wild.test=${EVIDENCE}/pki/wild-chain.pem,${EVIDENCE}/pki/wild.key",
+            "-site",
+            "a.b.wild.test=${EVIDENCE}/pki/wild-chain.pem,${EVIDENCE}/pki/wild.key",
+            "-site",
+            "eku.shop.test=${EVIDENCE}/pki/clientonly-chain.pem,${EVIDENCE}/pki/clientonly.key",
+            "-site",
+            "self.shop.test=${EVIDENCE}/pki/selfsigned-chain.pem,${EVIDENCE}/pki/selfsigned.key",
+            "-site",
+            "rogue.shop.test=${EVIDENCE}/pki/rogue-chain.pem,${EVIDENCE}/pki/rogue.key",
+            "-site",
+            "noint.shop.test=${EVIDENCE}/pki/shop.pem,${EVIDENCE}/pki/shop.key"
+          ],
+          "port": 443
+        },
+        {
+          "name": "tls12",
+          "run": [
+            "${BIN}/tlslab",
+            "serve",
+            "-addr",
+            "198.18.91.10:8443",
+            "-site",
+            "shop.test=${EVIDENCE}/pki/shop-chain.pem,${EVIDENCE}/pki/shop.key",
+            "-max",
+            "1.2"
+          ],
+          "port": 8443
+        },
+        {
+          "name": "p256",
+          "run": [
+            "${BIN}/tlslab",
+            "serve",
+            "-addr",
+            "198.18.91.10:7443",
+            "-site",
+            "shop.test=${EVIDENCE}/pki/shop-chain.pem,${EVIDENCE}/pki/shop.key",
+            "-groups",
+            "P256"
+          ],
+          "port": 7443
+        },
+        {
+          "name": "mtls",
+          "run": [
+            "${BIN}/tlslab",
+            "serve",
+            "-addr",
+            "198.18.91.10:9443",
+            "-site",
+            "shop.test=${EVIDENCE}/pki/shop-chain.pem,${EVIDENCE}/pki/shop.key",
+            "-clientca",
+            "${EVIDENCE}/pki/root.pem"
+          ],
+          "port": 9443
+        },
+        {
+          "name": "legacy",
+          "run": [
+            "${BIN}/tlslab",
+            "serve",
+            "-addr",
+            "198.18.91.10:1443",
+            "-site",
+            "shop.test=${EVIDENCE}/pki/shop-chain.pem,${EVIDENCE}/pki/shop.key",
+            "-min",
+            "1.0",
+            "-max",
+            "1.1"
+          ],
+          "port": 1443
+        }
+      ]
+    },
+    {
+      "name": "router",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "files": {
+        "/etc/hosts": "127.0.0.1\tlocalhost\n198.18.91.10\ta.b.wild.test\n198.18.91.10\ta.wild.test\n198.18.91.10\teku.shop.test\n198.18.91.10\texpired.shop.test\n198.18.91.10\tfuture.shop.test\n198.18.91.10\tnoint.shop.test\n198.18.91.10\trogue.shop.test\n198.18.91.10\trsa.shop.test\n198.18.91.10\tself.shop.test\n198.18.91.10\tshop.test\n198.18.91.10\twild.test\n198.18.91.10\twrong.shop.test\n198.18.91.10\twww.shop.test\n"
+      },
+      "services": [
+        {
+          "name": "relay13",
+          "run": [
+            "${BIN}/tlslab",
+            "relay",
+            "-listen",
+            "198.18.90.1:4443",
+            "-to",
+            "198.18.91.10:443",
+            "-delay",
+            "25ms"
+          ],
+          "port": 4443
+        },
+        {
+          "name": "relay12",
+          "run": [
+            "${BIN}/tlslab",
+            "relay",
+            "-listen",
+            "198.18.90.1:4444",
+            "-to",
+            "198.18.91.10:8443",
+            "-delay",
+            "25ms"
+          ],
+          "port": 4444
+        },
+        {
+          "name": "relayhrr",
+          "run": [
+            "${BIN}/tlslab",
+            "relay",
+            "-listen",
+            "198.18.90.1:4445",
+            "-to",
+            "198.18.91.10:7443",
+            "-delay",
+            "25ms"
+          ],
+          "port": 4445
+        },
+        {
+          "name": "intercept",
+          "run": [
+            "${BIN}/tlslab",
+            "intercept",
+            "-listen",
+            "198.18.90.1:8443",
+            "-ca",
+            "${EVIDENCE}/pki/inspection-ca.pem",
+            "-cakey",
+            "${EVIDENCE}/pki/inspection-ca.key",
+            "-upstream-ca",
+            "${EVIDENCE}/pki/root.pem"
+          ],
+          "port": 8443
+        }
+      ]
+    },
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.90.1"
+        }
+      ],
+      "files": {
+        "/etc/hosts": "127.0.0.1\tlocalhost\n198.18.91.10\ta.b.wild.test\n198.18.91.10\ta.wild.test\n198.18.91.10\teku.shop.test\n198.18.91.10\texpired.shop.test\n198.18.91.10\tfuture.shop.test\n198.18.91.10\tnoint.shop.test\n198.18.91.10\trogue.shop.test\n198.18.91.10\trsa.shop.test\n198.18.91.10\tself.shop.test\n198.18.91.10\tshop.test\n198.18.91.10\twild.test\n198.18.91.10\twrong.shop.test\n198.18.91.10\twww.shop.test\n"
+      }
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.90.10/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth0",
+        "addr": [
+          "198.18.90.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "router",
+        "if": "eth1",
+        "addr": [
+          "198.18.91.1/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.91.10/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 80",
+      "decode": [
+        "-nn",
+        "-A"
+      ],
+      "save": "cleartext.pcap",
+      "name": "HTTP Basic auth over plain HTTP: the credentials cross the wire readable",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; curl -sS -u alice:s3cret http://shop.test/"
+        ]
+      },
+      "expect_contains": [
+        "Authorization: Basic YWxpY2U6czNjcmV0",
+        "welcome, alice"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "decode it: Basic auth is base64, not encryption",
+      "run": [
+        "sh",
+        "-c",
+        "echo YWxpY2U6czNjcmV0 | base64 -d; echo"
+      ],
+      "expect_contains": [
+        "alice:s3cret"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 443",
+      "decode": [
+        "-nn",
+        "-A"
+      ],
+      "save": "https.pcap",
+      "name": "the same over HTTPS: no credentials in the capture \u2014 but the name (SNI) is still in cleartext",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; curl -sS -u alice:s3cret --cacert $P/root.pem https://shop.test/ >/dev/null && echo fetched"
+        ]
+      },
+      "expect_contains": [
+        "shop.test",
+        "fetched"
+      ],
+      "expect_absent": [
+        "YWxpY2U6czNjcmV0",
+        "Authorization"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 443 or tcp port 8443",
+      "decode": [
+        "-nn"
+      ],
+      "save": "handshakes.pcap",
+      "name": "a TLS 1.3 and a TLS 1.2 handshake to the same site, captured",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; curl -s -o /dev/null --http1.1 --cacert $P/root.pem https://shop.test/ && curl -s -o /dev/null --http1.1 --cacert $P/root.pem https://shop.test:8443/ && echo both"
+        ]
+      },
+      "expect_contains": [
+        "both"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "what a passive observer can read: in 1.3 only ClientHello (1) and ServerHello (2); in 1.2 also Certificate (11), ServerKeyExchange (12), ServerHelloDone (14), ClientKeyExchange (16)",
+      "run": [
+        "sh",
+        "-c",
+        "tshark -r ${EVIDENCE}/handshakes.pcap -Y 'tls.handshake' -T fields -E separator=' ' -e ip.src -e tcp.dstport -e tls.handshake.type -e tls.handshake.extensions_server_name -e frame.len 2>/dev/null"
+      ],
+      "save": "handshake-types.txt",
+      "expect_contains": [
+        " 443 1 shop.test",
+        " 8443 1 shop.test",
+        "2,11,12,14",
+        " 8443 16 "
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 443",
+      "decode": [
+        "-nn"
+      ],
+      "save": "keylog.pcap",
+      "name": "the same request with SSLKEYLOGFILE set: curl writes the session secrets",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; rm -f ${EVIDENCE}/keys.log; SSLKEYLOGFILE=${EVIDENCE}/keys.log curl -s -o /dev/null --http1.1 --cacert $P/root.pem https://shop.test/; cut -d' ' -f1 ${EVIDENCE}/keys.log | sort"
+        ]
+      },
+      "expect_contains": [
+        "CLIENT_HANDSHAKE_TRAFFIC_SECRET",
+        "SERVER_TRAFFIC_SECRET_0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "with the key log, Wireshark (tshark) decrypts it: the encrypted handshake (8 EncryptedExtensions, 11 Certificate, 15 CertificateVerify, 20 Finished, 4 NewSessionTicket) and the GET",
+      "run": [
+        "sh",
+        "-c",
+        "tshark -r ${EVIDENCE}/keylog.pcap -o tls.keylog_file:${EVIDENCE}/keys.log -Y 'http.request or tls.handshake.type==11' -T fields -E separator=' ' -e tls.handshake.type -e http.request.method -e http.host -e http.request.uri 2>/dev/null"
+      ],
+      "save": "decrypted.txt",
+      "expect_contains": [
+        "8,11,15,20",
+        "GET shop.test /"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "through a relay that adds 50 ms per round trip: a TLS 1.3 handshake costs one round trip, and so does a resumed one",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect 198.18.90.1:4443 -servername shop.test -resume -alpn http/1.1 | grep handshake"
+      ],
+      "save": "rtt-13.txt",
+      "expect_contains": [
+        "TLS 1.3",
+        "RESUMED"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "TLS 1.2: two round trips for a full handshake, one when the session is resumed",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect 198.18.90.1:4444 -servername shop.test -resume -alpn http/1.1 | grep handshake"
+      ],
+      "save": "rtt-12.txt",
+      "expect_contains": [
+        "TLS 1.2",
+        "RESUMED"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a server that only accepts P-256: the client's X25519/ML-KEM key shares are refused (HelloRetryRequest), costing a second round trip \u2014 every time",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect 198.18.90.1:4445 -servername shop.test -resume -alpn http/1.1 | grep handshake"
+      ],
+      "save": "rtt-hrr.txt",
+      "expect_contains": [
+        "TLS 1.3",
+        "RESUMED"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "curl's view of the same three paths: %{time_appconnect} is when TLS finished",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; for p in 4443 4444 4445; do curl -s -o /dev/null --cacert $P/root.pem --connect-to shop.test:443:198.18.90.1:$p -w \"port $p: tcp %{time_connect} s, tls done %{time_appconnect} s\\n\" https://shop.test/; done"
+      ],
+      "save": "rtt-curl.txt",
+      "expect_contains": [
+        "port 4443",
+        "port 4445"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 443",
+      "decode": [
+        "-nn"
+      ],
+      "save": "clienthello.pcap",
+      "name": "ClientHello sizes: Go 1.24 offers a post-quantum hybrid key share (X25519MLKEM768), curl/OpenSSL 3.0 does not",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; curl -s -o /dev/null --cacert $P/root.pem https://shop.test/; ${BIN}/tlslab inspect -cafile $P/root.pem -connect shop.test:443 >/dev/null; echo done"
+        ]
+      },
+      "expect_contains": [
+        "done"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the two ClientHellos' frame sizes, from the capture",
+      "run": [
+        "sh",
+        "-c",
+        "tshark -r ${EVIDENCE}/clienthello.pcap -Y 'tls.handshake.type==1' -T fields -e frame.len 2>/dev/null | awk 'NR==1{print \"curl ClientHello frame: \"$1\" bytes\"} NR==2{print \"Go ClientHello frame: \"$1\" bytes\"}'"
+      ],
+      "save": "clienthello-sizes.txt",
+      "expect_contains": [
+        "curl ClientHello frame:",
+        "Go ClientHello frame:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the client's system trust store does not know the lab root: a perfectly good chain is 'unknown'",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -connect shop.test:443 | grep -E 'verify|go error'; curl -sS -o /dev/null https://shop.test/ 2>&1 | head -1"
+      ],
+      "save": "system-store.txt",
+      "expect_exit": 0,
+      "expect_contains": [
+        "x509: certificate signed by unknown authority",
+        "unable to get local issuer certificate"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "trusting the lab root: the chain shop.test \u2192 Lab Issuing CA 1 \u2192 Lab Root CA verifies",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect shop.test:443"
+      ],
+      "save": "good.txt",
+      "expect_contains": [
+        "verify shop.test against",
+        "OK: shop.test \u2192 Lab Issuing CA 1 \u2192 Lab Root CA",
+        "names    shop.test, www.shop.test, noint.shop.test"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "eleven sites, one trust anchor \u2014 what Go's crypto/x509 says about each",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; for n in shop.test noint.shop.test expired.shop.test future.shop.test wrong.shop.test a.wild.test wild.test a.b.wild.test self.shop.test rogue.shop.test eku.shop.test; do r=$(${BIN}/tlslab inspect -cafile $P/root.pem -connect $n:443 2>&1 | grep -E 'go error|: OK' | sed 's/.*go error: //; s/.*: OK:.*/OK/'); echo \"$n \u2192 $r\"; done"
+      ],
+      "save": "failures-go.txt",
+      "expect_contains": [
+        "shop.test \u2192 OK",
+        "noint.shop.test \u2192 x509: certificate signed by unknown authority",
+        "expired.shop.test \u2192 x509: certificate has expired or is not yet valid",
+        "wrong.shop.test \u2192 x509: certificate is valid for other.test, not wrong.shop.test",
+        "a.wild.test \u2192 OK",
+        "wild.test \u2192 x509: certificate is valid for *.wild.test, not wild.test",
+        "eku.shop.test \u2192 x509: certificate specifies an incompatible key usage",
+        "self.shop.test \u2192 x509: certificate signed by unknown authority"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same eleven through curl (OpenSSL): exit 60 and OpenSSL's wording",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; for n in shop.test noint.shop.test expired.shop.test future.shop.test wrong.shop.test a.wild.test wild.test a.b.wild.test self.shop.test rogue.shop.test eku.shop.test; do r=$(curl -sS -o /dev/null --cacert $P/root.pem https://$n/ 2>&1); rc=$?; echo \"$n \u2192 exit $rc $(echo \"$r\" | head -1 | sed 's/^curl: //')\"; done"
+      ],
+      "save": "failures-curl.txt",
+      "expect_contains": [
+        "shop.test \u2192 exit 0",
+        "noint.shop.test \u2192 exit 60 (60) SSL certificate problem: unable to get local issuer certificate",
+        "certificate has expired",
+        "certificate is not yet valid",
+        "no alternative certificate subject name matches target host name 'wrong.shop.test'",
+        "self-signed certificate",
+        "unsuitable certificate purpose"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the missing intermediate, close up: the server sent only the leaf",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect noint.shop.test:443 | grep -E 'chain sent|note|meaning'"
+      ],
+      "save": "noint.txt",
+      "expect_contains": [
+        "1 certificate(s)",
+        "only the leaf was sent"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "no SNI (connecting by IP): the server falls back to its default certificate, for another name",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect 198.18.91.10:443 | grep -E 'SNI|subject|go error'"
+      ],
+      "save": "no-sni.txt",
+      "expect_contains": [
+        "no SNI",
+        "default.test",
+        "doesn't contain any IP SANs"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a server that only speaks TLS 1.0/1.1: modern clients refuse \u2014 Go and curl both report a protocol version alert",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect shop.test:1443 | grep -E 'go error'; curl -sS -o /dev/null --cacert $P/root.pem https://shop.test:1443/ 2>&1 | head -1"
+      ],
+      "save": "legacy.txt",
+      "expect_contains": [
+        "protocol version not supported",
+        "tlsv1 alert protocol version"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "mTLS without a client certificate: in TLS 1.3 the handshake 'succeeds' and the rejection arrives with the first read",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect shop.test:9443 | grep -E 'handshake|FAILED|meaning'; curl -sS -o /dev/null --cacert $P/root.pem https://shop.test:9443/ 2>&1 | head -1"
+      ],
+      "save": "mtls-none.txt",
+      "expect_contains": [
+        "TLS handshake",
+        "certificate required",
+        "tlsv13 alert certificate required"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "with a client certificate from the lab CA: accepted, and the server knows who called",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; curl -sS --cacert $P/root.pem --cert $P/client-chain.pem --key $P/client.key https://shop.test:9443/"
+      ],
+      "save": "mtls-good.txt",
+      "expect_contains": [
+        "client orders-service"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "with a client certificate from another CA: curl sends it, the server rejects it (Go would not even send it)",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; curl -sS -o /dev/null --cacert $P/root.pem --cert $P/rogue-client-chain.pem --key $P/rogue-client.key https://shop.test:9443/ 2>&1 | head -1; echo; ${BIN}/tlslab inspect -cafile $P/root.pem -connect shop.test:9443 -cert $P/rogue-client-chain.pem -key $P/rogue-client.key | grep -E 'FAILED|meaning'; grep 'unknown authority' ${EVIDENCE}/service-server-mtls.log | tail -1"
+      ],
+      "save": "mtls-rogue.txt",
+      "expect_contains": [
+        "certificate required",
+        "certificate signed by unknown authority"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "turn on TLS inspection: redirect forwarded port 443 to the intercepting proxy",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-A",
+        "PREROUTING",
+        "-i",
+        "eth0",
+        "-p",
+        "tcp",
+        "--dport",
+        "443",
+        "-j",
+        "REDIRECT",
+        "--to-ports",
+        "8443"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the client now sees a certificate issued by 'Corp TLS Inspection CA', not the lab's CA",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect shop.test:443 | grep -E 'issuer|verify|go error'"
+      ],
+      "save": "inspected.txt",
+      "expect_contains": [
+        "issuer   Corp TLS Inspection CA",
+        "x509: certificate signed by unknown authority"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "from the router itself (not redirected) the real chain is unchanged: comparing issuers inside and outside proves inspection",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; ${BIN}/tlslab inspect -cafile $P/root.pem -connect shop.test:443 | grep -E 'issuer|verify'"
+      ],
+      "save": "not-inspected.txt",
+      "expect_contains": [
+        "issuer   Lab Issuing CA 1",
+        "OK: shop.test \u2192 Lab Issuing CA 1 \u2192 Lab Root CA"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "three runtimes, each trusting only the lab root: all fail, each in its own words",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; curl -sS -o /dev/null --cacert $P/root.pem https://shop.test/ 2>&1 | head -1; SSL_CERT_FILE=$P/root.pem ${BIN}/tlslab get https://shop.test/; SSL_CERT_FILE=$P/root.pem python3 -c \"import urllib.request,sys\ntry: print('python:', urllib.request.urlopen('https://shop.test/', timeout=5).status)\nexcept Exception as e: print('python:', type(e).__name__, e)\""
+      ],
+      "save": "inspected-runtimes.txt",
+      "expect_contains": [
+        "self-signed certificate in certificate chain",
+        "x509: certificate signed by unknown authority",
+        "python: URLError",
+        "CERTIFICATE_VERIFY_FAILED"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the fix is trust, configured per runtime: a bundle with the inspection CA added",
+      "run": [
+        "sh",
+        "-c",
+        "unset SSL_CERT_FILE SSL_CERT_DIR CURL_CA_BUNDLE REQUESTS_CA_BUNDLE NODE_EXTRA_CA_CERTS JAVA_TOOL_OPTIONS HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; P=$NETLAB_EVIDENCE/pki; cat $P/root.pem $P/inspection-ca.pem > ${EVIDENCE}/bundle.pem; curl -sS --cacert ${EVIDENCE}/bundle.pem https://shop.test/; SSL_CERT_FILE=${EVIDENCE}/bundle.pem ${BIN}/tlslab get https://shop.test/; SSL_CERT_FILE=${EVIDENCE}/bundle.pem python3 -c \"import urllib.request,sys\ntry: print('python:', urllib.request.urlopen('https://shop.test/', timeout=5).status)\nexcept Exception as e: print('python:', type(e).__name__, e)\""
+      ],
+      "save": "inspected-fixed.txt",
+      "expect_contains": [
+        "hello from shop.test",
+        "go get https://shop.test/: 200 OK",
+        "python: 200"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "the proxy's own log: one real connection per intercepted client connection",
+      "run": [
+        "sh",
+        "-c",
+        "tail -3 ${EVIDENCE}/service-router-intercept.log"
+      ],
+      "save": "intercept-log.txt",
+      "expect_contains": [
+        "real certificate issued by \"Lab Issuing CA 1\", client shown one from \"Corp TLS Inspection CA\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "turn inspection off",
+      "run": [
+        "iptables",
+        "-t",
+        "nat",
+        "-F"
+      ]
+    }
+  ]
+}

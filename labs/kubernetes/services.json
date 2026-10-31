@@ -1,0 +1,17 @@
+{
+  "clusterCIDR": "10.244.0.0/16",
+  "nodes": { "node1": "192.168.50.11", "node2": "192.168.50.12" },
+  "services": [
+    {
+      "namespace": "default", "name": "web", "clusterIP": "10.96.0.20",
+      "ports": [ { "name": "http", "port": 80, "targetPort": 8080, "protocol": "TCP", "nodePort": 30080 } ],
+      "externalTrafficPolicy": "Cluster",
+      "endpoints": [ { "ip": "10.244.1.2", "node": "node1" }, { "ip": "10.244.2.2", "node": "node2" } ]
+    },
+    {
+      "namespace": "kube-system", "name": "kube-dns", "clusterIP": "10.96.0.10",
+      "ports": [ { "name": "dns", "port": 53, "protocol": "UDP" }, { "name": "dns-tcp", "port": 53, "protocol": "TCP" } ],
+      "endpoints": [ { "ip": "10.244.2.3", "node": "node2" } ]
+    }
+  ]
+}

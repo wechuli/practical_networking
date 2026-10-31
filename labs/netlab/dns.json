@@ -1,0 +1,943 @@
+{
+  "name": "dns",
+  "description": "DNS from the stub to the root and back: referrals and glue, an iterative trace, a validating resolver's upstream queries and cache, a record change and a negative answer followed through the cache, NODATA, truncation, lame and dead delegations, DNSSEC secure/insecure/bogus, REFUSED, split-horizon views, and glibc's search list, ndots, timeouts and /etc/hosts",
+  "nodes": [
+    {
+      "name": "auth1",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.52.1"
+        }
+      ],
+      "files": {
+        "/etc/bind/named.conf": "// auth1: an authoritative-only BIND instance for the lab\ninclude \"/etc/bind/rndc.key\";\ncontrols { inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { \"rndc-key\"; }; };\noptions {\n\tdirectory \"/var/cache/bind/netlab-dns-auth1\";\n\tpid-file none;\n\tlisten-on { 198.18.52.2; 198.18.52.3; 127.0.0.1; };\n\tlisten-on-v6 { none; };\n\trecursion no;\n\tdnssec-validation no;\n\tminimal-responses no-auth-recursive;\n\tnotify no;\n};\nlogging {\n\tchannel out { stderr; severity info; print-time yes; };\n\tcategory default { out; };\n\tcategory queries { out; };\n\tcategory lame-servers { null; };\n};\nview \"internal\" {\n\tmatch-clients { 198.18.60.2; };\n\tzone \"corp.test\" { type primary; file \"/etc/bind/corp.internal.db\"; };\n\tzone \"secure.test\" { type primary; file \"/etc/bind/secure.test.signed\"; };\n\tzone \"expired.test\" { type primary; file \"/etc/bind/expired.test.signed\"; };\n};\nview \"external\" {\n\tmatch-clients { any; };\n\tzone \"corp.test\" { type primary; file \"/etc/bind/corp.external.db\"; };\n\tzone \"secure.test\" { type primary; file \"/etc/bind/secure.test.signed\"; };\n\tzone \"expired.test\" { type primary; file \"/etc/bind/expired.test.signed\"; };\n};\n",
+        "/etc/bind/rndc.key": "key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"bmV0bGFiLWRucy1sYWItcm5kYy1rZXktbm90LWEtc2VjcmV0IQ==\";\n};\n",
+        "/etc/bind/corp.internal.db": "$TTL 300\n@\tSOA\tns1.corp.test. hostmaster.corp.test. 1 3600 900 604800 300\n@\tNS\tns1.corp.test.\n@\tNS\tns2.corp.test.\nns1\tA\t198.18.52.2\nns2\tA\t198.18.52.3\napi\tA\t10.20.0.10\ngit\tA\t10.20.0.20\n",
+        "/etc/bind/corp.external.db": "$TTL 300\n@\tSOA\tns1.corp.test. hostmaster.corp.test. 1 3600 900 604800 300\n@\tNS\tns1.corp.test.\n@\tNS\tns2.corp.test.\nns1\tA\t198.18.52.2\nns2\tA\t198.18.52.3\napi\tA\t192.0.2.10\n",
+        "/etc/bind/secure.test.db": "$TTL 300\n@\tSOA\tns1.corp.test. hostmaster.corp.test. 1 3600 900 604800 300\n@\tNS\tns1.corp.test.\nwww\tA\t198.18.70.40\n",
+        "/etc/bind/expired.test.db": "$TTL 300\n@\tSOA\tns1.corp.test. hostmaster.corp.test. 1 3600 900 604800 300\n@\tNS\tns1.corp.test.\nwww\tA\t198.18.70.50\n"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "rm -rf /var/cache/bind/netlab-dns-auth1; mkdir -p /var/cache/bind/netlab-dns-auth1 $NETLAB_EVIDENCE/dnssec"
+        ],
+        [
+          "sh",
+          "-c",
+          "cd /etc/bind && dnssec-keygen -q -K . -a ECDSAP256SHA256 -P now-3d -A now-3d -f KSK secure.test >/dev/null; dnssec-keygen -q -K . -a ECDSAP256SHA256 -P now-3d -A now-3d secure.test >/dev/null; dnssec-keygen -q -K . -a ECDSAP256SHA256 -P now-3d -A now-3d -f KSK expired.test >/dev/null; dnssec-keygen -q -K . -a ECDSAP256SHA256 -P now-3d -A now-3d expired.test >/dev/null; dnssec-signzone -q -K . -S -o secure.test -d $NETLAB_EVIDENCE/dnssec -f secure.test.signed secure.test.db && dnssec-signzone -q -P -K . -S -o expired.test -d $NETLAB_EVIDENCE/dnssec -f expired.test.signed -s now-172800 -e now-86400 expired.test.db"
+        ]
+      ],
+      "services": [
+        {
+          "name": "named",
+          "run": [
+            "named",
+            "-g",
+            "-c",
+            "/etc/bind/named.conf"
+          ],
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "auth2",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.54.1"
+        }
+      ],
+      "files": {
+        "/etc/bind/named.conf": "// auth2: an authoritative-only BIND instance for the lab\ninclude \"/etc/bind/rndc.key\";\ncontrols { inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { \"rndc-key\"; }; };\noptions {\n\tdirectory \"/var/cache/bind/netlab-dns-auth2\";\n\tpid-file none;\n\tlisten-on { 198.18.54.2; 127.0.0.1; };\n\tlisten-on-v6 { none; };\n\trecursion no;\n\tdnssec-validation no;\n\tminimal-responses no-auth-recursive;\n\tnotify no;\n};\nlogging {\n\tchannel out { stderr; severity info; print-time yes; };\n\tcategory default { out; };\n\tcategory queries { out; };\n\tcategory lame-servers { null; };\n};\nzone \"shop.test\" { type primary; file \"/etc/bind/shop.test.db\"; };\n",
+        "/etc/bind/rndc.key": "key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"bmV0bGFiLWRucy1sYWItcm5kYy1rZXktbm90LWEtc2VjcmV0IQ==\";\n};\n",
+        "/etc/bind/shop.test.db": "$TTL 10\n@\t20\tSOA\tns.shop.test. hostmaster.shop.test. 1 3600 900 604800 3600\n@\t20\tNS\tns.shop.test.\nns\t20\tA\t198.18.54.2\napp\t10\tA\t198.18.70.10\nwww\t10\tCNAME\tedge\napi\t10\tCNAME\tapi.corp.test.\nedge\t10\tA\t198.18.70.30\nrr\t30\tA\t198.18.70.1\nrr\t30\tA\t198.18.70.2\nrr\t30\tA\t198.18.70.3\nbig\t30\tTXT\t\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\" \"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\" \"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\" \"DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\" \"EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE\" \"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF\" \"GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG\" \"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH\"\n"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "rm -rf /var/cache/bind/netlab-dns-auth2; mkdir -p /var/cache/bind/netlab-dns-auth2 $NETLAB_EVIDENCE/dnssec"
+        ]
+      ],
+      "services": [
+        {
+          "name": "named",
+          "run": [
+            "named",
+            "-g",
+            "-c",
+            "/etc/bind/named.conf"
+          ],
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "tld",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.51.1"
+        }
+      ],
+      "files": {
+        "/etc/bind/named.conf": "// tld: an authoritative-only BIND instance for the lab\ninclude \"/etc/bind/rndc.key\";\ncontrols { inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { \"rndc-key\"; }; };\noptions {\n\tdirectory \"/var/cache/bind/netlab-dns-tld\";\n\tpid-file none;\n\tlisten-on { 198.18.51.2; 127.0.0.1; };\n\tlisten-on-v6 { none; };\n\trecursion no;\n\tdnssec-validation no;\n\tminimal-responses no-auth-recursive;\n\tnotify no;\n};\nlogging {\n\tchannel out { stderr; severity info; print-time yes; };\n\tcategory default { out; };\n\tcategory queries { out; };\n\tcategory lame-servers { null; };\n};\nzone \"test\" { type primary; file \"/etc/bind/test.signed\"; };\n",
+        "/etc/bind/rndc.key": "key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"bmV0bGFiLWRucy1sYWItcm5kYy1rZXktbm90LWEtc2VjcmV0IQ==\";\n};\n",
+        "/etc/bind/test.db": "$TTL 3600\ntest.\t\t3600\tSOA\tns.tld.test. hostmaster.tld.test. 1 1800 900 604800 3600\ntest.\t\t3600\tNS\tns.tld.test.\nns.tld.test.\t3600\tA\t198.18.51.2\na.root.test.\t3600\tA\t198.18.50.2\ncorp.test.\t3600\tNS\tns1.corp.test.\ncorp.test.\t3600\tNS\tns2.corp.test.\nns1.corp.test.\t3600\tA\t198.18.52.2\nns2.corp.test.\t3600\tA\t198.18.52.3\nshop.test.\t3600\tNS\tns.shop.test.\nns.shop.test.\t3600\tA\t198.18.54.2\nsecure.test.\t3600\tNS\tns1.corp.test.\nexpired.test.\t3600\tNS\tns1.corp.test.\nbroken.test.\t3600\tNS\tns.broken.test.\nns.broken.test.\t3600\tA\t198.18.52.2\nslow.test.\t3600\tNS\tns.slow.test.\nns.slow.test.\t3600\tA\t198.18.53.2\n"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "rm -rf /var/cache/bind/netlab-dns-tld; mkdir -p /var/cache/bind/netlab-dns-tld $NETLAB_EVIDENCE/dnssec"
+        ],
+        [
+          "sh",
+          "-c",
+          "cd /etc/bind && cat $NETLAB_EVIDENCE/dnssec/dsset-secure.test. $NETLAB_EVIDENCE/dnssec/dsset-expired.test. >> test.db && dnssec-keygen -q -K . -a ECDSAP256SHA256 -P now-3d -A now-3d -f KSK test >/dev/null; dnssec-keygen -q -K . -a ECDSAP256SHA256 -P now-3d -A now-3d test >/dev/null; dnssec-signzone -q -K . -S -o test -d $NETLAB_EVIDENCE/dnssec -f test.signed test.db"
+        ]
+      ],
+      "services": [
+        {
+          "name": "named",
+          "run": [
+            "named",
+            "-g",
+            "-c",
+            "/etc/bind/named.conf"
+          ],
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "root",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.50.1"
+        }
+      ],
+      "files": {
+        "/etc/bind/named.conf": "// root: an authoritative-only BIND instance for the lab\ninclude \"/etc/bind/rndc.key\";\ncontrols { inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { \"rndc-key\"; }; };\noptions {\n\tdirectory \"/var/cache/bind/netlab-dns-root\";\n\tpid-file none;\n\tlisten-on { 198.18.50.2; 127.0.0.1; };\n\tlisten-on-v6 { none; };\n\trecursion no;\n\tdnssec-validation no;\n\tminimal-responses no-auth-recursive;\n\tnotify no;\n};\nlogging {\n\tchannel out { stderr; severity info; print-time yes; };\n\tcategory default { out; };\n\tcategory queries { out; };\n\tcategory lame-servers { null; };\n};\nzone \".\" { type primary; file \"/etc/bind/root.signed\"; };\n",
+        "/etc/bind/rndc.key": "key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"bmV0bGFiLWRucy1sYWItcm5kYy1rZXktbm90LWEtc2VjcmV0IQ==\";\n};\n",
+        "/etc/bind/root.db": "$TTL 86400\n.\t\t86400\tSOA\ta.root.test. hostmaster.root.test. 1 1800 900 604800 86400\n.\t\t518400\tNS\ta.root.test.\na.root.test.\t518400\tA\t198.18.50.2\ntest.\t\t172800\tNS\tns.tld.test.\nns.tld.test.\t172800\tA\t198.18.51.2\n"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "rm -rf /var/cache/bind/netlab-dns-root; mkdir -p /var/cache/bind/netlab-dns-root $NETLAB_EVIDENCE/dnssec"
+        ],
+        [
+          "sh",
+          "-c",
+          "cd /etc/bind && cat $NETLAB_EVIDENCE/dnssec/dsset-test. >> root.db && dnssec-keygen -q -K . -a ECDSAP256SHA256 -P now-3d -A now-3d -f KSK . >/dev/null; dnssec-keygen -q -K . -a ECDSAP256SHA256 -P now-3d -A now-3d . >/dev/null; dnssec-signzone -q -K . -S -o . -d $NETLAB_EVIDENCE/dnssec -f root.signed root.db"
+        ]
+      ],
+      "services": [
+        {
+          "name": "named",
+          "run": [
+            "named",
+            "-g",
+            "-c",
+            "/etc/bind/named.conf"
+          ],
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "resolver",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.60.1"
+        }
+      ],
+      "files": {
+        "/etc/unbound/unbound.conf": "server:\n\tinterface: 198.18.60.2\n\tinterface: 127.0.0.1\n\tport: 53\n\tdo-ip6: no\n\tusername: \"\"\n\tchroot: \"\"\n\tdirectory: \"/etc/unbound\"\n\tpidfile: \"\"\n\tuse-syslog: no\n\tlogfile: \"\"\n\tverbosity: 1\n\tlog-queries: yes\n\tlog-servfail: yes\n\tval-log-level: 2\n\tede: yes\n\taccess-control: 0.0.0.0/0 refuse\n\taccess-control: 127.0.0.0/8 allow\n\taccess-control: 198.18.61.0/24 allow\n\troot-hints: \"/etc/unbound/root.hints\"\n\ttrust-anchor-file: \"/etc/unbound/root.key\"\n\tprefetch: no\n\tserve-expired: no\n\tqname-minimisation: yes\n\t# test. is reserved (RFC 6761): unbound answers NXDOMAIN for it unless told otherwise\n\tlocal-zone: \"test.\" nodefault\nremote-control:\n\tcontrol-enable: yes\n\tcontrol-interface: 127.0.0.1\n\tcontrol-use-cert: no\n",
+        "/etc/unbound/root.hints": ".\t\t\t3600000\tNS\ta.root.test.\na.root.test.\t\t3600000\tA\t198.18.50.2\n"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "cp $NETLAB_EVIDENCE/dnssec/dsset-. /etc/unbound/root.key"
+        ]
+      ],
+      "services": [
+        {
+          "name": "unbound",
+          "run": [
+            "unbound",
+            "-d",
+            "-c",
+            "/etc/unbound/unbound.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "public",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.62.1"
+        }
+      ],
+      "files": {
+        "/etc/unbound/unbound.conf": "server:\n\tinterface: 198.18.62.2\n\tinterface: 127.0.0.1\n\tport: 53\n\tdo-ip6: no\n\tusername: \"\"\n\tchroot: \"\"\n\tdirectory: \"/etc/unbound\"\n\tpidfile: \"\"\n\tuse-syslog: no\n\tlogfile: \"\"\n\tverbosity: 1\n\tlog-queries: yes\n\tlog-servfail: yes\n\tval-log-level: 2\n\tede: yes\n\taccess-control: 0.0.0.0/0 refuse\n\taccess-control: 127.0.0.0/8 allow\n\taccess-control: 0.0.0.0/0 allow\n\troot-hints: \"/etc/unbound/root.hints\"\n\ttrust-anchor-file: \"/etc/unbound/root.key\"\n\tprefetch: no\n\tserve-expired: no\n\tqname-minimisation: yes\n\t# test. is reserved (RFC 6761): unbound answers NXDOMAIN for it unless told otherwise\n\tlocal-zone: \"test.\" nodefault\nremote-control:\n\tcontrol-enable: yes\n\tcontrol-interface: 127.0.0.1\n\tcontrol-use-cert: no\n",
+        "/etc/unbound/root.hints": ".\t\t\t3600000\tNS\ta.root.test.\na.root.test.\t\t3600000\tA\t198.18.50.2\n"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "cp $NETLAB_EVIDENCE/dnssec/dsset-. /etc/unbound/root.key"
+        ]
+      ],
+      "services": [
+        {
+          "name": "unbound",
+          "run": [
+            "unbound",
+            "-d",
+            "-c",
+            "/etc/unbound/unbound.conf"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "office",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.61.1"
+        }
+      ],
+      "files": {
+        "/etc/resolv.conf": "nameserver 198.18.60.2\n",
+        "/etc/hosts": "127.0.0.1\tlocalhost\n198.18.99.99\tlegacy.corp.test\n"
+      }
+    },
+    {
+      "name": "cloud",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.63.1"
+        }
+      ],
+      "files": {
+        "/etc/resolv.conf": "nameserver 198.18.62.2\n",
+        "/etc/hosts": "127.0.0.1\tlocalhost\n"
+      }
+    },
+    {
+      "name": "net",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "ip",
+          "route",
+          "add",
+          "blackhole",
+          "198.18.53.0/24"
+        ]
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "root",
+        "if": "eth0",
+        "addr": [
+          "198.18.50.2/24"
+        ]
+      },
+      "b": {
+        "node": "net",
+        "if": "e-root",
+        "addr": [
+          "198.18.50.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "tld",
+        "if": "eth0",
+        "addr": [
+          "198.18.51.2/24"
+        ]
+      },
+      "b": {
+        "node": "net",
+        "if": "e-tld",
+        "addr": [
+          "198.18.51.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "auth1",
+        "if": "eth0",
+        "addr": [
+          "198.18.52.2/24",
+          "198.18.52.3/24"
+        ]
+      },
+      "b": {
+        "node": "net",
+        "if": "e-auth1",
+        "addr": [
+          "198.18.52.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "auth2",
+        "if": "eth0",
+        "addr": [
+          "198.18.54.2/24"
+        ]
+      },
+      "b": {
+        "node": "net",
+        "if": "e-auth2",
+        "addr": [
+          "198.18.54.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "resolver",
+        "if": "eth0",
+        "addr": [
+          "198.18.60.2/24"
+        ]
+      },
+      "b": {
+        "node": "net",
+        "if": "e-resolver",
+        "addr": [
+          "198.18.60.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "public",
+        "if": "eth0",
+        "addr": [
+          "198.18.62.2/24"
+        ]
+      },
+      "b": {
+        "node": "net",
+        "if": "e-public",
+        "addr": [
+          "198.18.62.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "office",
+        "if": "eth0",
+        "addr": [
+          "198.18.61.10/24"
+        ]
+      },
+      "b": {
+        "node": "net",
+        "if": "e-office",
+        "addr": [
+          "198.18.61.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "cloud",
+        "if": "eth0",
+        "addr": [
+          "198.18.63.10/24"
+        ]
+      },
+      "b": {
+        "node": "net",
+        "if": "e-cloud",
+        "addr": [
+          "198.18.63.1/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "office",
+      "name": "ask a root server directly (no recursion): it does not know app.shop.test, it refers us to test.",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional +norecurse @198.18.50.2 app.shop.test A"
+      ],
+      "save": "root-referral.txt",
+      "expect_contains": [
+        "status: NOERROR",
+        "flags: qr;",
+        "ANSWER: 0",
+        "test.\t\t\t172800\tIN\tNS\tns.tld.test.",
+        "ns.tld.test.\t\t172800\tIN\tA\t198.18.51.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "the test. server refers us to shop.test., with glue",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional +norecurse @198.18.51.2 app.shop.test A"
+      ],
+      "save": "tld-referral.txt",
+      "expect_contains": [
+        "flags: qr;",
+        "shop.test.\t\t3600\tIN\tNS\tns.shop.test.",
+        "ns.shop.test.\t\t3600\tIN\tA\t198.18.54.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "the shop.test. server answers with authority (aa)",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional +norecurse @198.18.54.2 app.shop.test A"
+      ],
+      "save": "auth-answer.txt",
+      "expect_contains": [
+        "flags: qr aa;",
+        "app.shop.test.\t\t10\tIN\tA\t198.18.70.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "dnslab trace does the same walk automatically, as a resolver would",
+      "run": [
+        "${BIN}/dnslab",
+        "trace",
+        "app.shop.test"
+      ],
+      "save": "trace.txt",
+      "expect_contains": [
+        "is delegated to ns.tld.test. (glue 198.18.51.2)",
+        "result: NOERROR after 3 queries"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "a CNAME into another zone sends the trace back to the root, and lands in corp.test's external view",
+      "run": [
+        "${BIN}/dnslab",
+        "trace",
+        "api.shop.test"
+      ],
+      "save": "trace-cname.txt",
+      "expect_contains": [
+        "start again from the root",
+        "192.0.2.10",
+        "result: NOERROR"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "resolver",
+      "if": "eth0",
+      "filter": "port 53",
+      "decode": [
+        "-nn"
+      ],
+      "save": "resolver-cold.pcap",
+      "name": "a cold cache: the resolver asks root, test. and shop.test. \u2014 QNAME-minimised \u2014 and fetches DNSKEYs to validate",
+      "during": {
+        "node": "office",
+        "run": [
+          "dig",
+          "+short",
+          "@198.18.60.2",
+          "app.shop.test"
+        ]
+      },
+      "expect_contains": [
+        "A? test.",
+        "A? shop.test.",
+        "A? app.shop.test.",
+        "DNSKEY? test.",
+        "198.18.70.10"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "resolver",
+      "if": "eth0",
+      "filter": "port 53 and not host 198.18.61.10",
+      "decode": [
+        "-nn"
+      ],
+      "save": "resolver-warm.pcap",
+      "name": "asked again: answered from cache, nothing goes upstream",
+      "during": {
+        "node": "office",
+        "run": [
+          "sh",
+          "-c",
+          "dig +noall +answer @198.18.60.2 app.shop.test; sleep 2; dig +noall +answer @198.18.60.2 app.shop.test"
+        ]
+      },
+      "expect_contains": [
+        "app.shop.test."
+      ],
+      "expect_absent": [
+        "A? app.shop.test."
+      ]
+    },
+    {
+      "type": "command",
+      "node": "cloud",
+      "name": "the public resolver caches it too, a few seconds later than the office resolver",
+      "run": [
+        "dig",
+        "+noall",
+        "+answer",
+        "@198.18.62.2",
+        "app.shop.test"
+      ],
+      "save": "public-prime.txt",
+      "expect_contains": [
+        "198.18.70.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "auth2",
+      "name": "change app.shop.test from .10 to .20 on the authoritative server (edit the zone, bump the serial, rndc reload)",
+      "run": [
+        "sh",
+        "-c",
+        "sed -i 's/^app\\t10\\tA\\t198.18.70.10/app\\t10\\tA\\t198.18.70.20/' /etc/bind/shop.test.db && sed -i 's/hostmaster.shop.test. [0-9]*/hostmaster.shop.test. 2/' /etc/bind/shop.test.db && rndc reload shop.test && grep -E '^(app|new)' /etc/bind/shop.test.db"
+      ],
+      "expect_contains": [
+        "zone reload queued"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "follow it: the authority answers .20 at once; each resolver keeps .10 until its cached copy's TTL runs out",
+      "run": [
+        "${BIN}/dnslab",
+        "watch",
+        "-s",
+        "198.18.54.2,198.18.60.2,198.18.62.2",
+        "-interval",
+        "500ms",
+        "-for",
+        "13s",
+        "app.shop.test"
+      ],
+      "save": "watch-change.txt",
+      "expect_contains": [
+        "198.18.70.20",
+        "summary:",
+        "198.18.60.2     changed at"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "a name that does not exist yet: NXDOMAIN, with the zone's SOA in the authority section",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional new.shop.test A"
+      ],
+      "save": "nxdomain.txt",
+      "expect_contains": [
+        "status: NXDOMAIN",
+        "SOA\tns.shop.test. hostmaster.shop.test."
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "the negative TTL comes from the SOA: min(SOA TTL 20, MINIMUM 3600) = 20 s",
+      "run": [
+        "${BIN}/dnslab",
+        "query",
+        "-s",
+        "198.18.54.2",
+        "-norec",
+        "new.shop.test"
+      ],
+      "save": "negative-ttl.txt",
+      "expect_exit": 0,
+      "expect_contains": [
+        "NXDOMAIN",
+        "negative answer cacheable for 20 s = min(SOA TTL 20, MINIMUM 3600)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "auth2",
+      "name": "now create new.shop.test",
+      "run": [
+        "sh",
+        "-c",
+        "printf 'new\\t10\\tA\\t198.18.70.60\\n' >> /etc/bind/shop.test.db && sed -i 's/hostmaster.shop.test. [0-9]*/hostmaster.shop.test. 3/' /etc/bind/shop.test.db && rndc reload shop.test && grep -E '^(app|new)' /etc/bind/shop.test.db"
+      ],
+      "expect_contains": [
+        "zone reload queued"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "the resolver keeps answering NXDOMAIN until its negative entry expires (at most 20 s)",
+      "run": [
+        "${BIN}/dnslab",
+        "watch",
+        "-s",
+        "198.18.54.2,198.18.60.2",
+        "-interval",
+        "500ms",
+        "-for",
+        "22s",
+        "new.shop.test"
+      ],
+      "save": "watch-negative.txt",
+      "expect_contains": [
+        "NXDOMAIN",
+        "198.18.70.60",
+        "198.18.60.2     changed at"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "NODATA is different: the name exists, there is just no AAAA record; NOERROR with an empty answer",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional app.shop.test AAAA"
+      ],
+      "save": "nodata.txt",
+      "expect_contains": [
+        "status: NOERROR",
+        "ANSWER: 0",
+        "SOA\tns.shop.test."
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "a 1.6 KB TXT answer does not fit the 1232-byte EDNS buffer: truncated over UDP, repeated over TCP",
+      "run": [
+        "${BIN}/dnslab",
+        "query",
+        "-s",
+        "198.18.60.2",
+        "big.shop.test",
+        "TXT"
+      ],
+      "save": "truncated.txt",
+      "expect_contains": [
+        "UDP truncated (tc), then TCP",
+        "answer (1 records)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "a lame delegation: broken.test. points at a server that does not serve it; the resolver answers SERVFAIL",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional x.broken.test A; grep 'broken.test' $NETLAB_EVIDENCE/service-resolver-unbound.log | tail -1"
+      ],
+      "save": "lame.txt",
+      "expect_contains": [
+        "status: SERVFAIL",
+        "got REFUSED"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "a dead delegation: slow.test.'s only server is unreachable; the client times out before the resolver gives up",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(date +%s%N); dig +tries=1 +time=4 www.slow.test A; rc=$?; echo \"exit $rc after $(( ($(date +%s%N) - s) / 1000000 )) ms\""
+      ],
+      "save": "dead-first.txt",
+      "expect_contains": [
+        "timed out",
+        "exit 9 after"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "keep asking (one try, 2 s each): the client sees timeouts until the resolver gives up on the server, then SERVFAIL at once",
+      "run": [
+        "sh",
+        "-c",
+        "s=$(date +%s); for i in $(seq 60); do r=$(dig +tries=1 +time=2 www2.slow.test | grep -oE \"status: [A-Z]+|timed out\" | head -1); echo \"$(( $(date +%s) - s ))s: $r\"; case \"$r\" in status*) break;; esac; sleep 1; done; s=$(date +%s%N); dig +tries=1 +time=2 www3.slow.test | grep -o \"status: [A-Z]*\"; rc=$?; echo \"exit $rc after $(( ($(date +%s%N) - s) / 1000000 )) ms\""
+      ],
+      "save": "dead-later.txt",
+      "expect_contains": [
+        "timed out",
+        "s: status: SERVFAIL",
+        "status: SERVFAIL"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "a signed zone validates: the ad flag (authenticated data)",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional +dnssec www.secure.test A"
+      ],
+      "save": "dnssec-secure.txt",
+      "expect_contains": [
+        "flags: qr rd ra ad;",
+        "RRSIG\tA 13 3 300"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "an unsigned zone (no DS in its parent) is insecure, not broken: an answer without ad",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional app.shop.test A"
+      ],
+      "save": "dnssec-insecure.txt",
+      "expect_contains": [
+        "flags: qr rd ra;",
+        "198.18.70.20"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "expired signatures: the validating resolver refuses to answer \u2014 SERVFAIL, with an Extended DNS Error",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional www.expired.test A"
+      ],
+      "save": "dnssec-bogus.txt",
+      "expect_contains": [
+        "status: SERVFAIL",
+        "EDE: 7 (Signature Expired)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "+cd (checking disabled) gets the data anyway: proof the failure is validation, not reachability",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional +cd www.expired.test A"
+      ],
+      "save": "dnssec-cd.txt",
+      "expect_contains": [
+        "status: NOERROR",
+        "198.18.70.50"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "cloud",
+      "name": "the office resolver only serves the office subnet: REFUSED",
+      "run": [
+        "sh",
+        "-c",
+        "dig +noall +comments +answer +authority +additional @198.18.60.2 api.corp.test A"
+      ],
+      "save": "refused.txt",
+      "expect_contains": [
+        "status: REFUSED",
+        "EDE: 18 (Prohibited)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "split horizon, inside: the office resolver is in corp.test's internal view",
+      "run": [
+        "sh",
+        "-c",
+        "dig +short api.corp.test; dig +short git.corp.test"
+      ],
+      "save": "view-internal.txt",
+      "expect_contains": [
+        "10.20.0.10",
+        "10.20.0.20"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "cloud",
+      "name": "split horizon, outside: the same names through the public resolver",
+      "run": [
+        "sh",
+        "-c",
+        "dig +short api.corp.test; dig git.corp.test | grep -o 'status: [A-Z]*'"
+      ],
+      "save": "view-external.txt",
+      "expect_contains": [
+        "192.0.2.10",
+        "status: NXDOMAIN"
+      ],
+      "expect_absent": [
+        "10.20.0.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "the stub's configuration: a search list and Kubernetes' ndots:5",
+      "run": [
+        "sh",
+        "-c",
+        "printf 'nameserver 198.18.60.2\\nsearch corp.test shop.test\\noptions ndots:5\\n' > /etc/resolv.conf; cat /etc/resolv.conf"
+      ],
+      "save": "resolv-search.txt",
+      "expect_contains": [
+        "ndots:5"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "office",
+      "if": "eth0",
+      "filter": "udp port 53",
+      "decode": [
+        "-nn"
+      ],
+      "save": "search.pcap",
+      "name": "getent ahosts app.shop.test (2 dots < 5): both search suffixes are tried first, then the name itself",
+      "during": {
+        "node": "office",
+        "run": [
+          "getent",
+          "ahosts",
+          "app.shop.test"
+        ]
+      },
+      "expect_contains": [
+        "A? app.shop.test.corp.test.",
+        "A? app.shop.test.shop.test.",
+        "A? app.shop.test. (31)",
+        "NXDomain",
+        "198.18.70.20"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "office",
+      "if": "eth0",
+      "filter": "udp port 53",
+      "decode": [
+        "-nn"
+      ],
+      "save": "search-dot.pcap",
+      "name": "with a trailing dot the name is absolute: one query",
+      "during": {
+        "node": "office",
+        "run": [
+          "getent",
+          "ahosts",
+          "app.shop.test."
+        ]
+      },
+      "expect_contains": [
+        "A? app.shop.test. (31)"
+      ],
+      "expect_absent": [
+        "corp.test.",
+        "shop.test.shop.test"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "a dead first nameserver (timeout:2): every lookup waits 2 s before the second server answers \u2014 glibc caches nothing",
+      "run": [
+        "sh",
+        "-c",
+        "printf 'nameserver 198.18.53.2\\nnameserver 198.18.60.2\\noptions timeout:2 attempts:2\\n' > /etc/resolv.conf; cat /etc/resolv.conf; for i in 1 2; do s=$(date +%s%N); getent ahosts app.shop.test >/dev/null; rc=$?; echo \"exit $rc after $(( ($(date +%s%N) - s) / 1000000 )) ms\"; done"
+      ],
+      "save": "dead-nameserver.txt",
+      "expect_contains": [
+        "exit 0 after 20"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "/etc/hosts wins: getent (via nsswitch 'files dns') sees it, dig never reads it",
+      "run": [
+        "sh",
+        "-c",
+        "printf 'nameserver 198.18.60.2\\n' > /etc/resolv.conf; cat /etc/resolv.conf; grep legacy /etc/hosts; getent hosts legacy.corp.test; dig legacy.corp.test | grep -o 'status: [A-Z]*'"
+      ],
+      "save": "hosts.txt",
+      "expect_contains": [
+        "198.18.99.99    legacy.corp.test",
+        "status: NXDOMAIN"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "office",
+      "name": "Go's own resolver reads the same files (GODEBUG=netdns=go+1 says which resolver it chose)",
+      "run": [
+        "sh",
+        "-c",
+        "GODEBUG=netdns=go+1 ${BIN}/dnslab lookup legacy.corp.test 2>&1; GODEBUG=netdns=go+1 ${BIN}/dnslab lookup app.shop.test 2>&1"
+      ],
+      "save": "go-resolver.txt",
+      "expect_contains": [
+        "Go resolver",
+        "legacy.corp.test \u2192 198.18.99.99",
+        "app.shop.test \u2192 198.18.70.20"
+      ]
+    }
+  ]
+}

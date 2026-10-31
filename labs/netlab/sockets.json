@@ -1,0 +1,606 @@
+{
+  "name": "sockets",
+  "description": "DRAFT",
+  "nodes": [
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.200.1"
+        }
+      ]
+    },
+    {
+      "name": "router",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.default.rp_filter": "0"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "ip tuntap add dev pl-ab mode tun && ip tuntap add dev pl-ba mode tun && ip link set pl-ab up && ip link set pl-ba up && sysctl -qw net.ipv4.conf.pl-ab.rp_filter=0 net.ipv4.conf.pl-ba.rp_filter=0 && ip rule add iif eth0 table 100 && ip route add default dev pl-ab table 100 && ip rule add iif eth1 table 101 && ip route add default dev pl-ba table 101"
+        ]
+      ],
+      "services": [
+        {
+          "name": "pathlab",
+          "run": [
+            "${BIN}/pathlab",
+            "run",
+            "-control",
+            "0.0.0.0:9911"
+          ],
+          "port": 9911
+        }
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.201.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "discard7002",
+          "run": [
+            "${BIN}/socklab",
+            "serve",
+            "-addr",
+            "198.18.201.10:7002",
+            "-mode",
+            "discard"
+          ],
+          "port": 7002
+        },
+        {
+          "name": "discard7003",
+          "run": [
+            "${BIN}/socklab",
+            "serve",
+            "-addr",
+            "198.18.201.10:7003",
+            "-mode",
+            "discard"
+          ],
+          "port": 7003
+        },
+        {
+          "name": "close7004",
+          "run": [
+            "${BIN}/socklab",
+            "serve",
+            "-addr",
+            "198.18.201.10:7004",
+            "-mode",
+            "close"
+          ],
+          "port": 7004
+        },
+        {
+          "name": "discard7005",
+          "run": [
+            "${BIN}/socklab",
+            "serve",
+            "-addr",
+            "198.18.201.10:7005",
+            "-mode",
+            "discard"
+          ],
+          "port": 7005
+        },
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "",
+            "-plain",
+            "198.18.201.10:8080"
+          ],
+          "port": 8080
+        },
+        {
+          "name": "netpoll",
+          "run": [
+            "${BIN}/socklab",
+            "serve",
+            "-addr",
+            "198.18.201.10:7032",
+            "-mode",
+            "discard",
+            "-model",
+            "netpoll",
+            "-pidfile",
+            "${EVIDENCE}/srv-netpoll.pid"
+          ],
+          "port": 7032
+        },
+        {
+          "name": "threads",
+          "run": [
+            "${BIN}/socklab",
+            "serve",
+            "-addr",
+            "198.18.201.10:7033",
+            "-mode",
+            "discard",
+            "-model",
+            "threads",
+            "-pidfile",
+            "${EVIDENCE}/srv-threads.pid"
+          ],
+          "port": 7033
+        },
+        {
+          "name": "noread",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.201.10:7020",
+            "-mode",
+            "noread",
+            "-quiet"
+          ],
+          "port": 7020
+        },
+        {
+          "name": "relay-copy",
+          "run": [
+            "${BIN}/socklab",
+            "relay",
+            "-listen",
+            "198.18.201.10:7101",
+            "-to",
+            "198.18.201.10:7020",
+            "-mode",
+            "copy",
+            "-pidfile",
+            "${EVIDENCE}/relay-copy.pid"
+          ],
+          "port": 7101
+        },
+        {
+          "name": "relay-unbounded",
+          "run": [
+            "${BIN}/socklab",
+            "relay",
+            "-listen",
+            "198.18.201.10:7102",
+            "-to",
+            "198.18.201.10:7020",
+            "-mode",
+            "unbounded",
+            "-pidfile",
+            "${EVIDENCE}/relay-unbounded.pid"
+          ],
+          "port": 7102
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.200.10/24",
+          "198.18.200.11/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth0",
+        "addr": [
+          "198.18.200.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.201.10/24",
+          "198.18.201.11/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth1",
+        "addr": [
+          "198.18.201.1/24"
+        ]
+      }
+    }
+  ],
+  "requires": {
+    "prlimit": "apt-get install util-linux",
+    "nstat": "apt-get install iproute2",
+    "tcpdump": "apt-get install tcpdump"
+  },
+  "checks": [
+    {
+      "type": "command",
+      "node": "server",
+      "name": "100 writes of 10 bytes arrive as however many read()s the receiver happens to do \u2014 and Nagle changes the segments",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/socklab serve -addr 198.18.201.10:7001 -mode reads -for 3s > ${EVIDENCE}/reads.txt & S=$!; tcpdump -i eth0 -nn -w ${EVIDENCE}/writes.pcap 'tcp dst port 7001' 2>/dev/null & T=$!; sleep 0.5; ip netns exec nl-sockets-client ${BIN}/socklab writes -to 198.18.201.10:7001 -n 100 -size 10; sleep 0.3; ip netns exec nl-sockets-client ${BIN}/socklab writes -to 198.18.201.10:7001 -n 100 -size 10 -nodelay=false; sleep 0.5; kill -INT $T; wait $S; grep reads: ${EVIDENCE}/reads.txt; echo 'data segments per client connection (count, client address):'; tcpdump -nn -r ${EVIDENCE}/writes.pcap '(ip[2:2] - ((ip[0]&0xf)<<2) - ((tcp[12]&0xf0)>>2)) > 0' 2>/dev/null | awk '{print $3}' | sort | uniq -c"
+      ],
+      "save": "framing.txt",
+      "expect_contains": [
+        "TCP_NODELAY on",
+        "Nagle's algorithm on",
+        "sent 1000 bytes; the server's read() returned them in",
+        "data segments per client connection"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "shrink this client's ephemeral range to 32 ports (60000\u201360031) \u2014 a namespace setting, the host is untouched",
+      "run": [
+        "sh",
+        "-c",
+        "sysctl -w net.ipv4.ip_local_port_range='60000 60031'; sysctl net.ipv4.tcp_tw_reuse"
+      ],
+      "expect_contains": [
+        "= 60000 60031",
+        "tcp_tw_reuse = 2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "hold connections open to one server port: 32 succeed, the 33rd fails with EADDRNOTAVAIL; at the same moment 32 more to a second port of the same server succeed \u2014 ports run out per destination, not per host",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/socklab hold -to 198.18.201.10:7002 -n 100 -hold 3s > ${EVIDENCE}/hold-a.txt & sleep 1; ${BIN}/socklab hold -to 198.18.201.10:7003 -n 100; wait; cat ${EVIDENCE}/hold-a.txt"
+      ],
+      "save": "ports-hold.txt",
+      "expect_contains": [
+        "32 connections open to 198.18.201.10:7002; attempt 33 failed",
+        "32 connections open to 198.18.201.10:7003; attempt 33 failed",
+        "EADDRNOTAVAIL"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the client closed those 64 connections first, so it now holds 64 TIME_WAITs (32 per destination port) \u2014 they block those tuples for 60 s",
+      "run": [
+        "sh",
+        "-c",
+        "for p in 7002 7003; do echo \"TIME_WAIT to :$p: $(ss -Htan state time-wait dport = :$p | wc -l)\"; done"
+      ],
+      "save": "ports-after-hold.txt",
+      "expect_contains": [
+        "TIME_WAIT to :7002: 32",
+        "TIME_WAIT to :7003: 32"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "connect and close 300 times where the SERVER closes first: all succeed with 32 ports \u2014 the client keeps no TIME_WAIT",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/socklab churn -to 198.18.201.10:7004 -n 300 -server-closes; echo \"client TIME_WAIT to :7004: $(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :7004 | wc -l); server TIME_WAIT on :7004: $(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :7004 | wc -l)\""
+      ],
+      "save": "churn-server-closes.txt",
+      "expect_contains": [
+        "300 of 300 connect+close cycles",
+        "client TIME_WAIT to :7004: 0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same where the CLIENT closes first: each close leaves a 60 s TIME_WAIT on the client; after 32, EADDRNOTAVAIL",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/socklab churn -to 198.18.201.10:7005 -n 100; echo \"client TIME_WAIT to :7005: $(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :7005 | wc -l)\""
+      ],
+      "save": "churn-client-closes.txt",
+      "expect_contains": [
+        "32 of 100 connect+close cycles",
+        "68 \u00d7 EADDRNOTAVAIL",
+        "client TIME_WAIT to :7005: 32"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "tcp_tw_reuse=1 (default 2 = loopback only) lets connect() reuse a TIME_WAIT port once it is 1 s old: 32 more, then EADDRNOTAVAIL again \u2014 reuse buys ports per second, not unlimited ports",
+      "run": [
+        "sh",
+        "-c",
+        "sysctl -qw net.ipv4.tcp_tw_reuse=1 && sleep 1.2 && ${BIN}/socklab churn -to 198.18.201.10:7005 -n 100; sysctl -qw net.ipv4.tcp_tw_reuse=2 net.ipv4.ip_local_port_range='32768 60999'; sysctl net.ipv4.ip_local_port_range"
+      ],
+      "save": "churn-tw-reuse.txt",
+      "expect_contains": [
+        "32 of 100 connect+close cycles",
+        "EADDRNOTAVAIL",
+        "32768\t60999"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "add 5 ms each way (10 ms RTT) so connection setup costs something",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "delay=5ms"
+      ],
+      "expect_contains": [
+        "5ms"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "1000 requests, 20 workers, no keep-alive: 1000 connections, each request pays the handshake (p50 \u2248 2 RTT); the server closes first and keeps the TIME_WAITs",
+      "run": [
+        "sh",
+        "-c",
+        "tw0=$(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :8080 | wc -l); sw0=$(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :8080 | wc -l); ${BIN}/socklab http -url 'http://198.18.201.10:8080/obj?size=10000' -n 1000 -c 20 -keepalive=false; echo \"  new TIME_WAIT \u2014 client: $(( $(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :8080 | wc -l) - tw0 )), server: $(( $(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :8080 | wc -l) - sw0 ))\""
+      ],
+      "save": "http-nokeepalive.txt",
+      "expect_contains": [
+        "1000 ok",
+        "TCP connections dialed: 1000;",
+        "on a reused one 0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "keep-alive with Go's default MaxIdleConnsPerHost = 2 and 20 workers: few requests wait for a new connection, but hundreds of connections are dialed and thrown away (client TIME_WAIT)",
+      "run": [
+        "sh",
+        "-c",
+        "tw0=$(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :8080 | wc -l); sw0=$(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :8080 | wc -l); ${BIN}/socklab http -url 'http://198.18.201.10:8080/obj?size=10000' -n 1000 -c 20 ; echo \"  new TIME_WAIT \u2014 client: $(( $(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :8080 | wc -l) - tw0 )), server: $(( $(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :8080 | wc -l) - sw0 ))\""
+      ],
+      "save": "http-default-idle.txt",
+      "expect_contains": [
+        "1000 ok",
+        "MaxIdleConnsPerHost 2",
+        "TCP connections dialed:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "MaxIdleConnsPerHost = 20 (\u2265 concurrency): 20 connections serve all 1000 requests, p50 \u2248 1 RTT, no TIME_WAIT",
+      "run": [
+        "sh",
+        "-c",
+        "tw0=$(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :8080 | wc -l); sw0=$(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :8080 | wc -l); ${BIN}/socklab http -url 'http://198.18.201.10:8080/obj?size=10000' -n 1000 -c 20 -idle-per-host 20; echo \"  new TIME_WAIT \u2014 client: $(( $(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :8080 | wc -l) - tw0 )), server: $(( $(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :8080 | wc -l) - sw0 ))\""
+      ],
+      "save": "http-idle20.txt",
+      "expect_contains": [
+        "1000 ok",
+        "TCP connections dialed: 20;",
+        "on a reused one 980",
+        "client: 0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same, but the code never reads the response body: no connection can be reused (1000 dials) \u2014 and closing with unread data sends RST, so not even a TIME_WAIT",
+      "run": [
+        "sh",
+        "-c",
+        "tw0=$(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :8080 | wc -l); sw0=$(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :8080 | wc -l); ${BIN}/socklab http -url 'http://198.18.201.10:8080/obj?size=10000' -n 1000 -c 20 -idle-per-host 20 -drain=false; echo \"  new TIME_WAIT \u2014 client: $(( $(ip netns exec nl-sockets-client ss -Htan state time-wait dport = :8080 | wc -l) - tw0 )), server: $(( $(ip netns exec nl-sockets-server ss -Htan state time-wait sport = :8080 | wc -l) - sw0 ))\""
+      ],
+      "save": "http-nodrain.txt",
+      "expect_contains": [
+        "1000 ok",
+        "TCP connections dialed: 1000;",
+        "on a reused one 0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "remove the delay",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "delay=0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "2000 idle connections to the netpoll server: Go's runtime \u2014 a few threads, one epoll instance watching every socket",
+      "run": [
+        "sh",
+        "-c",
+        "before=$(${BIN}/socklab stat -pid $(cat ${EVIDENCE}/srv-netpoll.pid)); ${BIN}/socklab hold -to 198.18.201.10:7032 -n 2000 -hold 4s > ${EVIDENCE}/hold-netpoll.txt & sleep 3; echo \"idle:   $before\"; echo \"loaded: $(${BIN}/socklab stat -pid $(cat ${EVIDENCE}/srv-netpoll.pid))\"; wait; cat ${EVIDENCE}/hold-netpoll.txt"
+      ],
+      "save": "model-netpoll.txt",
+      "expect_contains": [
+        "sockets 2001",
+        "all 2000 connections open",
+        "watching 2002 descriptors"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "2000 idle connections to the threads server: one OS thread blocked in read() per connection, no epoll registrations",
+      "run": [
+        "sh",
+        "-c",
+        "before=$(${BIN}/socklab stat -pid $(cat ${EVIDENCE}/srv-threads.pid)); ${BIN}/socklab hold -to 198.18.201.10:7033 -n 2000 -hold 4s > ${EVIDENCE}/hold-threads.txt & sleep 3; echo \"idle:   $before\"; echo \"loaded: $(${BIN}/socklab stat -pid $(cat ${EVIDENCE}/srv-threads.pid))\"; wait; cat ${EVIDENCE}/hold-threads.txt"
+      ],
+      "save": "model-threads.txt",
+      "expect_contains": [
+        "sockets 2001",
+        "all 2000 connections open",
+        "watching 1 descriptors"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "a server limited to 64 open files (soft = hard): 100 clients all CONNECT (the kernel completes handshakes into the accept queue), but accept() fails with EMFILE and the rest wait unanswered",
+      "run": [
+        "sh",
+        "-c",
+        "prlimit --nofile=64:64 ${BIN}/socklab serve -addr 198.18.201.10:7010 -mode greet -id limited -for 8s -pidfile ${EVIDENCE}/lim.pid > ${EVIDENCE}/emfile.log 2>&1 & sleep 0.5; ip netns exec nl-sockets-client ${BIN}/socklab hold -to 198.18.201.10:7010 -n 100 -hold 6s > ${EVIDENCE}/emfile-hold.txt & sleep 1.5; grep 'open files' /proc/$(cat ${EVIDENCE}/lim.pid)/limits; ${BIN}/socklab stat -pid $(cat ${EVIDENCE}/lim.pid); ss -Hltn sport = :7010; ip netns exec nl-sockets-client ${BIN}/socklab greet -to 198.18.201.10:7010 -n 1; wait; cat ${EVIDENCE}/emfile-hold.txt; grep -m2 'accept error' ${EVIDENCE}/emfile.log; echo \"accept errors logged: $(grep -c 'accept error' ${EVIDENCE}/emfile.log)\""
+      ],
+      "save": "emfile.txt",
+      "expect_contains": [
+        "Max open files            64                   64",
+        "all 100 connections open",
+        "no greeting",
+        "accept4: too many open files",
+        "EMFILE"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "Go raises its own soft limit at start-up (Go 1.19+): started with 64 soft / 8192 hard, it runs with 8191 (hard \u2212 1, by design) \u2014 while a shell under the same limits stays at 64",
+      "run": [
+        "sh",
+        "-c",
+        "prlimit --nofile=64:8192 ${BIN}/socklab serve -addr 198.18.201.10:7011 -for 1s -pidfile ${EVIDENCE}/lim2.pid >/dev/null & sleep 0.3; grep 'open files' /proc/$(cat ${EVIDENCE}/lim2.pid)/limits; prlimit --nofile=64:8192 sh -c 'ulimit -Sn; ulimit -Hn'; wait"
+      ],
+      "save": "go-rlimit.txt",
+      "expect_contains": [
+        "Max open files            8191                 8192",
+        "64\n8192"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "after a server that closed first exits, its port has TIME_WAITs: bind() without SO_REUSEADDR fails with EADDRINUSE; with it, succeeds",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/socklab serve -addr 198.18.201.10:7040 -mode close -for 1s >/dev/null & sleep 0.3; ip netns exec nl-sockets-client ${BIN}/socklab hold -to 198.18.201.10:7040 -n 3 -hold 0.5s >/dev/null; wait; ss -Htan sport = :7040; ${BIN}/socklab bind -addr 198.18.201.10:7040; ${BIN}/socklab bind -addr 198.18.201.10:7040 -reuseaddr"
+      ],
+      "save": "reuseaddr.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "TIME-WAIT",
+        "(no options): bind() failed: address already in use",
+        "(SO_REUSEADDR): bind() and listen() succeeded"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "a port with a live listener: EADDRINUSE even with SO_REUSEADDR, and with SO_REUSEPORT too unless the first listener also set it; ss -ltnp names the owner",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/socklab serve -addr 198.18.201.10:7041 -mode discard -for 1.5s >/dev/null & sleep 0.3; ${BIN}/socklab bind -addr 198.18.201.10:7041 -reuseaddr; ${BIN}/socklab bind -addr 198.18.201.10:7041 -reuseaddr -reuseport; ss -Hltnp sport = :7041; wait"
+      ],
+      "save": "addrinuse.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "(SO_REUSEADDR): bind() failed: address already in use",
+        "(SO_REUSEADDR, SO_REUSEPORT): bind() failed",
+        "users:((\"socklab\""
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "three servers on one port with SO_REUSEPORT: the kernel spreads new connections across them by hashing each connection's addresses and ports",
+      "run": [
+        "sh",
+        "-c",
+        "for i in 1 2 3; do ${BIN}/socklab serve -addr 198.18.201.10:7042 -mode greet -id worker$i -reuseport -for 4s >/dev/null & done; sleep 0.5; ss -Hltn sport = :7042; ip netns exec nl-sockets-client ${BIN}/socklab greet -to 198.18.201.10:7042 -n 300; wait"
+      ],
+      "save": "reuseport.txt",
+      "expect_contains": [
+        "hello from worker1",
+        "hello from worker2",
+        "hello from worker3"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a relay that copies with a fixed buffer, to a backend that never reads: the client's send blocks after ~12 MB (buffers on the way) and the relay stays small",
+      "run": [
+        "sh",
+        "-c",
+        "echo \"before: $(${BIN}/socklab stat -pid $(cat ${EVIDENCE}/relay-copy.pid))\"; ${BIN}/tcplab send -to 198.18.201.10:7101 -bytes 200000000 -timeout 5s | grep -E 'transfer|wrote|timed out|never closed'; echo \"after:  $(${BIN}/socklab stat -pid $(cat ${EVIDENCE}/relay-copy.pid))\""
+      ],
+      "save": "relay-copy.txt",
+      "expect_contains": [
+        "INCOMPLETE",
+        "timed out with data still unsent"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a relay that queues in memory instead: the client 'delivers' all 200 MB and the relay holds it \u2014 RSS grows by the amount the backend did not take",
+      "run": [
+        "sh",
+        "-c",
+        "echo \"before: $(${BIN}/socklab stat -pid $(cat ${EVIDENCE}/relay-unbounded.pid))\"; ${BIN}/tcplab send -to 198.18.201.10:7102 -bytes 200000000 -timeout 5s | grep -E 'transfer|wrote|timed out|never closed'; echo \"after:  $(${BIN}/socklab stat -pid $(cat ${EVIDENCE}/relay-unbounded.pid))\""
+      ],
+      "save": "relay-unbounded.txt",
+      "expect_contains": [
+        "INCOMPLETE",
+        "wrote 200000000 of 200000000 bytes"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "a UDP consumer that takes 1 ms per datagram, sent 10,000 at once: the default receive buffer (rmem_default) holds a few hundred; the kernel drops the rest and counts UdpRcvbufErrors; the sender is never told",
+      "run": [
+        "sh",
+        "-c",
+        "sysctl net.core.rmem_default net.core.rmem_max; nstat -n; ${BIN}/socklab udp-sink -addr 198.18.201.10:7200 -per 1ms & sleep 0.3; ${BIN}/socklab udp-blast -to 198.18.201.10:7200 -n 10000; ss -Huanm sport = :7200 | grep -o 'rb[0-9]*,'; wait; nstat -z UdpInDatagrams UdpRcvbufErrors"
+      ],
+      "save": "udp-default.txt",
+      "expect_contains": [
+        "sent 10000 of 10000",
+        "rb212992,",
+        "UdpRcvbufErrors"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "asking for 4 MB with SO_RCVBUF is silently capped at net.core.rmem_max (then doubled); SO_RCVBUFFORCE (root) gets it \u2014 more queue, fewer drops, and more delay for what waits in it",
+      "run": [
+        "sh",
+        "-c",
+        "for a in '-rcvbuf 4194304' '-rcvbuf 4194304 -force'; do nstat -n; ${BIN}/socklab udp-sink -addr 198.18.201.10:7201 -per 1ms $a & sleep 0.3; ${BIN}/socklab udp-blast -to 198.18.201.10:7201 -n 10000 >/dev/null; echo \"udp-sink $a: $(ss -Huanm sport = :7201 | grep -o 'rb[0-9]*')\"; wait; nstat -z UdpInDatagrams UdpRcvbufErrors | tail -2 | tr '\\n' ' '; echo; done"
+      ],
+      "save": "udp-bigger.txt",
+      "expect_contains": [
+        "-force: rb8388608",
+        "UdpRcvbufErrors"
+      ]
+    }
+  ]
+}

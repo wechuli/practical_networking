@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test fixture in the rfc-index.xml format (https://www.rfc-editor.org/rfc-index.xsd).
+     Trimmed for the tests: entries and lists are partial. Use the real index for answers. -->
+<rfc-index xmlns="https://www.rfc-editor.org/rfc-index"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <bcp-entry>
+    <doc-id>BCP0014</doc-id>
+    <is-also><doc-id>RFC2119</doc-id><doc-id>RFC8174</doc-id></is-also>
+  </bcp-entry>
+  <rfc-entry>
+    <doc-id>RFC0768</doc-id>
+    <title>User Datagram Protocol</title>
+    <author><name>J. Postel</name></author>
+    <date><month>August</month><year>1980</year></date>
+    <is-also><doc-id>STD0006</doc-id></is-also>
+    <current-status>INTERNET STANDARD</current-status>
+    <publication-status>INTERNET STANDARD</publication-status>
+    <stream>Legacy</stream>
+  </rfc-entry>
+  <rfc-entry>
+    <doc-id>RFC0793</doc-id>
+    <title>Transmission Control Protocol</title>
+    <author><name>J. Postel</name></author>
+    <date><month>September</month><year>1981</year></date>
+    <obsoleted-by><doc-id>RFC9293</doc-id></obsoleted-by>
+    <updated-by><doc-id>RFC1122</doc-id><doc-id>RFC3168</doc-id><doc-id>RFC6093</doc-id></updated-by>
+    <current-status>INTERNET STANDARD</current-status>
+    <publication-status>INTERNET STANDARD</publication-status>
+    <stream>Legacy</stream>
+    <errata-url>https://www.rfc-editor.org/errata/rfc793</errata-url>
+  </rfc-entry>
+  <rfc-entry>
+    <doc-id>RFC9293</doc-id>
+    <title>Transmission Control Protocol (TCP)</title>
+    <author><name>W. Eddy, Ed.</name></author>
+    <date><month>August</month><year>2022</year></date>
+    <obsoletes><doc-id>RFC0793</doc-id><doc-id>RFC0879</doc-id><doc-id>RFC6093</doc-id></obsoletes>
+    <updates><doc-id>RFC1011</doc-id><doc-id>RFC1122</doc-id><doc-id>RFC5961</doc-id></updates>
+    <is-also><doc-id>STD0007</doc-id></is-also>
+    <current-status>INTERNET STANDARD</current-status>
+    <publication-status>INTERNET STANDARD</publication-status>
+    <stream>IETF</stream>
+    <area>wit</area>
+    <wg_acronym>tcpm</wg_acronym>
+  </rfc-entry>
+  <rfc-entry>
+    <doc-id>RFC1883</doc-id>
+    <title>Internet Protocol, Version 6 (IPv6) Specification</title>
+    <author><name>S. Deering</name></author>
+    <author><name>R. Hinden</name></author>
+    <date><month>December</month><year>1995</year></date>
+    <obsoleted-by><doc-id>RFC2460</doc-id></obsoleted-by>
+    <current-status>PROPOSED STANDARD</current-status>
+    <publication-status>PROPOSED STANDARD</publication-status>
+    <stream>IETF</stream>
+  </rfc-entry>
+  <rfc-entry>
+    <doc-id>RFC2460</doc-id>
+    <title>Internet Protocol, Version 6 (IPv6) Specification</title>
+    <author><name>S. Deering</name></author>
+    <author><name>R. Hinden</name></author>
+    <date><month>December</month><year>1998</year></date>
+    <obsoletes><doc-id>RFC1883</doc-id></obsoletes>
+    <obsoleted-by><doc-id>RFC8200</doc-id></obsoleted-by>
+    <current-status>DRAFT STANDARD</current-status>
+    <publication-status>DRAFT STANDARD</publication-status>
+    <stream>IETF</stream>
+  </rfc-entry>
+  <rfc-entry>
+    <doc-id>RFC8200</doc-id>
+    <title>Internet Protocol, Version 6 (IPv6) Specification</title>
+    <author><name>S. Deering</name></author>
+    <author><name>R. Hinden</name></author>
+    <date><month>July</month><year>2017</year></date>
+    <obsoletes><doc-id>RFC2460</doc-id></obsoletes>
+    <is-also><doc-id>STD0086</doc-id></is-also>
+    <current-status>INTERNET STANDARD</current-status>
+    <publication-status>INTERNET STANDARD</publication-status>
+    <stream>IETF</stream>
+  </rfc-entry>
+</rfc-index>

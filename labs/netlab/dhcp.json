@@ -1,0 +1,365 @@
+{
+  "name": "dhcp",
+  "description": "Module 23: DHCP \u2014 DORA on the wire, renew and release, pool exhaustion, no server, a rogue server and a bridge filter that stops it, and a relay",
+  "requires": {
+    "dnsmasq": "apt-get install dnsmasq-base",
+    "busybox": "apt-get install busybox",
+    "tcpdump": "apt-get install tcpdump",
+    "tshark": "apt-get install tshark",
+    "nft": "apt-get install nftables",
+    "ethtool": "apt-get install ethtool"
+  },
+  "setup": [
+    [
+      "sh",
+      "-c",
+      "cat > ${EVIDENCE}/udhcpc.script <<'EOF'\n#!/bin/sh\n# udhcpc calls this with deconfig / bound / renew / leasefail / nak; it applies what the server sent\ncase \"$1\" in\n  deconfig) ip -4 addr flush dev \"$interface\"; ip link set \"$interface\" up ;;\n  bound|renew) ip -4 addr flush dev \"$interface\"; ip addr add \"$ip/${mask:-24}\" dev \"$interface\"\n     [ -n \"$router\" ] && ip route replace default via ${router%% *} dev \"$interface\"\n     echo \"udhcpc $1: $ip/$mask router $router dns $dns lease $lease server $serverid\" ;;\n  leasefail|nak) echo \"udhcpc $1\" ;;\nesac\nEOF\nchmod 755 ${EVIDENCE}/udhcpc.script"
+    ],
+    [
+      "sh",
+      "-c",
+      "cat > ${EVIDENCE}/dhcp-decode <<'EOF'\n#!/bin/sh\n# one line per DHCP message in a capture: time, type, source \u2192 destination and the fields that matter\ntshark -r \"$1\" -Y dhcp -T fields -E separator='|' -e frame.time_relative -e ip.src -e ip.dst -e dhcp.option.dhcp \\\n  -e dhcp.ip.your -e dhcp.ip.relay -e dhcp.option.router -e dhcp.option.ip_address_lease_time -e dhcp.flags.bc \\\n  -e dhcp.option.requested_ip_address -e dhcp.ip.client 2>/dev/null |\nawk -F'|' '{split(\"DISCOVER OFFER REQUEST DECLINE ACK NAK RELEASE INFORM\",T,\" \");\n  printf \"%7.3fs  %-8s %s \u2192 %s\", $1, T[$4], $2, $3\n  if ($11!=\"\" && $11!=\"0.0.0.0\") printf \"  ciaddr %s\", $11\n  if ($5!=\"\" && $5!=\"0.0.0.0\") printf \"  yiaddr %s\", $5\n  if ($6!=\"\" && $6!=\"0.0.0.0\") printf \"  giaddr %s\", $6\n  if ($10!=\"\") printf \"  requested %s\", $10\n  if ($7!=\"\") printf \"  router %s\", $7\n  if ($8!=\"\") printf \"  lease %ss\", $8\n  if ($9==\"1\" || $9==\"True\") printf \"  [broadcast flag]\"\n  print \"\"}'\nEOF\nchmod 755 ${EVIDENCE}/dhcp-decode"
+    ]
+  ],
+  "teardown": [
+    [
+      "sh",
+      "-c",
+      "for p in ${EVIDENCE}/*.pid; do [ -f \"$p\" ] && kill $(cat \"$p\") 2>/dev/null; done; true"
+    ]
+  ],
+  "nodes": [
+    {
+      "name": "switch",
+      "bridges": [
+        {
+          "name": "br0"
+        }
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "198.18.231.0/24",
+          "via": "198.18.230.2"
+        }
+      ],
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "ethtool -K eth0 tx off >/dev/null"
+        ]
+      ],
+      "services": [
+        {
+          "name": "dnsmasq",
+          "run": [
+            "sh",
+            "-c",
+            "exec dnsmasq --conf-file=/dev/null --port=0 --user=root --log-dhcp --keep-in-foreground --interface=eth0 --bind-interfaces --dhcp-authoritative --dhcp-range=set:lan,198.18.230.100,198.18.230.101,255.255.255.0,2m --dhcp-range=set:remote,198.18.231.100,198.18.231.110,255.255.255.0,2m --dhcp-option=tag:lan,option:router,198.18.230.1 --dhcp-option=tag:remote,option:router,198.18.231.1 --dhcp-option=option:dns-server,198.18.230.1 --dhcp-leasefile=${EVIDENCE}/server.leases --log-facility=${EVIDENCE}/server.log"
+          ],
+          "udp_port": 67
+        }
+      ]
+    },
+    {
+      "name": "relay",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "ethtool -K eth0 tx off >/dev/null; ethtool -K eth1 tx off >/dev/null"
+        ]
+      ],
+      "services": [
+        {
+          "name": "dhcp-relay",
+          "run": [
+            "sh",
+            "-c",
+            "exec dnsmasq --conf-file=/dev/null --port=0 --user=root --log-dhcp --keep-in-foreground --dhcp-relay=198.18.231.1,198.18.230.1 --log-facility=${EVIDENCE}/relay.log"
+          ],
+          "udp_port": 67
+        }
+      ]
+    },
+    {
+      "name": "remote"
+    },
+    {
+      "name": "c1"
+    },
+    {
+      "name": "c2"
+    },
+    {
+      "name": "c3"
+    },
+    {
+      "name": "rogue",
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "ethtool -K eth0 tx off >/dev/null"
+        ]
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.230.1/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p1",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "c1",
+        "if": "eth0"
+      },
+      "b": {
+        "node": "switch",
+        "if": "p2",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "c2",
+        "if": "eth0"
+      },
+      "b": {
+        "node": "switch",
+        "if": "p3",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "c3",
+        "if": "eth0"
+      },
+      "b": {
+        "node": "switch",
+        "if": "p4",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "rogue",
+        "if": "eth0",
+        "addr": [
+          "198.18.230.66/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p5",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "relay",
+        "if": "eth0",
+        "addr": [
+          "198.18.230.2/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p6",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "remote",
+        "if": "eth0"
+      },
+      "b": {
+        "node": "relay",
+        "if": "eth1",
+        "addr": [
+          "198.18.231.1/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "c1",
+      "name": "DORA: c1 broadcasts DISCOVER from 0.0.0.0; the server OFFERs an address (unicast to the offered address \u2014 no broadcast flag set), c1 REQUESTs it by broadcast so every server hears the choice, the server ACKs; the address, default route and lease file follow",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-dhcp-c1 tcpdump -i eth0 -n --immediate-mode -U -w ${EVIDENCE}/dora.pcap 'udp port 67 or udp port 68' 2>/dev/null & T=$!; sleep 1; ip netns exec nl-dhcp-c1 setsid busybox udhcpc -f -i eth0 -s ${EVIDENCE}/udhcpc.script -p ${EVIDENCE}/c1.pid -t 4 -T 4 > ${EVIDENCE}/c1-udhcpc.log 2>&1 & for i in $(seq 50); do grep -q 'udhcpc bound' ${EVIDENCE}/c1-udhcpc.log && break; sleep 0.2; done; sleep 0.5; kill -INT $T; wait $T 2>/dev/null; echo '--- on the wire:'; ${EVIDENCE}/dhcp-decode ${EVIDENCE}/dora.pcap; echo '--- c1:'; grep -E 'bound|lease of' ${EVIDENCE}/c1-udhcpc.log; echo \"c1: $(ip netns exec nl-dhcp-c1 ip -4 -br addr show eth0 | awk '{print $3}') default $(ip netns exec nl-dhcp-c1 ip route show default | awk '{print $3}')\"; echo '--- server lease file:'; cat ${EVIDENCE}/server.leases"
+      ],
+      "save": "dora.txt",
+      "expect_contains": [
+        "DISCOVER 0.0.0.0 \u2192 255.255.255.255",
+        "OFFER    198.18.230.1 \u2192 198.18.230.10",
+        "REQUEST  0.0.0.0 \u2192 255.255.255.255",
+        "ACK      198.18.230.1 \u2192 198.18.230.10",
+        "router 198.18.230.1  lease 120s",
+        "default 198.18.230.1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c1",
+      "name": "renewal (what happens at T1 = half the lease; SIGUSR1 makes udhcpc do it now): one unicast REQUEST to the server that granted the lease, one unicast ACK \u2014 no DISCOVER, no broadcast",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-dhcp-c1 tcpdump -i eth0 -n --immediate-mode -U -w ${EVIDENCE}/renew.pcap 'udp port 67 or udp port 68' 2>/dev/null & T=$!; sleep 1; kill -USR1 $(cat ${EVIDENCE}/c1.pid); sleep 2; sleep 0.5; kill -INT $T; wait $T 2>/dev/null; echo '--- on the wire:'; ${EVIDENCE}/dhcp-decode ${EVIDENCE}/renew.pcap; grep -c renew ${EVIDENCE}/c1-udhcpc.log | sed 's/^/renew events logged by udhcpc: /'"
+      ],
+      "save": "renew.txt",
+      "expect_contains": [
+        "REQUEST  198.18.230.10",
+        "\u2192 198.18.230.1  ciaddr 198.18.230.10",
+        "ACK      198.18.230.1 \u2192 198.18.230.10"
+      ],
+      "expect_absent": [
+        "DISCOVER"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c1",
+      "name": "release (SIGUSR2): c1 sends RELEASE and drops the address; the server deletes the lease at once instead of waiting for it to expire",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-dhcp-server tcpdump -i eth0 -n --immediate-mode -U -w ${EVIDENCE}/release.pcap 'udp port 67 or udp port 68' 2>/dev/null & T=$!; sleep 1; kill -USR2 $(cat ${EVIDENCE}/c1.pid); sleep 1; sleep 0.5; kill -INT $T; wait $T 2>/dev/null; echo '--- on the wire:'; ${EVIDENCE}/dhcp-decode ${EVIDENCE}/release.pcap; echo \"c1: $(ip netns exec nl-dhcp-c1 ip -4 -br addr show eth0 | awk '{print $3}') default $(ip netns exec nl-dhcp-c1 ip route show default | awk '{print $3}')\"; echo \"server lease file: $(wc -l < ${EVIDENCE}/server.leases) lease(s)\"; kill $(cat ${EVIDENCE}/c1.pid); rm -f ${EVIDENCE}/c1.pid"
+      ],
+      "save": "release.txt",
+      "expect_contains": [
+        "RELEASE  198.18.230.10",
+        "server lease file: 0 lease(s)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c3",
+      "name": "pool exhaustion: the range holds two addresses; c1 and c2 take them, c3's DISCOVERs get no OFFER at all \u2014 the server logs 'no address available', the client just sees silence",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-dhcp-server tcpdump -i eth0 -n --immediate-mode -U -w ${EVIDENCE}/exhausted.pcap 'udp port 67 or udp port 68' 2>/dev/null & T=$!; sleep 1; ip netns exec nl-dhcp-c1 setsid busybox udhcpc -f -i eth0 -s ${EVIDENCE}/udhcpc.script -p ${EVIDENCE}/c1.pid -t 4 -T 4 > ${EVIDENCE}/c1-udhcpc.log 2>&1 & for i in $(seq 50); do grep -q 'udhcpc bound' ${EVIDENCE}/c1-udhcpc.log && break; sleep 0.2; done; ip netns exec nl-dhcp-c2 setsid busybox udhcpc -f -i eth0 -s ${EVIDENCE}/udhcpc.script -p ${EVIDENCE}/c2.pid -t 4 -T 4 > ${EVIDENCE}/c2-udhcpc.log 2>&1 & for i in $(seq 50); do grep -q 'udhcpc bound' ${EVIDENCE}/c2-udhcpc.log && break; sleep 0.2; done; grep -h 'udhcpc bound' ${EVIDENCE}/c1-udhcpc.log ${EVIDENCE}/c2-udhcpc.log; ip netns exec nl-dhcp-c3 busybox udhcpc -i eth0 -s ${EVIDENCE}/udhcpc.script -n -q -t 3 -T 2 2>&1 | grep -E 'udhcpc (bound|leasefail|nak)|lease of|no lease'; sleep 0.5; kill -INT $T; wait $T 2>/dev/null; echo '--- on the wire:'; ${EVIDENCE}/dhcp-decode ${EVIDENCE}/exhausted.pcap; echo '--- server log:'; grep -o 'DHCPDISCOVER.*no address available' ${EVIDENCE}/server.log | sort | uniq -c"
+      ],
+      "save": "exhausted.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "udhcpc leasefail",
+        "no address available",
+        "OFFER    198.18.230.1 \u2192 198.18.230.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c3",
+      "name": "free the pool: c1 and c2 release (SIGUSR2) and the server drops both leases at once; c3 then gets an address",
+      "run": [
+        "sh",
+        "-c",
+        "kill -USR2 $(cat ${EVIDENCE}/c1.pid); sleep 0.3; kill $(cat ${EVIDENCE}/c1.pid); rm -f ${EVIDENCE}/c1.pid; kill -USR2 $(cat ${EVIDENCE}/c2.pid); sleep 0.3; kill $(cat ${EVIDENCE}/c2.pid); rm -f ${EVIDENCE}/c2.pid; sleep 0.3; echo \"lease file: $(wc -l < ${EVIDENCE}/server.leases) lease(s)\"; ip netns exec nl-dhcp-c3 busybox udhcpc -i eth0 -s ${EVIDENCE}/udhcpc.script -n -q -t 4 -T 4 2>&1 | grep -E 'udhcpc (bound|leasefail|nak)|lease of|no lease'"
+      ],
+      "save": "freed.txt",
+      "expect_contains": [
+        "lease file: 0 lease(s)",
+        "udhcpc bound: 198.18.230.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c1",
+      "name": "no server: with the server's switch port down, c1 retries DISCOVER and gives up \u2014 on Linux nothing assigns 169.254.x.x unless a link-local helper (avahi-autoipd, NetworkManager ipv4.link-local) is configured",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-dhcp-switch ip link set p1 down; ip netns exec nl-dhcp-c1 tcpdump -i eth0 -n --immediate-mode -U -w ${EVIDENCE}/noserver.pcap 'udp port 67 or udp port 68' 2>/dev/null & T=$!; sleep 1; ip netns exec nl-dhcp-c1 busybox udhcpc -i eth0 -s ${EVIDENCE}/udhcpc.script -n -q -t 4 -T 1 2>&1 | grep -E 'udhcpc (bound|leasefail|nak)|lease of|no lease'; sleep 0.5; kill -INT $T; wait $T 2>/dev/null; echo '--- on the wire:'; ${EVIDENCE}/dhcp-decode ${EVIDENCE}/noserver.pcap; ip netns exec nl-dhcp-switch ip link set p1 up; echo \"c1: $(ip netns exec nl-dhcp-c1 ip -4 -br addr show eth0 | awk '{print $3}') default $(ip netns exec nl-dhcp-c1 ip route show default | awk '{print $3}')\""
+      ],
+      "save": "noserver.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "udhcpc leasefail",
+        "c1:  default"
+      ],
+      "expect_absent": [
+        "OFFER",
+        "169.254"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "c3",
+      "name": "rogue DHCP server: a second dnsmasq on the segment answers every DISCOVER too; the client takes the first OFFER, and a rogue that skips dnsmasq's ping-before-offer answers first \u2014 the clients end up with the attacker as gateway and DNS",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-dhcp-rogue dnsmasq --conf-file=/dev/null --port=0 --user=root --log-dhcp --no-ping --interface=eth0 --bind-interfaces --dhcp-range=198.18.230.150,198.18.230.160,255.255.255.0,2m --dhcp-option=option:router,198.18.230.66 --dhcp-option=option:dns-server,198.18.230.66 --dhcp-leasefile=${EVIDENCE}/rogue.leases --log-facility=${EVIDENCE}/rogue.log --pid-file=${EVIDENCE}/rogue.pid; sleep 1; for n in c3 c2 c3 c2; do echo \"--- $n:\"; ip netns exec nl-dhcp-$n tcpdump -i eth0 -n --immediate-mode -U -w ${EVIDENCE}/rogue-$n.pcap 'udp port 67 or udp port 68' 2>/dev/null & T=$!; sleep 1; ip netns exec nl-dhcp-$n busybox udhcpc -i eth0 -s ${EVIDENCE}/udhcpc.script -n -q -t 4 -T 4 2>&1 | grep -E 'udhcpc bound'; sleep 0.5; kill -INT $T; wait $T 2>/dev/null; echo '--- on the wire:'; ${EVIDENCE}/dhcp-decode ${EVIDENCE}/rogue-$n.pcap | grep -E 'udhcpc bound|OFFER'; done"
+      ],
+      "save": "rogue.txt",
+      "expect_contains": [
+        "OFFER    198.18.230.66 \u2192 ",
+        "OFFER    198.18.230.1 \u2192 ",
+        "router 198.18.230.66 dns 198.18.230.66"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "switch",
+      "name": "DHCP snooping, by hand: a bridge rule drops server\u2192client DHCP (UDP source port 67) arriving from any port but the server's; the rogue's OFFERs die at the switch and c3 gets only the real server's",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-dhcp-switch nft -f - <<'EOF'\ntable bridge snoop {\n  chain fw { type filter hook forward priority 0; iifname != \"p1\" iifname != \"p6\" udp sport 67 counter drop\n  }\n}\nEOF\nip netns exec nl-dhcp-c3 tcpdump -i eth0 -n --immediate-mode -U -w ${EVIDENCE}/snooped.pcap 'udp port 67 or udp port 68' 2>/dev/null & T=$!; sleep 1; ip netns exec nl-dhcp-c3 busybox udhcpc -i eth0 -s ${EVIDENCE}/udhcpc.script -n -q -t 4 -T 4 2>&1 | grep -E 'udhcpc (bound|leasefail|nak)|lease of|no lease'; sleep 0.5; kill -INT $T; wait $T 2>/dev/null; echo '--- on the wire:'; ${EVIDENCE}/dhcp-decode ${EVIDENCE}/snooped.pcap; ip netns exec nl-dhcp-switch nft list chain bridge snoop fw | grep -o 'counter packets [0-9]*'; ip netns exec nl-dhcp-switch nft delete table bridge snoop; kill $(cat ${EVIDENCE}/rogue.pid); rm -f ${EVIDENCE}/rogue.pid"
+      ],
+      "save": "snooped.txt",
+      "expect_contains": [
+        "udhcpc bound: 198.18.230.10",
+        "router 198.18.230.1 ",
+        "OFFER    198.18.230.1 \u2192 "
+      ],
+      "expect_absent": [
+        "router 198.18.230.66"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "remote",
+      "name": "relay: 'remote' is on another subnet; the relay turns its broadcast into a unicast to the server with giaddr = its own interface on that subnet, and the server picks the range (and router) by giaddr",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-dhcp-relay tcpdump -i eth0 -n --immediate-mode -U -w ${EVIDENCE}/relay.pcap 'udp port 67 or udp port 68' 2>/dev/null & T=$!; sleep 1; ip netns exec nl-dhcp-remote busybox udhcpc -i eth0 -s ${EVIDENCE}/udhcpc.script -n -q -t 4 -T 4 2>&1 | grep -E 'udhcpc (bound|leasefail|nak)|lease of|no lease'; sleep 0.5; kill -INT $T; wait $T 2>/dev/null; echo '--- on the wire:'; ${EVIDENCE}/dhcp-decode ${EVIDENCE}/relay.pcap; echo \"remote: $(ip netns exec nl-dhcp-remote ip -4 -br addr show eth0 | awk '{print $3}') default $(ip netns exec nl-dhcp-remote ip route show default | awk '{print $3}')\""
+      ],
+      "save": "relay.txt",
+      "expect_contains": [
+        "DISCOVER 198.18.231.1 \u2192 198.18.230.1",
+        "giaddr 198.18.231.1",
+        "OFFER    198.18.230.1 \u2192 198.18.231.1",
+        "yiaddr 198.18.231.1",
+        "router 198.18.231.1",
+        "default 198.18.231.1"
+      ]
+    }
+  ]
+}

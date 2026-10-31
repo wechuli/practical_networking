@@ -1,0 +1,873 @@
+{
+  "name": "icmp",
+  "description": "ICMP from every angle: traceroute in three modes, unreachable codes, firewalls that answer with ICMP, redirects, rate limits, and a PMTUD black hole fixed by MSS clamping",
+  "nodes": [
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.7.254"
+        }
+      ]
+    },
+    {
+      "name": "r1",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "routes": [
+        {
+          "dst": "198.19.7.0/24",
+          "via": "198.18.8.2"
+        },
+        {
+          "dst": "198.19.8.0/24",
+          "via": "198.18.7.252"
+        }
+      ]
+    },
+    {
+      "name": "r2",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "routes": [
+        {
+          "dst": "198.18.7.0/24",
+          "via": "198.18.8.1"
+        }
+      ],
+      "setup": [
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-p",
+          "tcp",
+          "--dport",
+          "8082",
+          "-j",
+          "REJECT"
+        ],
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-p",
+          "tcp",
+          "--dport",
+          "8083",
+          "-j",
+          "REJECT",
+          "--reject-with",
+          "icmp-admin-prohibited"
+        ]
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.19.7.254"
+        }
+      ],
+      "services": [
+        {
+          "name": "big",
+          "port": 8080,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "198.19.7.2:8443",
+            "-http-addr",
+            "198.19.7.2:8080",
+            "-size",
+            "300000",
+            "-ca-out",
+            "/tmp/netlab-icmp-ca.pem"
+          ]
+        },
+        {
+          "name": "small",
+          "port": 8081,
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "198.19.7.2:8444",
+            "-http-addr",
+            "198.19.7.2:8081",
+            "-size",
+            "300",
+            "-ca-out",
+            "/tmp/netlab-icmp-ca2.pem"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "r3",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      }
+    },
+    {
+      "name": "host2",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.19.8.254"
+        }
+      ]
+    },
+    {
+      "name": "lan",
+      "bridges": [
+        {
+          "name": "br0"
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.7.1/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p1",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "r1",
+        "if": "eth0",
+        "addr": [
+          "198.18.7.254/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p2",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "r3",
+        "if": "eth0",
+        "addr": [
+          "198.18.7.252/24"
+        ]
+      },
+      "b": {
+        "node": "lan",
+        "if": "p3",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "r1",
+        "if": "eth1",
+        "addr": [
+          "198.18.8.1/24"
+        ],
+        "mtu": 1400
+      },
+      "b": {
+        "node": "r2",
+        "if": "eth0",
+        "addr": [
+          "198.18.8.2/24"
+        ],
+        "mtu": 1400
+      }
+    },
+    {
+      "a": {
+        "node": "r2",
+        "if": "eth1",
+        "addr": [
+          "198.19.7.254/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.19.7.2/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "r3",
+        "if": "eth1",
+        "addr": [
+          "198.19.8.254/24"
+        ]
+      },
+      "b": {
+        "node": "host2",
+        "if": "eth0",
+        "addr": [
+          "198.19.8.2/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp or udp",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "traceroute-udp.pcap",
+      "name": "traceroute (UDP): TTL 1, 2, 3 to ports 33434+; two routers answer Time Exceeded, the server answers Port Unreachable",
+      "during": {
+        "node": "client",
+        "run": [
+          "traceroute",
+          "-n",
+          "-q",
+          "1",
+          "-N",
+          "1",
+          "-w",
+          "1",
+          "198.19.7.2"
+        ]
+      },
+      "expect_contains": [
+        " 1  198.18.7.254",
+        " 2  198.18.8.2",
+        " 3  198.19.7.2",
+        "ttl 1,",
+        "ttl 2,",
+        "ttl 3,",
+        ".33434: UDP",
+        "198.18.7.254 > 198.18.7.1: ICMP time exceeded in-transit",
+        "198.18.8.2 > 198.18.7.1: ICMP time exceeded in-transit",
+        "198.19.7.2 > 198.18.7.1: ICMP 198.19.7.2 udp port 33436 unreachable"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "traceroute-icmp.pcap",
+      "name": "traceroute -I (ICMP): echo requests with rising TTL; the server answers with an echo reply",
+      "during": {
+        "node": "client",
+        "run": [
+          "traceroute",
+          "-n",
+          "-q",
+          "1",
+          "-N",
+          "1",
+          "-w",
+          "1",
+          "-I",
+          "198.19.7.2"
+        ]
+      },
+      "expect_contains": [
+        " 3  198.19.7.2",
+        "ICMP echo request",
+        "ICMP time exceeded in-transit",
+        "198.19.7.2 > 198.18.7.1: ICMP echo reply"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp or tcp port 8080",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "traceroute-tcp.pcap",
+      "name": "traceroute -T (TCP SYN to port 8080): the server answers SYN-ACK and traceroute resets it",
+      "during": {
+        "node": "client",
+        "run": [
+          "traceroute",
+          "-n",
+          "-q",
+          "1",
+          "-N",
+          "1",
+          "-w",
+          "1",
+          "-T",
+          "-p",
+          "8080",
+          "198.19.7.2"
+        ]
+      },
+      "expect_contains": [
+        " 3  198.19.7.2",
+        "Flags [S]",
+        "ICMP time exceeded in-transit",
+        "198.19.7.2.8080 > 198.18.7.1",
+        "Flags [S.]",
+        "Flags [R]"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the server's echo reply arrives with TTL 62: sent with 64, two routers",
+      "run": [
+        "ping",
+        "-c",
+        "1",
+        "198.19.7.2"
+      ],
+      "expect_contains": [
+        "ttl=62"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r2",
+      "name": "r2 stops sending Time Exceeded (a common router setting)",
+      "run": [
+        "iptables",
+        "-A",
+        "OUTPUT",
+        "-p",
+        "icmp",
+        "--icmp-type",
+        "time-exceeded",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "hop 2 now shows '*', yet hop 3 answers: the router still forwards",
+      "run": [
+        "traceroute",
+        "-n",
+        "-q",
+        "1",
+        "-N",
+        "1",
+        "-w",
+        "1",
+        "198.19.7.2"
+      ],
+      "save": "silent-hop.txt",
+      "expect_contains": [
+        " 1  198.18.7.254",
+        " 2  *",
+        " 3  198.19.7.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r2",
+      "name": "r2 answers again",
+      "run": [
+        "iptables",
+        "-D",
+        "OUTPUT",
+        "-p",
+        "icmp",
+        "--icmp-type",
+        "time-exceeded",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "10 probes a second: both routers 'lose' most replies (ICMP rate limiting), the destination loses none",
+      "run": [
+        "sh",
+        "-c",
+        "mtr -n -r -c 50 -i 0.1 198.19.7.2 | tee /dev/stderr | awk '$2==\"198.18.7.254\" && $3!=\"0.0%\" {print \"hop 1 limited its replies\"} $2==\"198.18.8.2\" && $3!=\"0.0%\" {print \"hop 2 limited its replies\"} $2==\"198.19.7.2\" {print \"destination loss \" $3}'"
+      ],
+      "save": "mtr-fast.txt",
+      "expect_contains": [
+        "hop 1 limited its replies",
+        "hop 2 limited its replies",
+        "destination loss 0.0%"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "one probe a second: no loss anywhere",
+      "run": [
+        "sh",
+        "-c",
+        "mtr -n -r -c 10 198.19.7.2 | tee /dev/stderr | awk '$3!=\"0.0%\" && $2 ~ /^198/ {print \"loss at \" $2}'"
+      ],
+      "save": "mtr-slow.txt",
+      "expect_absent": [
+        "loss at"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "host-unreachable.pcap",
+      "name": "no host 198.19.7.99 behind r2: after 3 s of ARP, r2 returns Host Unreachable (type 3 code 1)",
+      "during": {
+        "node": "client",
+        "run": [
+          "ping",
+          "-c",
+          "1",
+          "-W",
+          "5",
+          "198.19.7.99"
+        ]
+      },
+      "expect_contains": [
+        "From 198.18.8.2 icmp_seq=1 Destination Host Unreachable",
+        "198.18.8.2 > 198.18.7.1: ICMP host 198.19.7.99 unreachable"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "net-unreachable.pcap",
+      "name": "r1 has no route to 203.0.113.0/24 and no default: Net Unreachable (type 3 code 0)",
+      "during": {
+        "node": "client",
+        "run": [
+          "ping",
+          "-c",
+          "1",
+          "-W",
+          "2",
+          "203.0.113.5"
+        ]
+      },
+      "expect_contains": [
+        "From 198.18.7.254 icmp_seq=1 Destination Net Unreachable",
+        "198.18.7.254 > 198.18.7.1: ICMP net 203.0.113.5 unreachable"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "save": "phases-net.txt",
+      "name": "an application connecting there gets ENETUNREACH within milliseconds, from the router's ICMP",
+      "run": [
+        "${BIN}/phases",
+        "-noproxy",
+        "-timeout",
+        "8s",
+        "http://203.0.113.5/"
+      ],
+      "expect_exit": 1,
+      "expect_contains": [
+        "connect: network is unreachable"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "save": "phases-host.txt",
+      "name": "to 198.19.7.99 it gets EHOSTUNREACH, but only after r2's 3 s of ARP",
+      "run": [
+        "${BIN}/phases",
+        "-noproxy",
+        "-timeout",
+        "8s",
+        "http://198.19.7.99/"
+      ],
+      "expect_exit": 1,
+      "expect_contains": [
+        "connect: no route to host"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp or udp port 53",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "port-unreachable.pcap",
+      "name": "no DNS server on 198.19.7.2: UDP gets Port Unreachable (type 3 code 3), which dig reports as 'connection refused'",
+      "during": {
+        "node": "client",
+        "run": [
+          "dig",
+          "+tries=1",
+          "+time=2",
+          "@198.19.7.2",
+          "example.test"
+        ]
+      },
+      "expect_contains": [
+        "ICMP 198.19.7.2 udp port 53 unreachable",
+        "communications error to 198.19.7.2#53: connection refused"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp or tcp port 8082",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "reject-port.pcap",
+      "name": "r2's plain REJECT rule answers a TCP SYN with ICMP port unreachable: the client sees 'Connection refused', exactly like a closed port",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "curl -v --noproxy '*' --max-time 3 http://198.19.7.2:8082/ 2>&1"
+        ]
+      },
+      "expect_contains": [
+        "198.18.8.2 > 198.18.7.1: ICMP 198.19.7.2 tcp port 8082 unreachable",
+        "failed: Connection refused"
+      ],
+      "expect_absent": [
+        "Flags [S.]",
+        "Flags [R"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp or tcp port 8083",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "reject-admin.pcap",
+      "name": "REJECT with icmp-admin-prohibited (type 3 code 13): the client sees 'No route to host'",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "curl -v --noproxy '*' --max-time 3 http://198.19.7.2:8083/ 2>&1"
+        ]
+      },
+      "expect_contains": [
+        "198.18.8.2 > 198.18.7.1: ICMP host 198.19.7.2 unreachable - admin prohibited",
+        "failed: No route to host"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "save": "gotrace-udp.txt",
+      "name": "the course's own traceroute (gotrace, Go): same path, each reply explained",
+      "run": [
+        "${BIN}/gotrace",
+        "-q",
+        "1",
+        "198.19.7.2"
+      ],
+      "expect_exit": 0,
+      "expect_contains": [
+        " 1  198.18.7.254",
+        " 2  198.18.8.2",
+        " 3  198.19.7.2",
+        "port unreachable: the destination answered"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "save": "gotrace-host.txt",
+      "name": "gotrace to the missing host: r2's !H arrives about 3 s after the probe",
+      "run": [
+        "${BIN}/gotrace",
+        "-q",
+        "1",
+        "198.19.7.99"
+      ],
+      "expect_exit": 1,
+      "expect_contains": [
+        " 3  198.18.8.2",
+        "!H",
+        "host unreachable"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "save": "gotrace-tcp.txt",
+      "name": "gotrace in TCP mode into r2's admin-prohibited rule: !X at hop 3, sent by r2",
+      "run": [
+        "${BIN}/gotrace",
+        "-q",
+        "1",
+        "-tcp",
+        "-p",
+        "8083",
+        "198.19.7.2"
+      ],
+      "expect_exit": 1,
+      "expect_contains": [
+        " 3  198.18.8.2",
+        "!X",
+        "administratively prohibited"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "redirect.pcap",
+      "name": "r1 forwards to r3 on the same LAN it came from, so it tells the client: ICMP Redirect (type 5); the client resolves r3, then uses it",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "ping -c 2 -i 0.5 198.19.8.2; ip route get 198.19.8.2"
+        ]
+      },
+      "expect_contains": [
+        "198.18.7.254 > 198.18.7.1: ICMP redirect 198.19.8.2 to host 198.18.7.252",
+        "Redirect Host(New nexthop: 198.18.7.252)",
+        "198.19.8.2 via 198.18.7.252 dev eth0",
+        "<redirected>"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "server",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "pmtud.pcap",
+      "name": "PMTUD working: 300 kB from server to client; r2 cannot forward 1500-byte packets onto the 1400 link and says so",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "curl -sS --noproxy '*' -o /dev/null --max-time 5 -w '%{http_code} %{size_download} bytes in %{time_total}s\\n' http://198.19.7.2:8080/"
+        ]
+      },
+      "expect_contains": [
+        "198.19.7.254 > 198.19.7.2: ICMP 198.18.7.1 unreachable - need to frag (mtu 1400)",
+        "200 300000 bytes"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "the server cached the path MTU toward the client",
+      "run": [
+        "ip",
+        "route",
+        "get",
+        "198.18.7.1"
+      ],
+      "save": "server-pmtu.txt",
+      "expect_contains": [
+        "mtu 1400"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "tracepath finds the same 1400 without root, hop by hop",
+      "run": [
+        "tracepath",
+        "-n",
+        "198.19.7.2"
+      ],
+      "save": "tracepath.txt",
+      "expect_contains": [
+        "pmtu 1400",
+        "reached"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r2",
+      "name": "black hole, part 1: r2 drops the Fragmentation Needed messages it generates",
+      "run": [
+        "iptables",
+        "-A",
+        "OUTPUT",
+        "-p",
+        "icmp",
+        "--icmp-type",
+        "fragmentation-needed",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "black hole, part 2: both ends forget the path MTU they learned (the client's matters too: see the module)",
+      "run": [
+        "ip",
+        "route",
+        "flush",
+        "cache"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "(the client's cache)",
+      "run": [
+        "ip",
+        "route",
+        "flush",
+        "cache"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a small response still works: every packet fits",
+      "run": [
+        "sh",
+        "-c",
+        "curl -sS --noproxy '*' -o /dev/null --max-time 5 -w '%{http_code} %{size_download} bytes in %{time_total}s\\n' http://198.19.7.2:8081/"
+      ],
+      "save": "blackhole-small.txt",
+      "expect_exit": 0,
+      "expect_contains": [
+        "200 300 bytes"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a large one hangs: handshake fine, full-size data segments vanish",
+      "run": [
+        "sh",
+        "-c",
+        "curl -sS --noproxy '*' -o /dev/null --max-time 5 -w '%{http_code} %{size_download} bytes in %{time_total}s\\n' http://198.19.7.2:8080/"
+      ],
+      "save": "blackhole-big.txt",
+      "expect_exit": 28,
+      "expect_contains": [
+        "Operation timed out",
+        "000 0 bytes"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "r1",
+      "name": "the fix without ICMP: clamp the MSS in SYNs leaving through the small link",
+      "run": [
+        "iptables",
+        "-t",
+        "mangle",
+        "-A",
+        "FORWARD",
+        "-p",
+        "tcp",
+        "--tcp-flags",
+        "SYN,RST",
+        "SYN",
+        "-j",
+        "TCPMSS",
+        "--clamp-mss-to-pmtu"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "forget the MTU again",
+      "run": [
+        "ip",
+        "route",
+        "flush",
+        "cache"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "(the client's cache too)",
+      "run": [
+        "ip",
+        "route",
+        "flush",
+        "cache"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "server",
+      "if": "eth0",
+      "filter": "tcp[tcpflags] & tcp-syn != 0",
+      "decode": [
+        "-nn"
+      ],
+      "save": "clamped.pcap",
+      "name": "the SYN arrives with MSS 1360 (1400 - 40), so the server never sends a packet too big for the path",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "curl -sS --noproxy '*' -o /dev/null --max-time 5 -w '%{http_code} %{size_download} bytes in %{time_total}s\\n' http://198.19.7.2:8080/"
+        ]
+      },
+      "expect_contains": [
+        "mss 1360",
+        "200 300000 bytes"
+      ]
+    }
+  ]
+}

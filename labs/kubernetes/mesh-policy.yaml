@@ -1,0 +1,31 @@
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: web
+spec:
+  podSelector:
+    matchLabels: { app: web }
+  port: http
+  proxyProtocol: HTTP/1
+---
+apiVersion: policy.linkerd.io/v1alpha1
+kind: MeshTLSAuthentication
+metadata:
+  name: allowed-client
+spec:
+  identityRefs:
+    - { kind: ServiceAccount, name: allowed }
+---
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
+metadata:
+  name: web-client
+spec:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
+    name: web
+  requiredAuthenticationRefs:
+    - group: policy.linkerd.io
+      kind: MeshTLSAuthentication
+      name: allowed-client

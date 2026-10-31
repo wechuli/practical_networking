@@ -1,0 +1,425 @@
+{
+  "name": "case",
+  "description": "Module 26, capstones 2 and 4: an application that reaches https://api/health through a stub resolver, a caching resolver, an authoritative server and nginx \u2014 healthy, then each instructor fault with its symptom, a discriminating observation and the repair",
+  "requires": {
+    "named": "apt-get install bind9",
+    "unbound": "apt-get install unbound",
+    "unbound-control": "apt-get install unbound",
+    "nginx": "apt-get install nginx-light",
+    "dig": "apt-get install bind9-dnsutils",
+    "openssl": "apt-get install openssl"
+  },
+  "teardown": [
+    [
+      "sh",
+      "-c",
+      "rm -f ${EVIDENCE}/pki/*.key ${EVIDENCE}/pki/*.pem; rm -rf /var/cache/bind/netlab-case-auth /var/cache/bind/netlab-case-pubauth"
+    ]
+  ],
+  "nodes": [
+    {
+      "name": "switch",
+      "bridges": [
+        {
+          "name": "br0"
+        }
+      ]
+    },
+    {
+      "name": "client",
+      "files": {
+        "/etc/resolv.conf": "nameserver 198.18.240.53\nsearch shop.test\noptions timeout:2 attempts:2\n"
+      }
+    },
+    {
+      "name": "resolver",
+      "files": {
+        "/etc/unbound/unbound.conf": "server:\n\tinterface: 198.18.240.53\n\tinterface: 127.0.0.1\n\tport: 53\n\tdo-ip6: no\n\tusername: \"\"\n\tchroot: \"\"\n\tdirectory: \"/etc/unbound\"\n\tpidfile: \"\"\n\tuse-syslog: no\n\tlogfile: \"\"\n\tverbosity: 1\n\tlog-queries: yes\n\taccess-control: 0.0.0.0/0 refuse\n\taccess-control: 127.0.0.0/8 allow\n\taccess-control: 198.18.240.0/24 allow\n\t# no internet here: everything outside test. is answered NXDOMAIN locally\n\tlocal-zone: \".\" static\n\t# test. is reserved (RFC 6761); transparent overrides both unbound's built-in\n\t# NXDOMAIN for it and the static \".\" above, so test. is resolved via the stub\n\tlocal-zone: \"test.\" transparent\n\tprefetch: no\n\tserve-expired: no\nstub-zone:\n\tname: \"test.\"\n\tstub-addr: 198.18.240.2\nremote-control:\n\tcontrol-enable: yes\n\tcontrol-interface: 127.0.0.1\n\tcontrol-use-cert: no\n"
+      },
+      "services": [
+        {
+          "name": "unbound",
+          "run": [
+            "unbound",
+            "-d",
+            "-c",
+            "/etc/unbound/unbound.conf"
+          ],
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "pubresolver",
+      "files": {
+        "/etc/unbound/unbound.conf": "server:\n\tinterface: 198.18.240.54\n\tinterface: 127.0.0.1\n\tport: 53\n\tdo-ip6: no\n\tusername: \"\"\n\tchroot: \"\"\n\tdirectory: \"/etc/unbound\"\n\tpidfile: \"\"\n\tuse-syslog: no\n\tlogfile: \"\"\n\tverbosity: 1\n\tlog-queries: yes\n\taccess-control: 0.0.0.0/0 refuse\n\taccess-control: 127.0.0.0/8 allow\n\taccess-control: 198.18.240.0/24 allow\n\t# no internet here: everything outside test. is answered NXDOMAIN locally\n\tlocal-zone: \".\" static\n\t# test. is reserved (RFC 6761); transparent overrides both unbound's built-in\n\t# NXDOMAIN for it and the static \".\" above, so test. is resolved via the stub\n\tlocal-zone: \"test.\" transparent\n\tprefetch: no\n\tserve-expired: no\nstub-zone:\n\tname: \"test.\"\n\tstub-addr: 198.18.240.3\nremote-control:\n\tcontrol-enable: yes\n\tcontrol-interface: 127.0.0.1\n\tcontrol-use-cert: no\n"
+      },
+      "services": [
+        {
+          "name": "unbound",
+          "run": [
+            "unbound",
+            "-d",
+            "-c",
+            "/etc/unbound/unbound.conf"
+          ],
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "auth",
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "rm -rf /var/cache/bind/netlab-case-auth; mkdir -p /var/cache/bind/netlab-case-auth"
+        ]
+      ],
+      "files": {
+        "/etc/bind/named.conf": "// auth: authoritative for test. (the lab's whole namespace)\ninclude \"/etc/bind/rndc.key\";\ncontrols { inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { \"rndc-key\"; }; };\noptions {\n\tdirectory \"/var/cache/bind/netlab-case-auth\";\n\tpid-file none;\n\tlisten-on { 198.18.240.2; 127.0.0.1; };\n\tlisten-on-v6 { none; };\n\trecursion no;\n\tdnssec-validation no;\n\tnotify no;\n};\nlogging {\n\tchannel out { stderr; severity info; print-time yes; };\n\tcategory default { out; };\n\tcategory queries { out; };\n\tcategory lame-servers { null; };\n};\nzone \"test\" { type primary; file \"/etc/bind/test.db\"; };\n",
+        "/etc/bind/rndc.key": "key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"bmV0bGFiLWRucy1sYWItcm5kYy1rZXktbm90LWEtc2VjcmV0IQ==\";\n};\n",
+        "/etc/bind/test.db": "$TTL 300\n@\t300\tSOA\tns.test. hostmaster.test. 1 3600 900 604800 60\n@\t300\tNS\tns.test.\nns\t300\tA\t198.18.240.2\napi.shop\t300\tA\t198.18.240.20\nwww.shop\t300\tA\t198.18.240.20\n"
+      },
+      "services": [
+        {
+          "name": "named",
+          "run": [
+            "named",
+            "-g",
+            "-c",
+            "/etc/bind/named.conf"
+          ],
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "pubauth",
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "rm -rf /var/cache/bind/netlab-case-pubauth; mkdir -p /var/cache/bind/netlab-case-pubauth"
+        ]
+      ],
+      "files": {
+        "/etc/bind/named.conf": "// pubauth: authoritative for test. (the lab's whole namespace)\ninclude \"/etc/bind/rndc.key\";\ncontrols { inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { \"rndc-key\"; }; };\noptions {\n\tdirectory \"/var/cache/bind/netlab-case-pubauth\";\n\tpid-file none;\n\tlisten-on { 198.18.240.3; 127.0.0.1; };\n\tlisten-on-v6 { none; };\n\trecursion no;\n\tdnssec-validation no;\n\tnotify no;\n};\nlogging {\n\tchannel out { stderr; severity info; print-time yes; };\n\tcategory default { out; };\n\tcategory queries { out; };\n\tcategory lame-servers { null; };\n};\nzone \"test\" { type primary; file \"/etc/bind/test.db\"; };\n",
+        "/etc/bind/rndc.key": "key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"bmV0bGFiLWRucy1sYWItcm5kYy1rZXktbm90LWEtc2VjcmV0IQ==\";\n};\n",
+        "/etc/bind/test.db": "$TTL 300\n@\t300\tSOA\tns.test. hostmaster.test. 1 3600 900 604800 60\n@\t300\tNS\tns.test.\nns\t300\tA\t198.18.240.3\napi.shop\t300\tA\t192.0.2.80\nwww.shop\t300\tA\t198.18.240.20\n"
+      },
+      "services": [
+        {
+          "name": "named",
+          "run": [
+            "named",
+            "-g",
+            "-c",
+            "/etc/bind/named.conf"
+          ],
+          "port": 53
+        }
+      ]
+    },
+    {
+      "name": "web",
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "umask 077; ${BIN}/tlslab pki -dir ${EVIDENCE}/pki >/dev/null && mkdir -p ${EVIDENCE}/app ${EVIDENCE}/web && cp ${EVIDENCE}/pki/root.pem ${EVIDENCE}/app/ca-bundle.pem && chmod 644 ${EVIDENCE}/pki/*.pem ${EVIDENCE}/app/ca-bundle.pem && cat > ${EVIDENCE}/app/config.json <<'EOF'\n{\n  \"url\": \"https://api/health\",\n  \"ca_file\": \"${EVIDENCE}/app/ca-bundle.pem\",\n  \"timeout\": \"3s\"\n}\nEOF\ncat > ${EVIDENCE}/web/nginx.conf <<'EOF'\nworker_processes 1;\npid ${EVIDENCE}/web/nginx.pid;\nerror_log stderr warn;\nevents {}\nhttp {\n  access_log ${EVIDENCE}/web/access.log;\n  client_body_temp_path ${EVIDENCE}/web/tmp-body;\n  proxy_temp_path ${EVIDENCE}/web/tmp-proxy;\n  fastcgi_temp_path ${EVIDENCE}/web/tmp-fastcgi;\n  uwsgi_temp_path ${EVIDENCE}/web/tmp-uwsgi;\n  scgi_temp_path ${EVIDENCE}/web/tmp-scgi;\n  include ${EVIDENCE}/web/site.conf;\n}\nEOF\ncat > ${EVIDENCE}/web/site.conf <<'EOF'\n# the api service \u2014 what the server sends is chosen here\nserver {\n  listen 198.18.240.20:443 ssl;\n  server_name api.shop.test api;\n  ssl_certificate     ${EVIDENCE}/pki/api-chain.pem;\n  ssl_certificate_key ${EVIDENCE}/pki/api.key;\n  location / { return 200 \"api ok\\n\"; }\n}\nEOF"
+        ]
+      ],
+      "services": [
+        {
+          "name": "nginx",
+          "run": [
+            "nginx",
+            "-g",
+            "daemon off;",
+            "-c",
+            "${EVIDENCE}/web/nginx.conf"
+          ],
+          "port": 443
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.240.10/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p0",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "resolver",
+        "if": "eth0",
+        "addr": [
+          "198.18.240.53/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p1",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "pubresolver",
+        "if": "eth0",
+        "addr": [
+          "198.18.240.54/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p2",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "auth",
+        "if": "eth0",
+        "addr": [
+          "198.18.240.2/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p3",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "pubauth",
+        "if": "eth0",
+        "addr": [
+          "198.18.240.3/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p4",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "web",
+        "if": "eth0",
+        "addr": [
+          "198.18.240.20/24",
+          "198.18.240.21/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p5",
+        "bridge": "br0"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "client",
+      "name": "healthy baseline: the application resolves api through the search list (api.shop.test), connects, verifies the chain against its CA bundle and gets 200 \u2014 this also puts api.shop.test in the resolver's cache",
+      "run": [
+        "sh",
+        "-c",
+        "echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json; echo '--- what the resolver holds:'; dig +noall +answer @198.18.240.53 api.shop.test"
+      ],
+      "save": "baseline.txt",
+      "expect_contains": [
+        "resolve api: 198.18.240.20",
+        "tls api: OK, TLS 1.3",
+        "http: 200 OK",
+        "RESULT: OK",
+        "api.shop.test.\t"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "dns 'resolver': the host's nameserver is an address where nothing answers \u2014 inject, see the symptom, make the discriminating observation, repair, re-run the application",
+      "run": [
+        "sh",
+        "-c",
+        "echo '=== fault injected'; printf 'nameserver 198.18.240.99\\nsearch shop.test\\noptions timeout:2 attempts:2\\n' > /etc/resolv.conf; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json; echo '--- discriminating observation:'; echo \"dig via the configured server: $(dig +tries=1 +time=2 api.shop.test 2>&1 | grep -o 'timed out' | head -1)\"; echo \"dig @198.18.240.53 (the resolver the other hosts use): $(dig +short @198.18.240.53 api.shop.test)\"; echo '=== repaired'; printf 'nameserver 198.18.240.53\\nsearch shop.test\\noptions timeout:2 attempts:2\\n' > /etc/resolv.conf; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json"
+      ],
+      "save": "dns-resolver.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "i/o timeout [no answer from the nameserver(s)]",
+        "dig @198.18.240.53 (the resolver the other hosts use): 198.18.240.20",
+        "=== repaired",
+        "RESULT: OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "dns 'search': the search list was changed to other.test, so the short name becomes api.other.test (and api.) \u2014 both NXDOMAIN \u2014 inject, see the symptom, make the discriminating observation, repair, re-run the application",
+      "run": [
+        "sh",
+        "-c",
+        "echo '=== fault injected'; printf 'nameserver 198.18.240.53\\nsearch other.test\\noptions timeout:2 attempts:2\\n' > /etc/resolv.conf; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json; echo '--- discriminating observation:'; for n in api.other.test api. api.shop.test; do echo \"$n: $(dig @198.18.240.53 $n | grep -o 'status: [A-Z]*')\"; done; a=$(dig +search +short api); echo \"dig +search api: ${a:-(no answer)}\"; echo '=== repaired'; printf 'nameserver 198.18.240.53\\nsearch shop.test\\noptions timeout:2 attempts:2\\n' > /etc/resolv.conf; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json"
+      ],
+      "save": "dns-search.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "no such host [the name does not exist",
+        "api.other.test: status: NXDOMAIN",
+        "=== repaired",
+        "api.shop.test: status: NOERROR",
+        "RESULT: OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "dns 'view': the host was pointed at the public resolver, whose authority publishes the external address \u2014 DNS 'works', the address is unreachable from inside \u2014 inject, see the symptom, make the discriminating observation, repair, re-run the application",
+      "run": [
+        "sh",
+        "-c",
+        "echo '=== fault injected'; printf 'nameserver 198.18.240.54\\nsearch shop.test\\noptions timeout:2 attempts:2\\n' > /etc/resolv.conf; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json; echo '--- discriminating observation:'; echo \"internal resolver: $(dig +short @198.18.240.53 api.shop.test)   public resolver: $(dig +short @198.18.240.54 api.shop.test)\"; echo \"authorities: $(dig +short +norec @198.18.240.2 api.shop.test) vs $(dig +short +norec @198.18.240.3 api.shop.test)\"; echo '=== repaired'; printf 'nameserver 198.18.240.53\\nsearch shop.test\\noptions timeout:2 attempts:2\\n' > /etc/resolv.conf; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json"
+      ],
+      "save": "dns-view.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "resolve api: 192.0.2.80",
+        "internal resolver: 198.18.240.20   public resolver: 192.0.2.80",
+        "=== repaired",
+        "connect 192.0.2.80:443: FAILED",
+        "network is unreachable",
+        "RESULT: OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "dns 'cache': api moved to .21 (the authority changed, the old address no longer serves) but the resolver still holds the old answer for the rest of its 300 s TTL \u2014 inject, see the symptom, make the discriminating observation, repair, re-run the application",
+      "run": [
+        "sh",
+        "-c",
+        "echo '=== fault injected'; ip netns exec nl-case-auth sed -i 's/^api.shop\\t300\\tA\\t.*/api.shop\\t300\\tA\\t198.18.240.21/' /etc/bind/test.db && ip netns exec nl-case-auth rndc -s 127.0.0.1 -k /etc/bind/rndc.key reload test >/dev/null; sed -i 's/listen 198.18.240.20:443/listen 198.18.240.21:443/' ${EVIDENCE}/web/site.conf && ip netns exec nl-case-web nginx -c ${EVIDENCE}/web/nginx.conf -s reload 2>/dev/null; sleep 0.5; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json; echo '--- discriminating observation:'; echo \"authority: $(dig +noall +answer +norec @198.18.240.2 api.shop.test)\"; echo \"resolver:  $(dig +noall +answer @198.18.240.53 api.shop.test)\"; sleep 2; echo \"resolver, 2 s later: $(dig +noall +answer @198.18.240.53 api.shop.test)\"; echo '=== repaired'; ip netns exec nl-case-resolver unbound-control flush api.shop.test >/dev/null; echo \"resolver after flush: $(dig +short @198.18.240.53 api.shop.test)\"; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json"
+      ],
+      "save": "dns-cache.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "connection refused [RST",
+        "IN\tA\t198.18.240.21\nresolver:  api.shop.test.",
+        "=== repaired",
+        "IN\tA\t198.18.240.20\nresolver, 2 s later:",
+        "resolver after flush: 198.18.240.21",
+        "resolve api: 198.18.240.21",
+        "RESULT: OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "put the address back (zone, nginx, cache) for the TLS cases",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-case-auth sed -i 's/^api.shop\\t300\\tA\\t.*/api.shop\\t300\\tA\\t198.18.240.20/' /etc/bind/test.db && ip netns exec nl-case-auth rndc -s 127.0.0.1 -k /etc/bind/rndc.key reload test >/dev/null; sed -i 's/listen 198.18.240.21:443/listen 198.18.240.20:443/' ${EVIDENCE}/web/site.conf && ip netns exec nl-case-web nginx -c ${EVIDENCE}/web/nginx.conf -s reload 2>/dev/null; sleep 0.5; ip netns exec nl-case-resolver unbound-control flush api.shop.test >/dev/null; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json"
+      ],
+      "expect_contains": [
+        "resolve api: 198.18.240.20",
+        "RESULT: OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "tls 'chain': nginx was changed to send only the leaf, not leaf + intermediate \u2014 inject, see the symptom, make the discriminating observation, repair, re-run the application",
+      "run": [
+        "sh",
+        "-c",
+        "echo '=== fault injected'; sed -i 's|api-chain.pem|api.pem|' ${EVIDENCE}/web/site.conf && ip netns exec nl-case-web nginx -c ${EVIDENCE}/web/nginx.conf -s reload 2>/dev/null; sleep 0.5; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json; echo '--- discriminating observation:'; echo \"certificates sent: $(openssl s_client -connect 198.18.240.20:443 -servername api -showcerts  </dev/null 2>&1 | grep -c 'BEGIN CERTIFICATE')\"; echo \"openssl with the lab root: $(openssl s_client -connect 198.18.240.20:443 -servername api -showcerts -CAfile ${EVIDENCE}/pki/root.pem </dev/null 2>&1 | grep -m1 -o 'Verify return code: .*')\"; echo '=== repaired'; sed -i 's|api.pem|api-chain.pem|' ${EVIDENCE}/web/site.conf && ip netns exec nl-case-web nginx -c ${EVIDENCE}/web/nginx.conf -s reload 2>/dev/null; sleep 0.5; echo \"certificates sent: $(openssl s_client -connect 198.18.240.20:443 -servername api -showcerts  </dev/null 2>&1 | grep -c 'BEGIN CERTIFICATE')\"; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json"
+      ],
+      "save": "tls-chain.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "x509: certificate signed by unknown authority",
+        "certificates sent: 1",
+        "=== repaired",
+        "Verify return code: 21 (unable to verify the first certificate)",
+        "certificates sent: 2",
+        "RESULT: OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "tls 'trust': the application's CA bundle was replaced with a corporate inspection CA \u2014 inject, see the symptom, make the discriminating observation, repair, re-run the application",
+      "run": [
+        "sh",
+        "-c",
+        "echo '=== fault injected'; cp ${EVIDENCE}/pki/inspection-ca.pem ${EVIDENCE}/app/ca-bundle.pem; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json; echo '--- discriminating observation:'; echo \"certificates sent: $(openssl s_client -connect 198.18.240.20:443 -servername api -showcerts  </dev/null 2>&1 | grep -c 'BEGIN CERTIFICATE'), issuer of the top one: $(openssl s_client -connect 198.18.240.20:443 -servername api -showcerts  </dev/null 2>&1 | grep -m2 ' i:' | tail -1)\"; echo \"the app trusts: $(openssl x509 -in ${EVIDENCE}/app/ca-bundle.pem -noout -subject)\"; echo \"openssl with the app's bundle: $(openssl s_client -connect 198.18.240.20:443 -servername api -showcerts -CAfile ${EVIDENCE}/app/ca-bundle.pem </dev/null 2>&1 | grep -m1 -o 'Verify return code: .*')\"; echo '=== repaired'; cp ${EVIDENCE}/pki/root.pem ${EVIDENCE}/app/ca-bundle.pem; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json"
+      ],
+      "save": "tls-trust.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "x509: certificate signed by unknown authority",
+        "certificates sent: 2, issuer of the top one:",
+        "=== repaired",
+        "CN = Corp TLS Inspection CA",
+        "Verify return code: 20 (unable to get local issuer certificate)",
+        "RESULT: OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "tls 'hostname': nginx was changed to send another service's certificate \u2014 inject, see the symptom, make the discriminating observation, repair, re-run the application",
+      "run": [
+        "sh",
+        "-c",
+        "echo '=== fault injected'; sed -i 's|api-chain.pem|other-chain.pem|; s|api.key|other.key|' ${EVIDENCE}/web/site.conf && ip netns exec nl-case-web nginx -c ${EVIDENCE}/web/nginx.conf -s reload 2>/dev/null; sleep 0.5; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json; echo '--- discriminating observation:'; openssl s_client -connect 198.18.240.20:443 -servername api -showcerts  </dev/null 2>&1 | openssl x509 -noout -subject -ext subjectAltName | tr '\\n' ' '; echo; echo \"openssl checking the name: $(openssl s_client -connect 198.18.240.20:443 -servername api -showcerts -CAfile ${EVIDENCE}/pki/root.pem -verify_hostname api </dev/null 2>&1 | grep -m1 -o 'Verify return code: .*')\"; echo '=== repaired'; sed -i 's|other-chain.pem|api-chain.pem|; s|other.key|api.key|' ${EVIDENCE}/web/site.conf && ip netns exec nl-case-web nginx -c ${EVIDENCE}/web/nginx.conf -s reload 2>/dev/null; sleep 0.5; echo '--- the application:'; ${BIN}/caselab probe -config ${EVIDENCE}/app/config.json"
+      ],
+      "save": "tls-hostname.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "x509: certificate is valid for other.test, not api",
+        "DNS:other.test",
+        "=== repaired",
+        "Verify return code: 62 (hostname mismatch)",
+        "RESULT: OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "after every repair verification is still on: a client using a name the certificate does not carry (www.shop.test, same server) is rejected, and so is one trusting only an unrelated root",
+      "run": [
+        "sh",
+        "-c",
+        "sed 's|https://api/health|https://www.shop.test/health|' ${EVIDENCE}/app/config.json > ${EVIDENCE}/app/wrong-name.json; ${BIN}/caselab probe -config ${EVIDENCE}/app/wrong-name.json | grep -E '^tls|RESULT'; sed 's|ca-bundle.pem|../pki/rogue-root.pem|' ${EVIDENCE}/app/config.json > ${EVIDENCE}/app/wrong-ca.json; ${BIN}/caselab probe -config ${EVIDENCE}/app/wrong-ca.json | grep -E '^tls|RESULT'; true"
+      ],
+      "save": "still-rejected.txt",
+      "expect_contains": [
+        "not www.shop.test",
+        "certificate signed by unknown authority",
+        "RESULT: FAIL"
+      ],
+      "expect_absent": [
+        "RESULT: OK"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,891 @@
+{
+  "name": "tcp",
+  "description": "TCP on the wire and in the kernel: the handshake and teardown, TSO and MSS, refused vs timed out vs unreachable, SYN retransmission timing, a full accept queue, CLOSE_WAIT and FIN_WAIT_2, RST vs FIN without an answer, zero window, fast retransmit vs RTO, bufferbloat with CUBIC vs BBR, and how an outage is stretched by RTO backoff",
+  "nodes": [
+    {
+      "name": "client",
+      "sysctls": {
+        "net.ipv4.tcp_syn_retries": "2"
+      },
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.42.1"
+        }
+      ]
+    },
+    {
+      "name": "router",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-p",
+          "tcp",
+          "--dport",
+          "8085",
+          "-j",
+          "DROP"
+        ],
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-p",
+          "tcp",
+          "--dport",
+          "8086",
+          "-j",
+          "REJECT",
+          "--reject-with",
+          "tcp-reset"
+        ],
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-p",
+          "tcp",
+          "--dport",
+          "8087",
+          "-j",
+          "REJECT"
+        ],
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-p",
+          "tcp",
+          "--dport",
+          "8088",
+          "-j",
+          "REJECT",
+          "--reject-with",
+          "icmp-host-prohibited"
+        ]
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.43.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "discard",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.43.10:8080",
+            "-mode",
+            "discard"
+          ]
+        },
+        {
+          "name": "hold",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.43.10:8081",
+            "-mode",
+            "hold"
+          ]
+        },
+        {
+          "name": "noread",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.43.10:8082",
+            "-mode",
+            "noread",
+            "-rcvbuf",
+            "4096"
+          ]
+        },
+        {
+          "name": "noaccept",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.43.10:8083",
+            "-mode",
+            "noaccept",
+            "-backlog",
+            "2"
+          ]
+        },
+        {
+          "name": "reset",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.43.10:8084",
+            "-mode",
+            "reset"
+          ]
+        },
+        {
+          "name": "close",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.43.10:8089",
+            "-mode",
+            "close"
+          ]
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.42.10/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth0",
+        "addr": [
+          "198.18.42.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "router",
+        "if": "eth1",
+        "addr": [
+          "198.18.43.1/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.43.10/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 8080",
+      "decode": [
+        "-nn"
+      ],
+      "save": "lifecycle.pcap",
+      "name": "a whole connection: SYN, SYN-ACK, ACK, data, FIN from each side; options in the SYN",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "send",
+          "-to",
+          "198.18.43.10:8080",
+          "-bytes",
+          "3000"
+        ]
+      },
+      "expect_contains": [
+        "Flags [S], seq",
+        "options [mss 1460,sackOK,TS val",
+        "wscale",
+        "Flags [S.]",
+        "ack 1,",
+        "length 3000",
+        "Flags [F.]",
+        "complete: 3000 bytes"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the active closer (the client sent the first FIN) keeps TIME_WAIT for 60 s",
+      "run": [
+        "sh",
+        "-c",
+        "ss -tno state time-wait '( dport = :8080 )'"
+      ],
+      "save": "time-wait.txt",
+      "expect_contains": [
+        "198.18.43.10:8080",
+        "timer:(timewait,"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "the passive closer went through LAST_ACK to CLOSED: no TIME_WAIT here",
+      "run": [
+        "sh",
+        "-c",
+        "ss -tno state time-wait; echo end"
+      ],
+      "save": "server-time-wait.txt",
+      "expect_absent": [
+        "198.18.43.10:8080"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "'length 3000' was bigger than the MTU: that was a TSO/GSO super-packet; turn offloads off to see real segments",
+      "run": [
+        "sh",
+        "-c",
+        "ethtool -k eth0 | grep -E '^(tcp-segmentation|generic-segmentation)-offload'; ethtool -K eth0 tso off gso off"
+      ],
+      "save": "offloads.txt",
+      "expect_contains": [
+        "tcp-segmentation-offload: on"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "(the same on the server, so the loss experiments later drop single segments)",
+      "run": [
+        "ethtool",
+        "-K",
+        "eth0",
+        "tso",
+        "off",
+        "gso",
+        "off"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 8080",
+      "decode": [
+        "-nn"
+      ],
+      "save": "segments.pcap",
+      "name": "now 3000 bytes leave as 1448 + 1448 + 104: MSS 1460 minus 12 bytes of timestamp option",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "send",
+          "-to",
+          "198.18.43.10:8080",
+          "-bytes",
+          "3000"
+        ]
+      },
+      "expect_contains": [
+        "length 1448",
+        "length 104"
+      ],
+      "expect_absent": [
+        "length 3000"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "clamp the MSS in every SYN and SYN-ACK passing the router to 1200",
+      "run": [
+        "iptables",
+        "-t",
+        "mangle",
+        "-A",
+        "FORWARD",
+        "-p",
+        "tcp",
+        "--tcp-flags",
+        "SYN,RST",
+        "SYN",
+        "-j",
+        "TCPMSS",
+        "--set-mss",
+        "1200"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 8080",
+      "decode": [
+        "-nn"
+      ],
+      "save": "mss-clamp.pcap",
+      "name": "the SYN-ACK arrives with mss 1200, so the client sends 1188-byte segments",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "send",
+          "-to",
+          "198.18.43.10:8080",
+          "-bytes",
+          "3000"
+        ]
+      },
+      "expect_contains": [
+        "mss 1200",
+        "length 1188"
+      ],
+      "expect_absent": [
+        "length 1448"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "remove the clamp",
+      "run": [
+        "iptables",
+        "-t",
+        "mangle",
+        "-F"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 9",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "refused.pcap",
+      "name": "nothing listens on port 9: the server's kernel answers the SYN with RST, connect() fails at once",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "dial",
+          "-to",
+          "198.18.43.10:9"
+        ]
+      },
+      "expect_contains": [
+        "Flags [S]",
+        "Flags [R.]",
+        "refused"
+      ],
+      "expect_exit": 1
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 8086",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "reject-rst.pcap",
+      "name": "a firewall REJECT --reject-with tcp-reset looks the same to the application; the TTL gives the forger away",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "dial",
+          "-to",
+          "198.18.43.10:8086"
+        ]
+      },
+      "expect_contains": [
+        "Flags [R.]",
+        "ttl 64",
+        "refused"
+      ],
+      "expect_exit": 1
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn"
+      ],
+      "save": "reject-icmp.pcap",
+      "name": "plain REJECT sends ICMP port unreachable, which TCP also reports as ECONNREFUSED",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "dial",
+          "-to",
+          "198.18.43.10:8087"
+        ]
+      },
+      "expect_contains": [
+        "tcp port 8087 unreachable",
+        "refused"
+      ],
+      "expect_exit": 1
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "icmp",
+      "decode": [
+        "-nn"
+      ],
+      "save": "reject-prohibited.pcap",
+      "name": "REJECT with icmp-host-prohibited: EHOSTUNREACH, 'No route to host', though a route exists",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "dial",
+          "-to",
+          "198.18.43.10:8088"
+        ]
+      },
+      "expect_contains": [
+        "admin prohibited",
+        "unreachable",
+        "EHOSTUNREACH"
+      ],
+      "expect_exit": 1
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 8085",
+      "decode": [
+        "-nn",
+        "-tt"
+      ],
+      "save": "syn-drop.pcap",
+      "name": "a DROP rule: SYNs go unanswered and are retransmitted until tcp_syn_retries (2 here) runs out",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "dial",
+          "-to",
+          "198.18.43.10:8085"
+        ]
+      },
+      "expect_contains": [
+        "Flags [S]",
+        "timed out",
+        "ETIMEDOUT"
+      ],
+      "expect_exit": 1
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "when each SYN left: on Linux 6.5+ the first tcp_syn_linear_timeouts (4) retries are 1 s apart, then the gap doubles",
+      "run": [
+        "sh",
+        "-c",
+        "tcpdump -nn -tt -r $NETLAB_EVIDENCE/syn-drop.pcap 'tcp[tcpflags] == tcp-syn' 2>/dev/null | awk 'NR==1{t0=$1} {printf \"SYN %d at %5.2f s\\n\", NR, $1-t0}'; sysctl net.ipv4.tcp_syn_retries; sysctl net.ipv4.tcp_syn_linear_timeouts 2>/dev/null || echo 'net.ipv4.tcp_syn_linear_timeouts: not in this kernel (before 6.5): the gaps double from the start'"
+      ],
+      "save": "syn-timing.txt",
+      "expect_contains": [
+        "SYN 1 at  0.00 s",
+        "SYN 3 at",
+        "net.ipv4.tcp_syn_retries = 2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a server that never calls accept(), backlog 2: Linux queues 3 connections, then drops new SYNs",
+      "run": [
+        "${BIN}/tcplab",
+        "dial",
+        "-to",
+        "198.18.43.10:8083",
+        "-n",
+        "5",
+        "-hold",
+        "1s"
+      ],
+      "save": "backlog.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "summary: 3 connected, 2 timed out"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "the evidence on the server: Recv-Q (queued) above Send-Q (backlog), and the overflow counters",
+      "run": [
+        "sh",
+        "-c",
+        "ss -ltn '( sport = :8083 )'; nstat -saz TcpExtListenOverflows TcpExtListenDrops | grep -v '#'; echo; echo 'connections the client already closed, still queued, owned by no process:'; ss -tanp '( sport = :8083 )' | grep -v LISTEN"
+      ],
+      "save": "backlog-server.txt",
+      "expect_contains": [
+        "LISTEN 3      2",
+        "TcpExtListenOverflows",
+        "CLOSE-WAIT"
+      ],
+      "expect_absent": [
+        "TcpExtListenOverflows           0 "
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a server that reads but never closes: our FIN is acknowledged, its FIN never comes",
+      "run": [
+        "${BIN}/tcplab",
+        "send",
+        "-to",
+        "198.18.43.10:8081",
+        "-bytes",
+        "100K",
+        "-timeout",
+        "2s"
+      ],
+      "save": "hold.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "wrote 102400 of 102400",
+        "never closed",
+        "state FIN_WAIT2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "the server's socket sits in CLOSE_WAIT, owned by the process that forgot to close it",
+      "run": [
+        "sh",
+        "-c",
+        "ss -tanp '( sport = :8081 )'"
+      ],
+      "save": "close-wait.txt",
+      "expect_contains": [
+        "CLOSE-WAIT",
+        "tcplab"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the client process has exited; its orphaned FIN_WAIT_2 is reaped after tcp_fin_timeout (60 s)",
+      "run": [
+        "sh",
+        "-c",
+        "ss -tano '( dport = :8081 )'; sysctl net.ipv4.tcp_fin_timeout"
+      ],
+      "save": "fin-wait-2.txt",
+      "expect_contains": [
+        "FIN-WAIT-2",
+        "timer:(timewait,"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp[tcpflags] & tcp-rst != 0",
+      "decode": [
+        "-nn"
+      ],
+      "save": "reset.pcap",
+      "name": "a server that closes with SO_LINGER 0 aborts with RST: the writer gets ECONNRESET",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "send",
+          "-to",
+          "198.18.43.10:8084",
+          "-bytes",
+          "4M"
+        ]
+      },
+      "expect_contains": [
+        "Flags [R",
+        "INCOMPLETE",
+        "ECONNRESET"
+      ],
+      "expect_exit": 1
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a server that closes normally (FIN) without answering: HTTP clients report an empty reply, not a reset",
+      "run": [
+        "sh",
+        "-c",
+        "curl -sS -o /dev/null http://198.18.43.10:8089/; echo \"curl exit $?\""
+      ],
+      "save": "close-no-answer.txt",
+      "expect_contains": [
+        "Empty reply from server",
+        "curl exit 52"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 8082",
+      "decode": [
+        "-nn"
+      ],
+      "save": "zero-window.pcap",
+      "name": "a server that never reads, 4 KB receive buffer: the window falls to 0 and the sender only probes",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "send",
+          "-to",
+          "198.18.43.10:8082",
+          "-bytes",
+          "1M",
+          "-timeout",
+          "4s"
+        ]
+      },
+      "expect_contains": [
+        "win 0",
+        "INCOMPLETE",
+        "zero window"
+      ],
+      "expect_exit": 1
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "ss on the sender: persist timer, data stuck in the send queue, rwnd_limited 100%",
+      "run": [
+        "sh",
+        "-c",
+        "ss -tnoi '( dport = :8082 )'"
+      ],
+      "save": "zero-window-ss.txt",
+      "expect_contains": [
+        "timer:(persist",
+        "rwnd_limited"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "ss on the receiver: bytes waiting in Recv-Q that the application never read",
+      "run": [
+        "sh",
+        "-c",
+        "ss -tn '( sport = :8082 )'"
+      ],
+      "save": "zero-window-server.txt",
+      "expect_contains": [
+        "ESTAB"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "baseline: 20 MiB with CUBIC and no configured loss (a few retransmissions can still appear: at several Gbit/s a forwarding queue in the virtual path overflows)",
+      "run": [
+        "${BIN}/tcplab",
+        "send",
+        "-to",
+        "198.18.43.10:8080",
+        "-bytes",
+        "20M",
+        "-cc",
+        "cubic"
+      ],
+      "save": "baseline.txt",
+      "expect_contains": [
+        "complete: 20971520 bytes"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "drop 1% of the client's segments (iptables statistic)",
+      "run": [
+        "iptables",
+        "-A",
+        "FORWARD",
+        "-p",
+        "tcp",
+        "--dport",
+        "8080",
+        "-m",
+        "statistic",
+        "--mode",
+        "random",
+        "--probability",
+        "0.01",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "five transfers through 1% loss: SACK-based fast retransmit repairs each hole within a round trip, usually without a single RTO timeout",
+      "run": [
+        "sh",
+        "-c",
+        "c(){ nstat -saz \"$1\" | awk -v k=\"$1\" '$1==k {print $2}'; }; for i in 1 2 3 4 5; do f0=$(c TcpExtTCPFastRetrans); t0=$(c TcpExtTCPTimeouts); out=$(${BIN}/tcplab send -to 198.18.43.10:8080 -bytes 20M -cc cubic); f1=$(c TcpExtTCPFastRetrans); t1=$(c TcpExtTCPTimeouts); echo \"run $i: $(echo \"$out\" | sed -n 's/.*complete: [0-9]* bytes in \\([^ ]*\\) = \\(.*\\)/\\1 = \\2/p'), fast retransmits $((f1-f0)), RTO timeouts $((t1-t0))\"; done"
+      ],
+      "save": "loss-runs.txt",
+      "expect_contains": [
+        "run 5:",
+        "fast retransmits"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 8080 and src host 198.18.43.10",
+      "decode": [
+        "-nn"
+      ],
+      "save": "sack.pcap",
+      "name": "the receiver's ACKs during loss carry SACK blocks: 'I have these, the hole is before them'",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "send",
+          "-to",
+          "198.18.43.10:8080",
+          "-bytes",
+          "5M",
+          "-cc",
+          "cubic"
+        ]
+      },
+      "expect_contains": [
+        "sack 1 {"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "remove the loss; add a 20 Mbit/s bottleneck with a deep buffer (tbf, 200 ms of queue)",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -D FORWARD -p tcp --dport 8080 -m statistic --mode random --probability 0.01 -j DROP; tc qdisc add dev eth1 root tbf rate 20mbit burst 32kbit latency 200ms; tc qdisc show dev eth1"
+      ],
+      "save": "tbf.txt",
+      "expect_contains": [
+        "rate 20Mbit"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "CUBIC fills the bottleneck's buffer: full speed, but the RTT climbs from 0.05 ms to over 100 ms",
+      "run": [
+        "sh",
+        "-c",
+        "ping -i 0.2 -c 12 -q 198.18.43.10 > $NETLAB_EVIDENCE/ping-cubic.txt & ${BIN}/tcplab send -to 198.18.43.10:8080 -bytes 6M -cc cubic; wait; echo; echo 'ping to the server during the transfer:'; tail -1 $NETLAB_EVIDENCE/ping-cubic.txt"
+      ],
+      "save": "bloat-cubic.txt",
+      "expect_contains": [
+        "complete: 6291456 bytes",
+        "rtt min/avg/max"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "BBR gets the same throughput while keeping the queue (and everyone's RTT) small",
+      "run": [
+        "sh",
+        "-c",
+        "ping -i 0.2 -c 12 -q 198.18.43.10 > $NETLAB_EVIDENCE/ping-bbr.txt & ${BIN}/tcplab send -to 198.18.43.10:8080 -bytes 6M -cc bbr; wait; echo; echo 'ping to the server during the transfer:'; tail -1 $NETLAB_EVIDENCE/ping-bbr.txt"
+      ],
+      "save": "bloat-bbr.txt",
+      "expect_contains": [
+        "complete: 6291456 bytes",
+        "cc bbr",
+        "rtt min/avg/max"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "in 2 s, black-hole all forwarded traffic for 3 s",
+      "run": [
+        "sh",
+        "-c",
+        "(sleep 2; iptables -I FORWARD -j DROP; sleep 3; iptables -D FORWARD -j DROP) >/dev/null 2>&1 &"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "tcp port 8080 and src host 198.18.42.10",
+      "decode": [
+        "-nn"
+      ],
+      "save": "outage.pcap",
+      "name": "a 10 MiB transfer that runs into the outage",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/tcplab",
+          "send",
+          "-to",
+          "198.18.43.10:8080",
+          "-bytes",
+          "10M",
+          "-cc",
+          "cubic"
+        ]
+      },
+      "expect_contains": [
+        "complete: 10485760 bytes"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the silences in what the client sent: each retransmission waits twice as long as the last, so TCP resumes at its next retry after the path returns, not the moment it returns",
+      "run": [
+        "sh",
+        "-c",
+        "tcpdump -nn -tt -r $NETLAB_EVIDENCE/outage.pcap 'greater 100' 2>/dev/null | awk '{t=$1; if (NR>1 && t-p>0.1) {printf \"silent %.2f s, then %s %s\\n\", t-p, $8, $9; total+=t-p}; p=t} END {printf \"total silence %.2f s; the path was down for 3 s\\n\", total}'"
+      ],
+      "save": "outage-gaps.txt",
+      "expect_contains": [
+        "silent 0.",
+        "silent 1."
+      ]
+    }
+  ]
+}

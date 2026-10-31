@@ -1,0 +1,686 @@
+{
+  "name": "docker",
+  "description": "Real Docker, inspected from the host: veth pairs and the bridge, container namespaces Docker does not register, the embedded DNS server at 127.0.0.11 (its iptables redirect, name resolution on user-defined vs default networks, and which namespace forwards upstream queries), the NAT, filter and raw rules behind port publishing, a host INPUT rule that does not protect a published port and a DOCKER-USER rule that does, loopback-only publishing and docker-proxy, egress MASQUERADE, network isolation, internal/none/host networks, a network MTU, and a subnet that collides with a corporate route",
+  "requires": {
+    "docker": "install Docker Engine (https://docs.docker.com/engine/install/ubuntu/) and start the daemon",
+    "busybox": "apt-get install busybox-static (the image is built from it; nothing is pulled)",
+    "go": "install Go 1.24+ (the image includes the course tools)",
+    "dnsmasq": "apt-get install dnsmasq-base",
+    "conntrack": "apt-get install conntrack",
+    "curl": "apt-get install curl"
+  },
+  "preflight": [
+    [
+      "docker",
+      "info"
+    ]
+  ],
+  "nodes": [
+    {
+      "name": "outside"
+    }
+  ],
+  "links": [],
+  "setup": [
+    [
+      "${LABS}/docker/build-image.sh",
+      "course/netshell:1"
+    ],
+    [
+      "sh",
+      "-c",
+      "ip link add nl-dk-out type veth peer name eth0 netns nl-docker-outside && ip addr add 198.51.100.1/24 dev nl-dk-out && ip link set nl-dk-out up && ip -n nl-docker-outside addr add 198.51.100.10/24 dev eth0 && ip -n nl-docker-outside addr add 10.90.0.20/32 dev lo && ip -n nl-docker-outside link set eth0 up && ip -n nl-docker-outside link set lo up && ip -n nl-docker-outside route add default via 198.51.100.1 && ip route add 10.90.0.0/24 via 198.51.100.10"
+    ],
+    [
+      "sh",
+      "-c",
+      "ip netns exec nl-docker-outside dnsmasq -u root --no-resolv --no-hosts --listen-address=198.51.100.10 --bind-interfaces --local=/corp.test/ --host-record=app.corp.test,198.51.100.80 --log-queries --log-facility=${EVIDENCE}/dnsmasq.log --pid-file=${EVIDENCE}/dnsmasq.pid"
+    ],
+    [
+      "docker",
+      "network",
+      "create",
+      "--subnet",
+      "10.89.0.0/24",
+      "-o",
+      "com.docker.network.bridge.name=nl-dk-br0",
+      "nl-dk-app"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "nl-dk-web",
+      "--network",
+      "nl-dk-app",
+      "-p",
+      "18080:80",
+      "-p",
+      "127.0.0.1:18081:80",
+      "course/netshell:1",
+      "weblab",
+      "serve",
+      "-tls",
+      "",
+      "-plain",
+      ":80"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "nl-dk-cli",
+      "--network",
+      "nl-dk-app",
+      "course/netshell:1",
+      "sleep",
+      "3600"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "nl-dk-ext",
+      "--network",
+      "nl-dk-app",
+      "--dns",
+      "198.51.100.10",
+      "course/netshell:1",
+      "sleep",
+      "3600"
+    ],
+    [
+      "docker",
+      "run",
+      "-d",
+      "--name",
+      "nl-dk-def",
+      "course/netshell:1",
+      "sleep",
+      "3600"
+    ]
+  ],
+  "teardown": [
+    [
+      "sh",
+      "-c",
+      "docker rm -f nl-dk-web nl-dk-cli nl-dk-ext nl-dk-def nl-dk-clash1 >/dev/null 2>&1; docker network rm nl-dk-app nl-dk-int nl-dk-mtu nl-dk-clash >/dev/null 2>&1; true"
+    ],
+    [
+      "iptables",
+      "-D",
+      "INPUT",
+      "-i",
+      "nl-dk-out",
+      "-p",
+      "tcp",
+      "--dport",
+      "18080",
+      "-j",
+      "DROP"
+    ],
+    [
+      "iptables",
+      "-D",
+      "DOCKER-USER",
+      "-i",
+      "nl-dk-out",
+      "-p",
+      "tcp",
+      "-m",
+      "conntrack",
+      "--ctorigdstport",
+      "18080",
+      "-j",
+      "DROP"
+    ],
+    [
+      "ip",
+      "route",
+      "del",
+      "10.90.0.0/24",
+      "via",
+      "198.51.100.10"
+    ],
+    [
+      "ip",
+      "link",
+      "del",
+      "nl-dk-out"
+    ]
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "the daemon: version, firewall backend, and whether the userland proxy is on",
+      "run": [
+        "sh",
+        "-c",
+        "docker info -f 'Docker {{.ServerVersion}}, firewall backend {{.FirewallBackend.Driver}} {{.FirewallBackend.Info}}'"
+      ],
+      "save": "docker-info.txt",
+      "expect_contains": [
+        "firewall backend iptables"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "a container's eth0 is one end of a veth pair: eth0@ifN names the host-side peer, which is a port of the network's bridge",
+      "run": [
+        "sh",
+        "-c",
+        "docker exec nl-dk-cli ip addr show eth0; i=$(docker exec nl-dk-cli cat /sys/class/net/eth0/iflink); echo \"host side, ifindex $i:\"; ip -o link | awk -F': ' -v i=\"$i\" '$1==i {print $2, $3}' | cut -c1-90"
+      ],
+      "save": "veth-pair.txt",
+      "expect_contains": [
+        "eth0@if",
+        "inet 10.89.0.3/24",
+        "master nl-dk-br0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "Docker's namespaces are not in `ip netns`; each container's is a file under /var/run/docker/netns, and nsenter shows the same interface from the host",
+      "run": [
+        "sh",
+        "-c",
+        "k=$(docker inspect -f '{{.NetworkSettings.SandboxKey}}' nl-dk-cli); echo \"SandboxKey: $k\"; echo \"in ip netns list: $(ip netns list | grep -c \"$(basename $k)\")\"; nsenter --net=\"$k\" ip -4 -o addr show eth0"
+      ],
+      "save": "netns.txt",
+      "expect_contains": [
+        "in ip netns list: 0",
+        "/var/run/docker/netns/",
+        "10.89.0.3/24"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "the bridge and its ports, and Docker's view of the network",
+      "run": [
+        "sh",
+        "-c",
+        "ip -4 addr show nl-dk-br0 | grep inet; bridge link show master nl-dk-br0 | cut -d' ' -f2-7; docker network inspect -f '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{\"\\n\"}}{{end}}' nl-dk-app | sort"
+      ],
+      "save": "bridge.txt",
+      "expect_contains": [
+        "inet 10.89.0.1/24",
+        "master nl-dk-br0",
+        "nl-dk-web 10.89.0.2/24",
+        "nl-dk-cli 10.89.0.3/24"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "a user-defined network: resolv.conf points at the embedded server 127.0.0.11, which forwards to the host's resolvers (\"host(\u2026)\")",
+      "run": [
+        "sh",
+        "-c",
+        "docker exec nl-dk-cli cat /etc/resolv.conf"
+      ],
+      "save": "resolv-user.txt",
+      "expect_contains": [
+        "nameserver 127.0.0.11",
+        "ExtServers: [host("
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "the default bridge: a copy of the host's resolvers, no embedded server",
+      "run": [
+        "sh",
+        "-c",
+        "docker exec nl-dk-def cat /etc/resolv.conf"
+      ],
+      "save": "resolv-default.txt",
+      "expect_absent": [
+        "127.0.0.11"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "container names resolve on the user-defined network \u2026",
+      "run": [
+        "sh",
+        "-c",
+        "docker exec nl-dk-cli nslookup nl-dk-web"
+      ],
+      "save": "dns-user.txt",
+      "expect_contains": [
+        "Address: 10.89.0.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "\u2026 and not on the default bridge (the query goes to the host's resolvers, which have never heard of nl-dk-web)",
+      "run": [
+        "sh",
+        "-c",
+        "docker exec nl-dk-def nslookup nl-dk-web"
+      ],
+      "save": "dns-default.txt",
+      "expect_exit": 1,
+      "expect_absent": [
+        "10.89.0.2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "how 127.0.0.11 works: iptables in the CONTAINER's namespace redirect port 53 to sockets dockerd holds open inside it",
+      "run": [
+        "sh",
+        "-c",
+        "nsenter -t $(docker inspect -f '{{.State.Pid}}' nl-dk-cli) -n iptables -t nat -S DOCKER_OUTPUT; nsenter -t $(docker inspect -f '{{.State.Pid}}' nl-dk-cli) -n ss -Hlnup | sed 's/  */ /g'"
+      ],
+      "save": "embedded-dns.txt",
+      "expect_contains": [
+        "-d 127.0.0.11/32 -p udp -m udp --dport 53 -j DNAT --to-destination 127.0.0.11:",
+        "dockerd"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "@host",
+      "if": "nl-dk-br0",
+      "filter": "udp port 53",
+      "decode": [
+        "-nn"
+      ],
+      "save": "dns-forward.pcap",
+      "name": "with --dns, the embedded server forwards from the CONTAINER's namespace: the query crosses the bridge from the container's address",
+      "during": {
+        "node": "@host",
+        "run": [
+          "sh",
+          "-c",
+          "docker exec nl-dk-ext nslookup app.corp.test"
+        ]
+      },
+      "expect_contains": [
+        "> 198.51.100.10.53: ",
+        "A? app.corp.test",
+        "Address: 198.51.100.80"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "\u2026so the upstream server sees the host's address, after MASQUERADE \u2014 while host(\u2026) resolvers are queried from the host's own namespace",
+      "run": [
+        "sh",
+        "-c",
+        "grep 'app.corp.test from' ${EVIDENCE}/dnsmasq.log | head -2; docker exec nl-dk-ext grep -E '^nameserver|ExtServers' /etc/resolv.conf"
+      ],
+      "save": "dns-upstream.txt",
+      "expect_contains": [
+        "query[A] app.corp.test from 198.51.100.1",
+        "ExtServers: [198.51.100.10]"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "the NAT rules: DNAT for each published port (loopback-only for 18081), MASQUERADE for the network's egress",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -t nat -S | grep -E 'nl-dk-br0|DOCKER'"
+      ],
+      "save": "nat-rules.txt",
+      "expect_contains": [
+        "-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER",
+        "-A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER",
+        "-s 10.89.0.0/24 ! -o nl-dk-br0 -j MASQUERADE",
+        "--dport 18080 -j DNAT --to-destination 10.89.0.2:80",
+        "-d 127.0.0.1/32 ! -i nl-dk-br0 -p tcp -m tcp --dport 18081"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "the filter path: FORWARD \u2192 DOCKER-USER (yours) \u2192 DOCKER-FORWARD; raw PREROUTING drops traffic addressed straight to a container from any other interface",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -S FORWARD; iptables -S DOCKER | grep nl-dk-br0; iptables -t raw -S PREROUTING | grep nl-dk-br0"
+      ],
+      "save": "filter-rules.txt",
+      "expect_contains": [
+        "-P FORWARD DROP",
+        "-A FORWARD -j DOCKER-USER",
+        "-d 10.89.0.2/32 ! -i nl-dk-br0 -o nl-dk-br0 -p tcp -m tcp --dport 80 -j ACCEPT",
+        "-d 10.89.0.2/32 ! -i nl-dk-br0 -j DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "outside",
+      "name": "from outside, the published port works and the container sees the real client address",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://198.51.100.1:18080/"
+      ],
+      "save": "publish-outside.txt",
+      "expect_contains": [
+        "from 198.51.100.10:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "a host firewall rule in INPUT that drops port 18080 \u2026",
+      "run": [
+        "iptables",
+        "-I",
+        "INPUT",
+        "-i",
+        "nl-dk-out",
+        "-p",
+        "tcp",
+        "--dport",
+        "18080",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "outside",
+      "name": "\u2026 does not protect it: after DNAT the packet is forwarded, never delivered to the host (this is why ufw does not cover published ports)",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://198.51.100.1:18080/"
+      ],
+      "save": "publish-input-drop.txt",
+      "expect_contains": [
+        "from 198.51.100.10:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "a DOCKER-USER rule does \u2014 matching the ORIGINAL destination port through conntrack, since the packet is already translated to :80",
+      "run": [
+        "iptables",
+        "-I",
+        "DOCKER-USER",
+        "-i",
+        "nl-dk-out",
+        "-p",
+        "tcp",
+        "-m",
+        "conntrack",
+        "--ctorigdstport",
+        "18080",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "outside",
+      "name": "now the published port is blocked from outside",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://198.51.100.1:18080/"
+      ],
+      "save": "publish-docker-user.txt",
+      "expect_exit": 28
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "remove both rules",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -D INPUT -i nl-dk-out -p tcp --dport 18080 -j DROP && iptables -D DOCKER-USER -i nl-dk-out -p tcp -m conntrack --ctorigdstport 18080 -j DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "outside",
+      "name": "reachable again",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://198.51.100.1:18080/"
+      ],
+      "expect_contains": [
+        "from 198.51.100.10:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "-p 127.0.0.1:18081:80 is reachable from the host \u2026",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://127.0.0.1:18081/"
+      ],
+      "save": "publish-loopback.txt",
+      "expect_contains": [
+        "from 10.89.0.1:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "outside",
+      "name": "\u2026 and not from outside",
+      "run": [
+        "sh",
+        "-c",
+        "curl -s -m 3 --noproxy '*' http://198.51.100.1:18081/"
+      ],
+      "expect_exit": 7
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "the host's own 127.0.0.1:18080 is served by docker-proxy, a userland process \u2014 so the container sees the bridge gateway, not 127.0.0.1",
+      "run": [
+        "sh",
+        "-c",
+        "ss -Hltnp 'sport = :18080' | grep -o 'docker-proxy' | head -1; curl -s -m 3 --noproxy '*' http://127.0.0.1:18080/"
+      ],
+      "save": "docker-proxy.txt",
+      "expect_contains": [
+        "docker-proxy",
+        "from 10.89.0.1:"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "@host",
+      "if": "nl-dk-out",
+      "filter": "icmp",
+      "decode": [
+        "-nn"
+      ],
+      "save": "egress.pcap",
+      "name": "egress: a container's ping leaves the host from the host's address (MASQUERADE)",
+      "during": {
+        "node": "@host",
+        "run": [
+          "sh",
+          "-c",
+          "docker exec nl-dk-cli ping -c 2 198.51.100.10"
+        ]
+      },
+      "expect_contains": [
+        "198.51.100.1 > 198.51.100.10: ICMP echo request",
+        "198.51.100.10 > 198.51.100.1: ICMP echo reply"
+      ],
+      "expect_absent": [
+        "10.89.0.3 >"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "networks are isolated: the default-bridge container cannot reach nl-dk-cli's address \u2026",
+      "run": [
+        "sh",
+        "-c",
+        "docker exec nl-dk-def ping -c 1 -W 2 10.89.0.3"
+      ],
+      "save": "isolation.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "100% packet loss"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "\u2026 but it can reach the published port through the host, and arrives from nl-dk-app's gateway (masqueraded into that bridge)",
+      "run": [
+        "sh",
+        "-c",
+        "docker exec nl-dk-def wget -q -T 3 -O - http://198.51.100.1:18080/"
+      ],
+      "save": "isolation-published.txt",
+      "expect_contains": [
+        "from 10.89.0.1:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "docker network connect gives it a second interface on nl-dk-app; then names and direct traffic work",
+      "run": [
+        "sh",
+        "-c",
+        "docker network connect nl-dk-app nl-dk-def && docker exec nl-dk-def ip -o -4 addr | awk '{print $2, $4}'; docker exec nl-dk-def ping -c 1 -W 2 nl-dk-cli"
+      ],
+      "save": "isolation-connect.txt",
+      "expect_contains": [
+        "eth1 10.89.0.",
+        "0% packet loss"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "--internal: no gateway, no default route, no MASQUERADE \u2014 nothing leaves",
+      "run": [
+        "sh",
+        "-c",
+        "docker network create --internal --subnet 10.91.0.0/24 nl-dk-int >/dev/null && docker run --rm --network nl-dk-int course/netshell:1 sh -c 'ip route; ping -c1 -W2 198.51.100.10'"
+      ],
+      "save": "internal.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "10.91.0.0/24 dev eth0",
+        "Network is unreachable"
+      ],
+      "expect_absent": [
+        "default via"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "--network none: only loopback",
+      "run": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "course/netshell:1",
+        "ip",
+        "-o",
+        "link"
+      ],
+      "save": "none.txt",
+      "expect_contains": [
+        "1: lo:"
+      ],
+      "expect_absent": [
+        "eth0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "--network host: the host's own interfaces, including the lab's nl-dk-out",
+      "run": [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "host",
+        "course/netshell:1",
+        "ip",
+        "-o",
+        "link"
+      ],
+      "save": "host-mode.txt",
+      "expect_contains": [
+        "nl-dk-out",
+        "nl-dk-br0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "a network MTU (com.docker.network.driver.mtu) is what containers get \u2014 the fix when the host's uplink is a tunnel smaller than 1500",
+      "run": [
+        "sh",
+        "-c",
+        "docker network create -o com.docker.network.driver.mtu=1400 --subnet 10.92.0.0/24 nl-dk-mtu >/dev/null && docker run --rm --network nl-dk-mtu course/netshell:1 ip link show eth0"
+      ],
+      "save": "mtu.txt",
+      "expect_contains": [
+        "mtu 1400"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "a 'corporate' network 10.90.0.0/24 is reachable from the host through the outside router",
+      "run": [
+        "sh",
+        "-c",
+        "ip route get 10.90.0.20 | head -1; ping -c1 -W2 10.90.0.20 | tail -2"
+      ],
+      "save": "corp-before.txt",
+      "expect_contains": [
+        "via 198.51.100.10",
+        "0% packet loss"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "@host",
+      "name": "a Docker network created with the same subnet: containers on it think 10.90.0.20 is on their own link, ARP for it on the bridge, and never reach it",
+      "run": [
+        "sh",
+        "-c",
+        "docker network create --subnet 10.90.0.0/24 nl-dk-clash >/dev/null && docker run -d --name nl-dk-clash1 --network nl-dk-clash course/netshell:1 sleep 600 >/dev/null && docker exec nl-dk-clash1 ip route; docker exec nl-dk-clash1 ping -c1 -W2 10.90.0.20; echo \"exit $?\"; echo 'host:'; ip route show 10.90.0.0/24"
+      ],
+      "save": "corp-clash.txt",
+      "expect_contains": [
+        "10.90.0.0/24 dev eth0",
+        "100% packet loss",
+        "10.90.0.0/24 via 198.51.100.10"
+      ]
+    }
+  ]
+}

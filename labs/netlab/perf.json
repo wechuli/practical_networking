@@ -1,0 +1,529 @@
+{
+  "name": "perf",
+  "description": "Network performance on an emulated path (pathlab: delay, rate, queue, loss in userspace): RTT and the curl timing breakdown, slow start vs a reused connection, window-limited throughput vs the BDP, bufferbloat with deep vs short queues, UDP overload, TCP throughput under loss vs the Mathis model (CUBIC vs BBR), goodput vs throughput from a sender capture, and a PMTUD black hole with PLPMTUD recovery and MSS clamping",
+  "nodes": [
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.100.1"
+        }
+      ],
+      "files": {
+        "/etc/hosts": "127.0.0.1\tlocalhost\n198.18.101.10\tapi.perf.test files.perf.test\n"
+      }
+    },
+    {
+      "name": "router",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.default.rp_filter": "0"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "ip tuntap add dev pl-ab mode tun && ip tuntap add dev pl-ba mode tun && ip link set pl-ab up && ip link set pl-ba up && sysctl -qw net.ipv4.conf.pl-ab.rp_filter=0 net.ipv4.conf.pl-ba.rp_filter=0 && ip rule add iif eth0 table 100 && ip route add default dev pl-ab table 100 && ip rule add iif eth1 table 101 && ip route add default dev pl-ba table 101"
+        ]
+      ],
+      "services": [
+        {
+          "name": "pathlab",
+          "run": [
+            "${BIN}/pathlab",
+            "run",
+            "-delay",
+            "25ms",
+            "-control",
+            "0.0.0.0:9911"
+          ],
+          "port": 9911
+        }
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.101.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "iperf3",
+          "run": [
+            "iperf3",
+            "-s",
+            "-B",
+            "198.18.101.10"
+          ],
+          "port": 5201
+        },
+        {
+          "name": "api",
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "198.18.101.10:8443",
+            "-name",
+            "api.perf.test",
+            "-size",
+            "2048",
+            "-delay",
+            "100ms",
+            "-ca-out",
+            "${EVIDENCE}/api-ca.pem"
+          ],
+          "port": 8443
+        },
+        {
+          "name": "files",
+          "run": [
+            "${BIN}/labserver",
+            "-addr",
+            "198.18.101.10:9443",
+            "-http-addr",
+            "198.18.101.10:8080",
+            "-name",
+            "files.perf.test",
+            "-size",
+            "4194304",
+            "-ca-out",
+            "${EVIDENCE}/files-ca.pem"
+          ],
+          "port": 9443
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.100.10/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth0",
+        "addr": [
+          "198.18.100.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "router",
+        "if": "eth1",
+        "addr": [
+          "198.18.101.1/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.101.10/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "router",
+      "name": "the emulated path: 25 ms each way, nothing else yet",
+      "run": [
+        "${BIN}/pathlab",
+        "stats"
+      ],
+      "save": "path-start.txt",
+      "expect_contains": [
+        "delay 25ms each way (RTT +50ms)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "ping: the RTT is the two 25 ms delays plus a fraction of a millisecond",
+      "run": [
+        "ping",
+        "-c",
+        "5",
+        "-q",
+        "198.18.101.10"
+      ],
+      "save": "ping.txt",
+      "expect_contains": [
+        "rtt min/avg/max"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "curl's timing breakdown for a small HTTPS API call (server adds 100 ms of work): TCP 1 RTT, TLS 1.3 1 RTT, request 1 RTT + 100 ms",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; curl -s -o /dev/null --cacert ${EVIDENCE}/api-ca.pem -w 'dns %{time_namelookup}  tcp %{time_connect}  tls %{time_appconnect}  first byte %{time_starttransfer}  total %{time_total}  (%{size_download} bytes)\\n' https://api.perf.test:8443/"
+      ],
+      "save": "curl-timing.txt",
+      "expect_contains": [
+        "first byte",
+        "(2048 bytes)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "4 MiB twice in one curl run: the second transfer reuses the connection \u2014 no handshakes, and slow start is already done",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; curl -s -o /dev/null -o /dev/null --cacert ${EVIDENCE}/files-ca.pem -w 'dns %{time_namelookup}  tcp %{time_connect}  tls %{time_appconnect}  first byte %{time_starttransfer}  total %{time_total}  (%{size_download} bytes)\\n' https://files.perf.test:9443/ https://files.perf.test:9443/"
+      ],
+      "save": "reuse.txt",
+      "expect_contains": [
+        "(4194304 bytes)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "add a 20 Mbit/s bottleneck with a 100-packet queue: BDP = 20 Mbit/s \u00d7 50 ms = 125 KB",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "rate=20mbit",
+        "limit=100"
+      ],
+      "expect_contains": [
+        "rate 20Mbit"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "throughput is capped at window \u00f7 RTT: 16 KB \u2192 ~2.6 Mbit/s, 64 KB \u2192 ~10.5 Mbit/s, autotuned \u2192 the link",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; iperf3 -c 198.18.101.10 -t 5 -w 16K -J | python3 -c 'import json,sys; j=json.load(sys.stdin); e=j[\"end\"]; print(\"%s: %.2f Mbit/s received, %s retransmissions\" % (sys.argv[1], e[\"sum_received\"][\"bits_per_second\"]/1e6, e[\"sum_sent\"].get(\"retransmits\")))' \"window 16K\"; iperf3 -c 198.18.101.10 -t 5 -w 64K -J | python3 -c 'import json,sys; j=json.load(sys.stdin); e=j[\"end\"]; print(\"%s: %.2f Mbit/s received, %s retransmissions\" % (sys.argv[1], e[\"sum_received\"][\"bits_per_second\"]/1e6, e[\"sum_sent\"].get(\"retransmits\")))' \"window 64K\"; iperf3 -c 198.18.101.10 -t 5  -J | python3 -c 'import json,sys; j=json.load(sys.stdin); e=j[\"end\"]; print(\"%s: %.2f Mbit/s received, %s retransmissions\" % (sys.argv[1], e[\"sum_received\"][\"bits_per_second\"]/1e6, e[\"sum_sent\"].get(\"retransmits\")))' \"window auto\";"
+      ],
+      "save": "windows.txt",
+      "expect_contains": [
+        "window 16K:",
+        "window 64K:",
+        "window auto:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "a deep bottleneck queue: 1000 packets = 600 ms at 20 Mbit/s",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "limit=1000"
+      ],
+      "expect_contains": [
+        "queue 1000 packets"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "CUBIC fills it: full throughput, and ping (sharing the queue) waits hundreds of milliseconds",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; ping -i 0.2 -c 35 -q 198.18.101.10 > ${EVIDENCE}/ping-1000.txt & iperf3 -c 198.18.101.10 -t 8 -C cubic -J | python3 -c 'import json,sys; j=json.load(sys.stdin); e=j[\"end\"]; print(\"%s: %.2f Mbit/s received, %s retransmissions\" % (sys.argv[1], e[\"sum_received\"][\"bits_per_second\"]/1e6, e[\"sum_sent\"].get(\"retransmits\")))' \"queue 1000 packets\"; wait; tail -1 ${EVIDENCE}/ping-1000.txt"
+      ],
+      "save": "bloat-deep.txt",
+      "expect_contains": [
+        "queue 1000 packets:",
+        "rtt min/avg/max"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "the same bottleneck with a 30-packet queue",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "limit=30"
+      ],
+      "expect_contains": [
+        "queue 30 packets"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "nearly the same throughput, a fraction of the delay \u2014 at the price of some drops CUBIC recovers from",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; ping -i 0.2 -c 35 -q 198.18.101.10 > ${EVIDENCE}/ping-30.txt & iperf3 -c 198.18.101.10 -t 8 -C cubic -J | python3 -c 'import json,sys; j=json.load(sys.stdin); e=j[\"end\"]; print(\"%s: %.2f Mbit/s received, %s retransmissions\" % (sys.argv[1], e[\"sum_received\"][\"bits_per_second\"]/1e6, e[\"sum_sent\"].get(\"retransmits\")))' \"queue 30 packets\"; wait; tail -1 ${EVIDENCE}/ping-30.txt"
+      ],
+      "save": "bloat-short.txt",
+      "expect_contains": [
+        "queue 30 packets:",
+        "rtt min/avg/max"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "UDP has no congestion control: offer 30 Mbit/s to a 20 Mbit/s bottleneck and a third is lost",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; iperf3 -c 198.18.101.10 -u -b 30M -t 5 -J | python3 -c 'import json,sys; s=json.load(sys.stdin)[\"end\"][\"sum\"]; print(\"udp: sent %d datagrams, lost %d = %.1f%%, received %.1f Mbit/s\" % (s[\"packets\"], s[\"lost_packets\"], s[\"lost_percent\"], s[\"bits_per_second\"]*(1-s[\"lost_percent\"]/100)/1e6))'"
+      ],
+      "save": "udp-overload.txt",
+      "expect_contains": [
+        "udp: sent"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "the bottleneck's own counters: drops because the queue was full",
+      "run": [
+        "${BIN}/pathlab",
+        "stats"
+      ],
+      "save": "path-queue.txt",
+      "expect_contains": [
+        "dropped_queue_full"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "remove the bottleneck; keep the 50 ms RTT",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "rate=0"
+      ],
+      "expect_contains": [
+        "rate unlimited"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "random loss vs single-flow throughput: CUBIC near the Mathis bound (MSS/RTT \u00d7 1.22/\u221ap), BBR barely affected",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; for p in 0.001 0.01 0.02; do ${BIN}/pathlab set -c 198.18.100.1:9911 loss=$p >/dev/null; m=$(python3 -c \"print('%.1f' % (1448*8/0.0514*1.22/$p**0.5/1e6))\"); for cc in cubic bbr; do iperf3 -c 198.18.101.10 -t 6 -C $cc -J | python3 -c 'import json,sys; j=json.load(sys.stdin); e=j[\"end\"]; print(\"%s: %.2f Mbit/s received, %s retransmissions\" % (sys.argv[1], e[\"sum_received\"][\"bits_per_second\"]/1e6, e[\"sum_sent\"].get(\"retransmits\")))' \"loss $p $cc\"; done; echo \"  Mathis bound at $p: $m Mbit/s\"; done"
+      ],
+      "save": "loss-sweep.txt",
+      "expect_contains": [
+        "loss 0.001 cubic:",
+        "loss 0.02 bbr:",
+        "Mathis bound at 0.01"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "the sweep left 2% loss; set 1% for the capture",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "loss=0.01"
+      ],
+      "expect_contains": [
+        "loss 1%"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "server",
+      "if": "eth0",
+      "filter": "tcp port 8080",
+      "decode": [
+        "-nn",
+        "-q"
+      ],
+      "save": "goodput.pcap",
+      "name": "a 4 MiB HTTP download through 1% loss, captured at the SENDER (a receiver-side capture never sees the copies that were lost)",
+      "during": {
+        "node": "client",
+        "run": [
+          "sh",
+          "-c",
+          "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; curl -s -o /dev/null -w 'curl: %{size_download} bytes in %{time_total} s\\n' http://files.perf.test:8080/"
+        ]
+      },
+      "expect_contains": [
+        "curl: 4194304 bytes"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "goodput vs throughput from the capture: bytes the application got vs bytes the sender put on the wire",
+      "run": [
+        "sh",
+        "-c",
+        "tshark -r ${EVIDENCE}/goodput.pcap -Y 'ip.src==198.18.101.10' -T fields -e frame.time_relative -e ip.len -e tcp.len -e tcp.analysis.retransmission 2>/dev/null | awk '{t=$1; ip+=$2; pay+=$3; if ($4!=\"\") {r++; rb+=$3}} END {printf \"duration %.3f s; IP bytes sent %d; TCP payload sent %d, of which retransmitted %d bytes in %d segments\\nthroughput (IP bytes / time) %.1f Mbit/s; goodput (4194304 file bytes / time) %.1f Mbit/s\\n\", t, ip, pay, rb, r, ip*8/t/1e6, 4194304*8/t/1e6}'"
+      ],
+      "save": "goodput.txt",
+      "expect_contains": [
+        "goodput (4194304 file bytes / time)",
+        "retransmitted"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "no loss again; make the router's client-side link MTU 1400 \u2014 a narrow hop in the middle of the path",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/pathlab set loss=0 && ip link set eth0 mtu 1400 && ip link show eth0 | grep -o 'mtu [0-9]*'"
+      ],
+      "expect_contains": [
+        "mtu 1400"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "ping with DF from the server finds it: the router answers Frag needed (mtu = 1400); tracepath reports pmtu 1400",
+      "run": [
+        "sh",
+        "-c",
+        "ping -c1 -M do -s 1472 198.18.100.10 2>&1 | grep -iE 'frag|mtu'; ping -c1 -M do -s 1372 198.18.100.10 | grep 'bytes from'; tracepath -n 198.18.100.10 | tail -1"
+      ],
+      "save": "pmtu.txt",
+      "expect_contains": [
+        "Frag needed and DF set (mtu = 1400)",
+        "1380 bytes from",
+        "pmtu 1400"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "break PMTUD: the router no longer sends 'fragmentation needed'",
+      "run": [
+        "iptables",
+        "-A",
+        "OUTPUT",
+        "-p",
+        "icmp",
+        "--icmp-type",
+        "fragmentation-needed",
+        "-j",
+        "DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "forget the learned path MTU, and turn PLPMTUD off (tcp_mtu_probing=0)",
+      "run": [
+        "sh",
+        "-c",
+        "ip route flush cache; sysctl -w net.ipv4.tcp_mtu_probing=0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a download from the server: the handshake works, every full-size segment vanishes \u2014 a black hole",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; timeout 20 iperf3 -c 198.18.101.10 -R -t 10 -J | python3 -c 'import json,sys; j=json.load(sys.stdin); print(sys.argv[1], \"per-second Mbit/s:\", \" \".join(\"%.1f\" % (i[\"sum\"][\"bits_per_second\"]/1e6) for i in j[\"intervals\"]))' \"mtu_probing=0\""
+      ],
+      "save": "blackhole.txt",
+      "expect_contains": [
+        "mtu_probing=0 per-second Mbit/s: 0.0 0.0 0.0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "PLPMTUD on (tcp_mtu_probing=1): after repeated timeouts TCP tries smaller segments itself",
+      "run": [
+        "sh",
+        "-c",
+        "ip route flush cache; sysctl -w net.ipv4.tcp_mtu_probing=1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same download now recovers after a few seconds \u2014 slowly, from slow start",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; timeout 20 iperf3 -c 198.18.101.10 -R -t 10 -J | python3 -c 'import json,sys; j=json.load(sys.stdin); print(sys.argv[1], \"per-second Mbit/s:\", \" \".join(\"%.1f\" % (i[\"sum\"][\"bits_per_second\"]/1e6) for i in j[\"intervals\"]))' \"mtu_probing=1\""
+      ],
+      "save": "plpmtud.txt",
+      "expect_contains": [
+        "mtu_probing=1 per-second Mbit/s: 0.0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "PLPMTUD off again, to test the network-side fix",
+      "run": [
+        "sh",
+        "-c",
+        "ip route flush cache; sysctl -w net.ipv4.tcp_mtu_probing=0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "MSS clamping at the router: --clamp-mss-to-pmtu also considers the MTU back towards the SYN's sender",
+      "run": [
+        "iptables",
+        "-t",
+        "mangle",
+        "-A",
+        "FORWARD",
+        "-p",
+        "tcp",
+        "--tcp-flags",
+        "SYN,RST",
+        "SYN",
+        "-j",
+        "TCPMSS",
+        "--clamp-mss-to-pmtu"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "with clamping, full speed from the first second, ICMP still blocked",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy; timeout 20 iperf3 -c 198.18.101.10 -R -t 5 -J | python3 -c 'import json,sys; j=json.load(sys.stdin); print(sys.argv[1], \"per-second Mbit/s:\", \" \".join(\"%.1f\" % (i[\"sum\"][\"bits_per_second\"]/1e6) for i in j[\"intervals\"]))' \"clamped\""
+      ],
+      "save": "clamped.txt",
+      "expect_contains": [
+        "clamped per-second Mbit/s:"
+      ],
+      "expect_absent": [
+        "clamped per-second Mbit/s: 0.0"
+      ]
+    }
+  ]
+}

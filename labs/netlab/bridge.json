@@ -1,0 +1,26 @@
+{
+  "name": "bridge",
+  "description": "Two hosts on one Linux bridge: forwarding and MAC learning",
+  "nodes": [
+    { "name": "switch", "bridges": [ { "name": "br0" } ] },
+    { "name": "peer1" },
+    { "name": "peer2" }
+  ],
+  "links": [
+    { "a": { "node": "peer1", "if": "eth0", "addr": ["198.18.0.1/24"] },
+      "b": { "node": "switch", "if": "port1", "bridge": "br0" } },
+    { "a": { "node": "peer2", "if": "eth0", "addr": ["198.18.0.2/24"] },
+      "b": { "node": "switch", "if": "port2", "bridge": "br0" } }
+  ],
+  "checks": [
+    { "type": "command", "node": "switch", "run": ["bridge", "fdb", "show", "br", "br0"], "save": "fdb-before.txt",
+      "name": "forwarding database before any traffic: only the bridge's own (permanent) entries" },
+    { "type": "ping", "from": "peer1", "to": "198.18.0.2", "expect": "reachable" },
+    { "type": "fdb", "node": "switch", "bridge": "br0", "port": "port1", "learns": "peer1:eth0" },
+    { "type": "fdb", "node": "switch", "bridge": "br0", "port": "port2", "learns": "peer2:eth0" },
+    { "type": "command", "node": "switch", "run": ["bridge", "fdb", "show", "br", "br0"], "save": "fdb-after.txt",
+      "name": "forwarding database after traffic: peer1 and peer2 learned on their ports" },
+    { "type": "command", "node": "peer1", "run": ["ip", "neigh", "show", "dev", "eth0"], "save": "peer1-neigh.txt",
+      "name": "peer1's neighbour (ARP) table now maps 198.18.0.2 to peer2's MAC" }
+  ]
+}

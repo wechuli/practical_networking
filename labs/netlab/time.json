@@ -1,0 +1,368 @@
+{
+  "name": "time",
+  "description": "Module 23: time \u2014 the NTP offset and delay arithmetic, a server that is 5 minutes wrong, what asymmetric delay does to the estimate, how chrony out-votes a falseticker, and TLS certificate checks with a skewed clock",
+  "requires": {
+    "chronyd": "apt-get install chrony",
+    "chronyc": "apt-get install chrony"
+  },
+  "nodes": [
+    {
+      "name": "client"
+    },
+    {
+      "name": "switch",
+      "bridges": [
+        {
+          "name": "br0"
+        }
+      ]
+    },
+    {
+      "name": "web",
+      "files": {
+        "/etc/hosts": "127.0.0.1\tlocalhost\n198.18.234.80\tweb.time.test\n"
+      },
+      "services": [
+        {
+          "name": "tls",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            ":443",
+            "-name",
+            "web.time.test",
+            "-pki",
+            "${EVIDENCE}/webpki"
+          ],
+          "port": 443
+        }
+      ]
+    },
+    {
+      "name": "ntp1",
+      "services": [
+        {
+          "name": "ntp",
+          "run": [
+            "${BIN}/edgelab",
+            "ntp",
+            "serve",
+            "-addr",
+            ":123",
+            "-offset",
+            "0s",
+            "-request-delay",
+            "10ms",
+            "-reply-delay",
+            "10ms"
+          ],
+          "udp_port": 123
+        }
+      ]
+    },
+    {
+      "name": "ntp2",
+      "services": [
+        {
+          "name": "ntp",
+          "run": [
+            "${BIN}/edgelab",
+            "ntp",
+            "serve",
+            "-addr",
+            ":123",
+            "-offset",
+            "0s",
+            "-request-delay",
+            "10ms",
+            "-reply-delay",
+            "10ms"
+          ],
+          "udp_port": 123
+        }
+      ]
+    },
+    {
+      "name": "ntp3",
+      "services": [
+        {
+          "name": "ntp",
+          "run": [
+            "${BIN}/edgelab",
+            "ntp",
+            "serve",
+            "-addr",
+            ":123",
+            "-offset",
+            "0s",
+            "-request-delay",
+            "10ms",
+            "-reply-delay",
+            "10ms"
+          ],
+          "udp_port": 123
+        }
+      ]
+    },
+    {
+      "name": "bad",
+      "services": [
+        {
+          "name": "ntp",
+          "run": [
+            "${BIN}/edgelab",
+            "ntp",
+            "serve",
+            "-addr",
+            ":123",
+            "-offset",
+            "5m",
+            "-request-delay",
+            "10ms",
+            "-reply-delay",
+            "10ms"
+          ],
+          "udp_port": 123
+        }
+      ]
+    },
+    {
+      "name": "asym",
+      "services": [
+        {
+          "name": "ntp",
+          "run": [
+            "${BIN}/edgelab",
+            "ntp",
+            "serve",
+            "-addr",
+            ":123",
+            "-offset",
+            "0s",
+            "-request-delay",
+            "10ms",
+            "-reply-delay",
+            "50ms"
+          ],
+          "udp_port": 123
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.234.10/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p0",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "web",
+        "if": "eth0",
+        "addr": [
+          "198.18.234.80/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p9",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "ntp1",
+        "if": "eth0",
+        "addr": [
+          "198.18.234.11/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p1",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "ntp2",
+        "if": "eth0",
+        "addr": [
+          "198.18.234.12/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p2",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "ntp3",
+        "if": "eth0",
+        "addr": [
+          "198.18.234.13/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p3",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "bad",
+        "if": "eth0",
+        "addr": [
+          "198.18.234.66/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p4",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "asym",
+        "if": "eth0",
+        "addr": [
+          "198.18.234.40/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p5",
+        "bridge": "br0"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the four timestamps: t1 client send, t2 server receive, t3 server send, t4 client receive; offset = ((t2\u2212t1)+(t3\u2212t4))/2 and delay = (t4\u2212t1)\u2212(t3\u2212t2). With 10 ms each way and the same clock: offset \u2248 0, delay \u2248 20 ms",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/edgelab ntp query -server 198.18.234.11:123 -n 5"
+      ],
+      "save": "ntp-symmetric.txt",
+      "expect_contains": [
+        "stratum 2",
+        "median of 5: offset +0.0 ms (+0.00 s), delay 2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a server whose clock is 5 minutes ahead: the offset says so (+300 000 ms) and the delay is unaffected",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/edgelab ntp query -server 198.18.234.66:123 -n 5"
+      ],
+      "save": "ntp-wrong-server.txt",
+      "expect_contains": [
+        "(+300.00 s), delay 2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "asymmetric path, same clocks: 10 ms in, 50 ms out \u2014 the formula assumes both halves are equal, so it reports a \u221220 ms offset that is not there; the error is half the asymmetry and can never exceed delay/2 (\u2248 30 ms)",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/edgelab ntp query -server 198.18.234.40:123 -n 5"
+      ],
+      "save": "ntp-asymmetric.txt",
+      "expect_contains": [
+        "(-0.02 s), delay 6"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "chronyd -Q measures without touching the clock (here every namespace shares one kernel clock, so nothing may set it): one good server, then the 5-minutes-ahead server alone \u2014 a single source is believed whatever it says",
+      "run": [
+        "sh",
+        "-c",
+        "chronyd -Q -u root -f /dev/null 'server 198.18.234.11 iburst minpoll 0 maxpoll 0' 2>&1 | grep -o 'System clock wrong.*'; chronyd -Q -u root -f /dev/null 'server 198.18.234.66 iburst minpoll 0 maxpoll 0' 2>&1 | grep -o 'System clock wrong.*'"
+      ],
+      "save": "chrony-single.txt",
+      "expect_contains": [
+        "System clock wrong by 0.000",
+        "System clock wrong by 300.0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "three sources, one 5 minutes off: chrony's selection finds the two that agree, marks the odd one a falseticker (x) and synchronises to a good one (*); note chronyc's sign: \u2212300 s means the source is ahead",
+      "run": [
+        "sh",
+        "-c",
+        "mkdir -m 700 -p ${EVIDENCE}/chrony-three; printf 'server 198.18.234.11 iburst minpoll 0 maxpoll 0\\nserver 198.18.234.12 iburst minpoll 0 maxpoll 0\\nserver 198.18.234.66 iburst minpoll 0 maxpoll 0\\nbindcmdaddress ${EVIDENCE}/chrony-three/chronyd.sock\\npidfile ${EVIDENCE}/chrony-three/chronyd.pid\\n' > ${EVIDENCE}/chrony-three/chrony.conf; chronyd -x -u root -f ${EVIDENCE}/chrony-three/chrony.conf -l ${EVIDENCE}/chrony-three/chronyd.log; sleep 8; chronyc -h ${EVIDENCE}/chrony-three/chronyd.sock -n sources | tail -n +2; chronyc -h ${EVIDENCE}/chrony-three/chronyd.sock -n tracking | sed -n '1,2p'; kill $(cat ${EVIDENCE}/chrony-three/chronyd.pid); sleep 0.3; echo '--- chronyd log:'; grep -E 'falseticker|Selected source|majority' ${EVIDENCE}/chrony-three/chronyd.log | cut -d' ' -f2- | sort | uniq -c"
+      ],
+      "save": "chrony-three.txt",
+      "expect_contains": [
+        "^x 198.18.234.66",
+        "-300.0s",
+        "Detected falseticker 198.18.234.66",
+        "Reference ID    : C612EA"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "two sources that disagree: neither has a majority, both are marked x and chrony does not synchronise at all ('no majority') \u2014 use at least three, preferably four, independent sources; the asymmetric server is shown alongside (noselect): +20 ms, but inside its \u00b1error bound",
+      "run": [
+        "sh",
+        "-c",
+        "mkdir -m 700 -p ${EVIDENCE}/chrony-two; printf 'server 198.18.234.11 iburst minpoll 0 maxpoll 0\\nserver 198.18.234.66 iburst minpoll 0 maxpoll 0\\nserver 198.18.234.40 iburst minpoll 0 maxpoll 0 noselect\\nbindcmdaddress ${EVIDENCE}/chrony-two/chronyd.sock\\npidfile ${EVIDENCE}/chrony-two/chronyd.pid\\n' > ${EVIDENCE}/chrony-two/chrony.conf; chronyd -x -u root -f ${EVIDENCE}/chrony-two/chrony.conf -l ${EVIDENCE}/chrony-two/chronyd.log; sleep 8; chronyc -h ${EVIDENCE}/chrony-two/chronyd.sock -n sources | tail -n +2; chronyc -h ${EVIDENCE}/chrony-two/chronyd.sock -n tracking | sed -n '1,2p'; kill $(cat ${EVIDENCE}/chrony-two/chronyd.pid); sleep 0.3; echo '--- chronyd log:'; grep -E 'falseticker|Selected source|majority' ${EVIDENCE}/chrony-two/chronyd.log | cut -d' ' -f2- | sort | uniq -c"
+      ],
+      "save": "chrony-two.txt",
+      "expect_contains": [
+        "^x 198.18.234.11",
+        "^x 198.18.234.66",
+        "^? 198.18.234.40",
+        "Can't synchronise: no majority",
+        "Reference ID    : 00000000"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "TLS with a wrong clock: the certificate is valid from 1 h ago for 30 days; a client clock 2 h behind or 31 days ahead rejects it with the error users report as 'your connection is not private'",
+      "run": [
+        "sh",
+        "-c",
+        "for o in 0s -30m -2h 696h 744h; do ${BIN}/edgelab tlsclock -connect 198.18.234.80:443 -servername web.time.test -cafile ${EVIDENCE}/webpki/ca.pem -offset $o; done"
+      ],
+      "save": "tls-clock.txt",
+      "expect_contains": [
+        "clock +0s (",
+        "): OK (certificate valid",
+        "clock -2h0m0s (",
+        "certificate has expired or is not yet valid: current time",
+        "is before 20",
+        "clock +744h0m0s",
+        "is after 20"
+      ]
+    }
+  ]
+}

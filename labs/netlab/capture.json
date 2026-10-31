@@ -1,0 +1,436 @@
+{
+  "name": "capture",
+  "description": "A client, a router that can add delay and loss (pathlab), and a server with DNS, HTTP and HTTPS: what tcpdump can miss (--immediate-mode, kernel drops, snaplen), capturing on -i any, localizing a drop with captures at four points, ring buffers, network vs server time and one-way delay from two captures, TCP loss as the sender's and the receiver's capture report it, zero window in Expert Info, unanswered DNS queries, and TLS without and with a key log.",
+  "nodes": [
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.210.1"
+        }
+      ],
+      "files": {
+        "/etc/resolv.conf": "nameserver 198.18.211.10\n",
+        "/etc/hosts": "127.0.0.1\tlocalhost\n"
+      }
+    },
+    {
+      "name": "router",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.default.rp_filter": "0"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "ip tuntap add dev pl-ab mode tun && ip tuntap add dev pl-ba mode tun && ip link set pl-ab up && ip link set pl-ba up && sysctl -qw net.ipv4.conf.pl-ab.rp_filter=0 net.ipv4.conf.pl-ba.rp_filter=0 && ip rule add iif eth0 table 100 && ip route add default dev pl-ab table 100 && ip rule add iif eth1 table 101 && ip route add default dev pl-ba table 101"
+        ]
+      ],
+      "services": [
+        {
+          "name": "pathlab",
+          "run": [
+            "${BIN}/pathlab",
+            "run",
+            "-control",
+            "0.0.0.0:9911"
+          ],
+          "port": 9911
+        }
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.211.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "dns",
+          "run": [
+            "dnsmasq",
+            "--keep-in-foreground",
+            "--conf-file=/dev/null",
+            "--no-resolv",
+            "--no-hosts",
+            "--listen-address=198.18.211.10",
+            "--bind-interfaces",
+            "--host-record=api.capture.test,198.18.211.10",
+            "--local=/capture.test/"
+          ],
+          "udp_port": 53
+        },
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "198.18.211.10:8443",
+            "-plain",
+            "198.18.211.10:8080",
+            "-name",
+            "api.capture.test",
+            "-pki",
+            "${EVIDENCE}/webpki"
+          ],
+          "port": 8443
+        },
+        {
+          "name": "iperf3",
+          "run": [
+            "iperf3",
+            "-s",
+            "-B",
+            "198.18.211.10"
+          ],
+          "port": 5201
+        },
+        {
+          "name": "noread",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.211.10:7020",
+            "-mode",
+            "noread",
+            "-rcvbuf",
+            "4096",
+            "-quiet"
+          ],
+          "port": 7020
+        },
+        {
+          "name": "discard",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "198.18.211.10:7021",
+            "-mode",
+            "discard",
+            "-quiet"
+          ],
+          "port": 7021
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.210.10/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth0",
+        "addr": [
+          "198.18.210.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.211.10/24"
+        ]
+      },
+      "b": {
+        "node": "router",
+        "if": "eth1",
+        "addr": [
+          "198.18.211.1/24"
+        ]
+      }
+    }
+  ],
+  "requires": {
+    "tshark": "apt-get install tshark",
+    "dnsmasq": "apt-get install dnsmasq-base",
+    "dig": "apt-get install dnsutils",
+    "iperf3": "apt-get install iperf3",
+    "mergecap": "apt-get install wireshark-common",
+    "curl": "apt-get install curl"
+  },
+  "checks": [
+    {
+      "type": "command",
+      "node": "client",
+      "name": "stop tcpdump right after the traffic WITHOUT --immediate-mode: the packets were 'received by filter' but never written \u2014 libpcap hands them over in blocks",
+      "run": [
+        "sh",
+        "-c",
+        "for m in '' '--immediate-mode'; do tcpdump $m -Z root -U -nn -i eth0 -w ${EVIDENCE}/immediate.pcap icmp 2>${EVIDENCE}/immediate.log & T=$!; sleep 0.7; ping -c3 -i 0.002 -q 198.18.211.10 >/dev/null; kill -INT $T; wait $T; echo \"tcpdump ${m:-(default)}: $(grep -E 'captured|received' ${EVIDENCE}/immediate.log | tr '\\n' ' ')\"; done"
+      ],
+      "save": "immediate-mode.txt",
+      "expect_contains": [
+        "(default): 0 packets captured 6 packets received by filter",
+        "--immediate-mode: 6 packets captured 6 packets received by filter"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "-i any on the router: one ping appears twice per direction \u2014 in on eth0, out on eth1 \u2014 with the Linux 'cooked' link type instead of Ethernet",
+      "run": [
+        "sh",
+        "-c",
+        "tcpdump -Z root --immediate-mode -nn -i any -w ${EVIDENCE}/any.pcap icmp 2>${EVIDENCE}/any.log & T=$!; sleep 0.7; ip netns exec nl-capture-client ping -c1 -q 198.18.211.10 >/dev/null; sleep 0.3; kill -INT $T; wait $T; grep -o 'link-type [A-Z0-9_]*' ${EVIDENCE}/any.log; tcpdump -nn -r ${EVIDENCE}/any.pcap 2>/dev/null"
+      ],
+      "save": "any.txt",
+      "expect_contains": [
+        "link-type LINUX_SLL2",
+        "eth0  In  IP 198.18.210.10 > 198.18.211.10: ICMP echo request",
+        "eth1  Out IP 198.18.210.10 > 198.18.211.10: ICMP echo request"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "find where packets die: capture at four points while the router drops one port \u2014 the SYNs are seen leaving the client and entering the router, never leaving it",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-capture-router iptables -I FORWARD -p tcp --dport 7021 -j DROP; P=''; ip netns exec nl-capture-client tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/drop-client.pcap 'tcp port 7021' 2>${EVIDENCE}/drop-client.log & P=\"$P $!\"; ip netns exec nl-capture-router tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/drop-router-in.pcap 'tcp port 7021' 2>${EVIDENCE}/drop-router-in.log & P=\"$P $!\"; ip netns exec nl-capture-router tcpdump -Z root --immediate-mode -nn -i eth1 -w ${EVIDENCE}/drop-router-out.pcap 'tcp port 7021' 2>${EVIDENCE}/drop-router-out.log & P=\"$P $!\"; ip netns exec nl-capture-server tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/drop-server.pcap 'tcp port 7021' 2>${EVIDENCE}/drop-server.log & P=\"$P $!\"; sleep 0.7; ${BIN}/tcplab dial -to 198.18.211.10:7021 -timeout 2.5s; sleep 0.4; kill -INT $P; wait $P 2>/dev/null; ip netns exec nl-capture-router iptables -D FORWARD -p tcp --dport 7021 -j DROP; for p in client router-in router-out server; do echo \"SYNs seen at $p: $(tcpdump -nn -r ${EVIDENCE}/drop-$p.pcap 'tcp[tcpflags] == tcp-syn' 2>/dev/null | wc -l)\"; done"
+      ],
+      "save": "localize.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "SYNs seen at client: 3",
+        "SYNs seen at router-in: 3",
+        "SYNs seen at router-out: 0",
+        "SYNs seen at server: 0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "snaplen 96 keeps the headers and the first 30 bytes of payload (enough for 'HTTP/1.1 200 OK', not for the body): a fraction of the file size, every data frame marked as cut short",
+      "run": [
+        "sh",
+        "-c",
+        "P=''; ip netns exec nl-capture-client tcpdump -Z root --immediate-mode -nn -s 96 -i eth0 -w ${EVIDENCE}/snap96.pcap 'tcp port 8080' 2>${EVIDENCE}/snap96.log & P=\"$P $!\"; sleep 0.7; unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY ALL_PROXY all_proxy;  curl -s -o /dev/null http://198.18.211.10:8080/obj?size=20000; sleep 0.4; kill -INT $P; wait $P 2>/dev/null; P=''; ip netns exec nl-capture-client tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/snapfull.pcap 'tcp port 8080' 2>${EVIDENCE}/snapfull.log & P=\"$P $!\"; sleep 0.7; unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY ALL_PROXY all_proxy;  curl -s -o /dev/null http://198.18.211.10:8080/obj?size=20000; sleep 0.4; kill -INT $P; wait $P 2>/dev/null; for f in snap96 snapfull; do echo \"$f: $(capinfos -c -s ${EVIDENCE}/$f.pcap | grep -E 'Number of packets|File size' | tr -s ' ' | tr '\\n' ' ') HTTP status lines: $(tshark -n -r ${EVIDENCE}/$f.pcap -Y http.response.code -T fields -e http.response.code 2>/dev/null | tr '\\n' ' '), frames cut short: $(tshark -n -r ${EVIDENCE}/$f.pcap -Y '_ws.short' 2>/dev/null | wc -l)\"; done"
+      ],
+      "save": "snaplen.txt",
+      "expect_contains": [
+        "snap96:",
+        "snapfull:",
+        "frames cut short: 0",
+        "200"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a capture can miss packets: a small capture buffer (-B 64 KiB) feeding a reader that stalls for 3 s drops almost everything \u2014 tcpdump reports it when it stops; a large buffer writing to a file kept up",
+      "run": [
+        "sh",
+        "-c",
+        "rm -f ${EVIDENCE}/slow.fifo; mkfifo ${EVIDENCE}/slow.fifo; (exec 3<${EVIDENCE}/slow.fifo; sleep 3; cat <&3 >/dev/null) & R=$!; tcpdump -B 64 -nn -v -i eth0 'tcp port 5201' 2>${EVIDENCE}/drops-slow.log >${EVIDENCE}/slow.fifo & T=$!; sleep 0.7; iperf3 -c 198.18.211.10 -t 1 >/dev/null; sleep 2.5; kill -INT $T; wait $T $R; tcpdump -B 16384 -s 96 -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/drops-fast.pcap 'tcp port 5201' 2>${EVIDENCE}/drops-fast.log & T=$!; sleep 0.7; iperf3 -c 198.18.211.10 -t 1 >/dev/null; sleep 0.3; kill -INT $T; wait $T; for f in slow fast; do echo \"$f: $(grep -E 'captured|received|dropped' ${EVIDENCE}/drops-$f.log | tr '\\n' ' ')\"; done"
+      ],
+      "save": "kernel-drops.txt",
+      "expect_contains": [
+        "slow:",
+        "packets dropped by kernel",
+        "fast:",
+        "received by filter 0 packets dropped by kernel"
+      ],
+      "expect_absent": [
+        "slow: \n"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a ring buffer (-C 1 -W 3): at most three files of 1 MB each, the oldest overwritten \u2014 bounded disk however long it runs",
+      "run": [
+        "sh",
+        "-c",
+        "mkdir -p ${EVIDENCE}/ring && tcpdump -Z root --immediate-mode -nn -i eth0 -C 1 -W 3 -w ${EVIDENCE}/ring/ring.pcap 'tcp port 7021' 2>/dev/null & T=$!; sleep 0.7; ${BIN}/tcplab send -to 198.18.211.10:7021 -bytes 20000000 >/dev/null; sleep 0.3; kill -INT $T; wait $T; ls -l ${EVIDENCE}/ring | awk 'NR>1 {print $5, $9}'; echo \"files: $(ls ${EVIDENCE}/ring | wc -l)\"; capinfos -a -e ${EVIDENCE}/ring/ring.pcap0 | grep -E 'First|Last'"
+      ],
+      "save": "ring.txt",
+      "expect_contains": [
+        "ring.pcap0",
+        "ring.pcap1",
+        "ring.pcap2",
+        "files: 3"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "add 10 ms each way",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "delay=10ms"
+      ],
+      "expect_contains": [
+        "10ms"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "one request captured at both ends: the handshake gives the RTT (\u2248 21 ms on both sides), the first response byte separates server time (\u2248 200 ms at the server) from network time",
+      "run": [
+        "sh",
+        "-c",
+        "P=''; ip netns exec nl-capture-client tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/time-client.pcap 'tcp port 8080' 2>${EVIDENCE}/time-client.log & P=\"$P $!\"; ip netns exec nl-capture-server tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/time-server.pcap 'tcp port 8080' 2>${EVIDENCE}/time-server.log & P=\"$P $!\"; sleep 0.7; unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY ALL_PROXY all_proxy;  curl -s -o /dev/null -w 'curl: connect %{time_connect} s, first byte %{time_starttransfer} s, total %{time_total} s\\n' 'http://198.18.211.10:8080/obj?size=2000&delay=200ms'; sleep 0.4; kill -INT $P; wait $P 2>/dev/null; for p in client server; do echo \"$p capture: initial RTT $(tshark -n -r ${EVIDENCE}/time-$p.pcap -Y 'tcp.analysis.initial_rtt' -T fields -e tcp.analysis.initial_rtt 2>/dev/null | head -1) s, request\u2192first response packet $(tshark -n -r ${EVIDENCE}/time-$p.pcap -o tcp.desegment_tcp_streams:FALSE -Y http.response -T fields -e http.time 2>/dev/null) s\"; done; tshark -n -r ${EVIDENCE}/time-client.pcap -q -z follow,tcp,ascii,0 2>/dev/null | grep -E '^(GET|HTTP|Host)'"
+      ],
+      "save": "timing.txt",
+      "expect_contains": [
+        "client capture: initial RTT 0.02",
+        "server capture: initial RTT 0.02",
+        "request\u2192first response packet 0.2",
+        "GET /obj?size=2000&delay=200ms HTTP/1.1",
+        "HTTP/1.1 200 OK"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "merge the two captures (same clock here): the SYN left the client and reached the server \u2248 10 ms later \u2014 a one-way delay; across hosts this needs synchronized clocks",
+      "run": [
+        "sh",
+        "-c",
+        "mergecap -w ${EVIDENCE}/time-merged.pcap ${EVIDENCE}/time-client.pcap ${EVIDENCE}/time-server.pcap && tshark -n -r ${EVIDENCE}/time-merged.pcap -Y 'tcp.flags.syn==1 && tcp.flags.ack==0' -T fields -e frame.time_epoch -e ip.id -e tcp.seq_raw 2>/dev/null | awk '{t[NR]=$1; id[NR]=$2} END {printf \"SYN ip.id %s: seen %d times, one-way delay %.1f ms\\n\", id[1], NR, (t[2]-t[1])*1000}'"
+      ],
+      "save": "one-way.txt",
+      "expect_contains": [
+        "seen 2 times, one-way delay 1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "router",
+      "name": "2 % random loss each way, 100 Mbit/s",
+      "run": [
+        "${BIN}/pathlab",
+        "set",
+        "loss=0.02",
+        "rate=100mbit"
+      ],
+      "expect_contains": [
+        "loss 2%"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "one lossy 5 MB transfer captured at both ends: the sender's capture shows retransmissions; the receiver's shows 'previous segment not captured', out-of-order and duplicate ACKs \u2014 the same loss, two vocabularies",
+      "run": [
+        "sh",
+        "-c",
+        "P=''; ip netns exec nl-capture-client tcpdump -Z root --immediate-mode -nn -s 128 -i eth0 -w ${EVIDENCE}/loss-client.pcap 'tcp port 7021' 2>${EVIDENCE}/loss-client.log & P=\"$P $!\"; ip netns exec nl-capture-server tcpdump -Z root --immediate-mode -nn -s 128 -i eth0 -w ${EVIDENCE}/loss-server.pcap 'tcp port 7021' 2>${EVIDENCE}/loss-server.log & P=\"$P $!\"; sleep 0.7; ${BIN}/tcplab send -to 198.18.211.10:7021 -bytes 5000000 -timeout 30s | grep -E 'transfer|retransmitted'; sleep 0.4; kill -INT $P; wait $P 2>/dev/null; ip netns exec nl-capture-router ${BIN}/pathlab set loss=0 rate=0 >/dev/null; printf '%-38s %8s %8s\\n' 'display filter' sender receiver; for flt in tcp.analysis.retransmission tcp.analysis.fast_retransmission tcp.analysis.lost_segment tcp.analysis.out_of_order tcp.analysis.duplicate_ack tcp.options.sack_le; do printf '%-38s %8s %8s\\n' $flt $(tshark -n -r ${EVIDENCE}/loss-client.pcap -Y $flt 2>/dev/null | wc -l) $(tshark -n -r ${EVIDENCE}/loss-server.pcap -Y $flt 2>/dev/null | wc -l); done; tshark -n -r ${EVIDENCE}/loss-client.pcap -q -z conv,tcp 2>/dev/null | grep -A3 'Frames'"
+      ],
+      "save": "loss.txt",
+      "expect_contains": [
+        "transfer  complete",
+        "tcp.analysis.retransmission",
+        "tcp.analysis.lost_segment",
+        "198.18.210.10:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a receiver that never reads: Expert Info flags the zero window and the window-full sends \u2014 and labels Linux's persist probes 'keep-alive'",
+      "run": [
+        "sh",
+        "-c",
+        "P=''; ip netns exec nl-capture-client tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/zerowin.pcap 'tcp port 7020' 2>${EVIDENCE}/zerowin.log & P=\"$P $!\"; sleep 0.7; ${BIN}/tcplab send -to 198.18.211.10:7020 -bytes 1000000 -timeout 4s | grep -E 'transfer|persist|probes'; sleep 0.4; kill -INT $P; wait $P 2>/dev/null; for flt in tcp.analysis.zero_window tcp.analysis.zero_window_probe tcp.analysis.window_full; do echo \"$flt: $(tshark -n -r ${EVIDENCE}/zerowin.pcap -Y $flt 2>/dev/null | wc -l)\"; done; tshark -n -r ${EVIDENCE}/zerowin.pcap -q -z expert 2>/dev/null | grep -E '^ +[0-9]+ +Sequence'"
+      ],
+      "save": "zero-window.txt",
+      "expect_contains": [
+        "INCOMPLETE",
+        "TCP Zero Window segment",
+        "completely full",
+        "TCP keep-alive segment"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "three DNS outcomes in one capture: an answer, NXDOMAIN, and a query whose response the router drops \u2014 'dns.flags.response == 0 && !dns.response_in' (two-pass: -2) finds the unanswered one",
+      "run": [
+        "sh",
+        "-c",
+        "P=''; ip netns exec nl-capture-client tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/dns.pcap 'udp port 53' 2>${EVIDENCE}/dns.log & P=\"$P $!\"; sleep 0.7; dig +short +tries=1 +time=1 api.capture.test; dig +tries=1 +time=1 nope.capture.test | grep -o 'status: [A-Z]*'; ip netns exec nl-capture-router iptables -I FORWARD -p udp --sport 53 -j DROP; dig +tries=1 +time=1 lost.capture.test | grep -E 'timed out|no servers'; ip netns exec nl-capture-router iptables -D FORWARD -p udp --sport 53 -j DROP; sleep 0.4; kill -INT $P; wait $P 2>/dev/null; echo answered:; tshark -n -r ${EVIDENCE}/dns.pcap -Y 'dns.flags.response==1' -T fields -e dns.qry.name -e dns.flags.rcode -e dns.time -e dns.a 2>/dev/null; echo unanswered:; tshark -2 -n -r ${EVIDENCE}/dns.pcap -Y 'dns.flags.response==0 && !dns.response_in' -T fields -e dns.qry.name 2>/dev/null"
+      ],
+      "save": "dns.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "198.18.211.10",
+        "status: NXDOMAIN",
+        "timed out",
+        "nope.capture.test\t3",
+        "unanswered:\nlost.capture.test"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "three HTTPS requests with curl (OpenSSL): untrusted CA, trusted (TLS 1.3), trusted with TLS 1.2 \u2014 SSLKEYLOGFILE records the session secrets",
+      "run": [
+        "sh",
+        "-c",
+        "P=''; ip netns exec nl-capture-client tcpdump -Z root --immediate-mode -nn -i eth0 -w ${EVIDENCE}/tls.pcap 'tcp port 8443' 2>${EVIDENCE}/tls.log & P=\"$P $!\"; sleep 0.7; unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY ALL_PROXY all_proxy;  SSLKEYLOGFILE=${EVIDENCE}/tls-keys.log curl -sS --http1.1 https://api.capture.test:8443/ 2>&1 | head -1; unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY ALL_PROXY all_proxy;  SSLKEYLOGFILE=${EVIDENCE}/tls-keys.log curl -sS --http1.1 --cacert ${EVIDENCE}/webpki/ca.pem https://api.capture.test:8443/obj?size=10; echo; unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY ALL_PROXY all_proxy;  SSLKEYLOGFILE=${EVIDENCE}/tls-keys.log curl -sS --http1.1 --tls-max 1.2 --cacert ${EVIDENCE}/webpki/ca.pem https://api.capture.test:8443/ -o /dev/null; sleep 0.4; kill -INT $P; wait $P 2>/dev/null; echo \"key log: $(wc -l < ${EVIDENCE}/tls-keys.log) lines, labels: $(cut -d' ' -f1 ${EVIDENCE}/tls-keys.log | sort -u | tr '\\n' ' ')\""
+      ],
+      "save": "tls-run.txt",
+      "expect_contains": [
+        "SSL certificate problem",
+        "abcdefghij",
+        "CLIENT_HANDSHAKE_TRAFFIC_SECRET",
+        "CLIENT_RANDOM"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "WITHOUT keys: SNI and ALPN are in clear text; TLS 1.3 hides the certificate, TLS 1.2 shows it; OpenSSL's 'Unknown CA' alert went out unencrypted; no HTTP is visible",
+      "run": [
+        "sh",
+        "-c",
+        "tshark -n -r ${EVIDENCE}/tls.pcap -Y 'tls.handshake.type==1 || tls.handshake.type==11 || tls.alert_message' -T fields -e tcp.stream -e tls.handshake.extensions_server_name -e tls.handshake.extensions_alpn_str -e x509ce.dNSName -e tls.alert_message.desc -e _ws.col.Info 2>/dev/null; echo \"HTTP messages visible: $(tshark -n -r ${EVIDENCE}/tls.pcap -Y http 2>/dev/null | wc -l)\""
+      ],
+      "save": "tls-nokeys.txt",
+      "expect_contains": [
+        "Client Hello (SNI=api.capture.test)",
+        "api.capture.test\thttp/1.1",
+        "Server Hello, Certificate",
+        "Alert (Level: Fatal, Description: Unknown CA)",
+        "HTTP messages visible: 0"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "WITH the key log: the requests, responses and close_notify alerts are readable",
+      "run": [
+        "sh",
+        "-c",
+        "tshark -n -r ${EVIDENCE}/tls.pcap -o tls.keylog_file:${EVIDENCE}/tls-keys.log -Y 'http || tls.alert_message' -T fields -e tcp.stream -e _ws.col.Info 2>/dev/null"
+      ],
+      "save": "tls-keys.txt",
+      "expect_contains": [
+        "GET /obj?size=10 HTTP/1.1",
+        "HTTP/1.1 200 OK",
+        "Close Notify"
+      ]
+    }
+  ]
+}

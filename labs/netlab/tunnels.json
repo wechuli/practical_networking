@@ -1,0 +1,1154 @@
+{
+  "name": "tunnels",
+  "description": "Two sites joined across an emulated internet by WireGuard, IPsec (strongSwan) and OpenVPN, a VXLAN segment, a laptop behind home NAT using WireGuard and an SSH bastion: what each tunnel puts on the wire, its overhead and MTU, the PMTU black hole and its fixes, the failure signatures of each (wrong key, AllowedIPs, PSK, proposals, traffic selectors, forwarding refused), NAT keepalives, and TCP-over-TCP under loss.",
+  "requires": {
+    "wg": "apt-get install wireguard-tools (and wireguard-go if the kernel has no WireGuard)",
+    "openvpn": "apt-get install openvpn",
+    "swanctl": "apt-get install strongswan-swanctl strongswan-charon libcharon-extra-plugins libstrongswan-standard-plugins",
+    "ssh": "apt-get install openssh-client",
+    "sshd": "apt-get install openssh-server",
+    "openssl": "apt-get install openssl",
+    "iperf3": "apt-get install iperf3",
+    "conntrack": "apt-get install conntrack",
+    "curl": "apt-get install curl"
+  },
+  "preflight": [
+    [
+      "sh",
+      "-c",
+      "ip link add nl-wgprobe type wireguard 2>/dev/null && ip link del nl-wgprobe || command -v wireguard-go"
+    ],
+    [
+      "sh",
+      "-c",
+      "test -x /usr/lib/ipsec/charon && test -e /usr/lib/ipsec/plugins/libstrongswan-kernel-libipsec.so && test -e /usr/lib/ipsec/plugins/libstrongswan-gcm.so"
+    ],
+    [
+      "sh",
+      "-c",
+      "test -x /usr/sbin/sshd"
+    ]
+  ],
+  "teardown": [
+    [
+      "sh",
+      "-c",
+      "rm -f /var/run/wireguard/wga.sock /var/run/wireguard/wgb.sock /var/run/wireguard/wgl.sock"
+    ]
+  ],
+  "nodes": [
+    {
+      "name": "lanb",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "10.2.0.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "tcp5001",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            "10.2.0.10:5001",
+            "-mode",
+            "discard",
+            "-quiet"
+          ],
+          "port": 5001
+        },
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "",
+            "-plain",
+            "10.2.0.10:8080",
+            "-id",
+            "lanb"
+          ],
+          "port": 8080
+        }
+      ]
+    },
+    {
+      "name": "gwb",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.191.254"
+        }
+      ],
+      "files": {
+        "/etc/hosts": "127.0.0.1\tlocalhost\n10.2.0.10\tdb.internal\n"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "umask 077 && mkdir -p ${EVIDENCE}/wg ${EVIDENCE}/openvpn ${EVIDENCE}/ssh ${EVIDENCE}/ipsec/gwa ${EVIDENCE}/ipsec/gwb && for k in gwa gwb laptop; do wg genkey > ${EVIDENCE}/wg/$k.key && wg pubkey < ${EVIDENCE}/wg/$k.key > ${EVIDENCE}/wg/$k.pub; done && for n in gwa gwb; do openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -keyout ${EVIDENCE}/openvpn/$n.key -out ${EVIDENCE}/openvpn/$n.crt -nodes -days 30 -subj /CN=$n 2>/dev/null && openssl x509 -in ${EVIDENCE}/openvpn/$n.crt -noout -fingerprint -sha256 | cut -d= -f2 > ${EVIDENCE}/openvpn/$n.fp; done && ssh-keygen -q -t ed25519 -N '' -f ${EVIDENCE}/ssh/bastion_host -C bastion && ssh-keygen -q -t ed25519 -N '' -f ${EVIDENCE}/ssh/laptop -C laptop && cp ${EVIDENCE}/ssh/laptop.pub ${EVIDENCE}/ssh/authorized_keys && echo \"198.18.191.1 $(cut -d' ' -f1,2 ${EVIDENCE}/ssh/bastion_host.pub)\" > ${EVIDENCE}/ssh/known_hosts && for p in 22:yes 2222:no; do printf 'Port %s\\nListenAddress 198.18.191.1\\nHostKey ${EVIDENCE}/ssh/bastion_host\\nPermitRootLogin prohibit-password\\nAuthorizedKeysFile ${EVIDENCE}/ssh/authorized_keys\\nPasswordAuthentication no\\nKbdInteractiveAuthentication no\\nUsePAM no\\nPidFile none\\nStrictModes no\\nAllowTcpForwarding %s\\nGatewayPorts no\\n' ${p%%:*} ${p#*:} > ${EVIDENCE}/ssh/sshd_${p%%:*}.conf; done && mkdir -p /run/sshd"
+        ],
+        [
+          "sh",
+          "-c",
+          "cat > ${EVIDENCE}/ipsec/gwa/strongswan.conf <<'EOF'\ncharon {\n  load = random nonce openssl pem pkcs1 x509 pubkey gcm aes sha1 sha2 hmac curve25519 kdf kernel-libipsec kernel-netlink socket-default vici\n  filelog {\n    gwa {\n      path = ${EVIDENCE}/ipsec/gwa/charon.log\n      time_format = %H:%M:%S\n      default = 1\n      flush_line = yes\n    }\n  }\n  plugins {\n    vici {\n      socket = unix://${EVIDENCE}/ipsec/gwa/charon.vici\n    }\n    kernel-libipsec {\n      raw_esp = yes\n    }\n  }\n}\nEOF\ncat > ${EVIDENCE}/ipsec/gwb/strongswan.conf <<'EOF'\ncharon {\n  load = random nonce openssl pem pkcs1 x509 pubkey gcm aes sha1 sha2 hmac curve25519 kdf kernel-libipsec kernel-netlink socket-default vici\n  filelog {\n    gwb {\n      path = ${EVIDENCE}/ipsec/gwb/charon.log\n      time_format = %H:%M:%S\n      default = 1\n      flush_line = yes\n    }\n  }\n  plugins {\n    vici {\n      socket = unix://${EVIDENCE}/ipsec/gwb/charon.vici\n    }\n    kernel-libipsec {\n      raw_esp = yes\n    }\n  }\n}\nEOF\ncat > ${EVIDENCE}/ipsec/gwa/swanctl.conf <<'EOF'\nconnections {\n  site-b {\n    local_addrs = 198.18.190.1\n    remote_addrs = 198.18.191.1\n    proposals = aes256-sha256-x25519\n    local {\n      auth = psk\n      id = gw-a\n    }\n    remote {\n      auth = psk\n      id = gw-b\n    }\n    children {\n      lan-b {\n        local_ts = 10.1.1.0/24\n        remote_ts = 10.2.1.0/24\n        esp_proposals = aes256gcm16-x25519\n      }\n    }\n  }\n}\nsecrets {\n  ike-ab {\n    id-a = gw-a\n    id-b = gw-b\n    secret = \"course-psk-not-for-production\"\n  }\n}\nEOF\ncat > ${EVIDENCE}/ipsec/gwb/swanctl.conf <<'EOF'\nconnections {\n  site-a {\n    local_addrs = 198.18.191.1\n    remote_addrs = 198.18.190.1\n    proposals = aes256-sha256-x25519\n    local {\n      auth = psk\n      id = gw-b\n    }\n    remote {\n      auth = psk\n      id = gw-a\n    }\n    children {\n      lan-a {\n        local_ts = 10.2.1.0/24\n        remote_ts = 10.1.1.0/24\n        esp_proposals = aes256gcm16-x25519\n      }\n    }\n  }\n}\nsecrets {\n  ike-ab {\n    id-a = gw-a\n    id-b = gw-b\n    secret = \"course-psk-not-for-production\"\n  }\n}\nEOF\n"
+        ],
+        [
+          "sh",
+          "-c",
+          "(ip link add wgb type wireguard 2>/dev/null || wireguard-go wgb >/dev/null 2>&1) && wg set wgb private-key ${EVIDENCE}/wg/gwb.key listen-port 51820 peer $(cat ${EVIDENCE}/wg/gwa.pub) endpoint 198.18.190.1:51820 allowed-ips 10.1.0.0/24,10.99.0.1/32 peer $(cat ${EVIDENCE}/wg/laptop.pub) allowed-ips 10.99.0.3/32 && ip addr add 10.99.0.2/24 dev wgb && ip link set wgb up && ip route add 10.1.0.0/24 dev wgb"
+        ]
+      ],
+      "services": [
+        {
+          "name": "charon",
+          "run": [
+            "sh",
+            "-c",
+            "mount -t tmpfs netlab-run /run && STRONGSWAN_CONF=${EVIDENCE}/ipsec/gwb/strongswan.conf exec /usr/lib/ipsec/charon"
+          ],
+          "udp_port": 500
+        },
+        {
+          "name": "openvpn-udp",
+          "run": [
+            "sh",
+            "-c",
+            "exec openvpn --disable-dco --dev tun-udp --dev-type tun --proto udp --local 198.18.191.1 --lport 1194 --tls-server --cert ${EVIDENCE}/openvpn/gwb.crt --key ${EVIDENCE}/openvpn/gwb.key --dh none --peer-fingerprint \"$(cat ${EVIDENCE}/openvpn/gwa.fp)\" --ifconfig 10.97.0.2 10.97.0.1 --verb 3"
+          ],
+          "udp_port": 1194
+        },
+        {
+          "name": "openvpn-tcp",
+          "run": [
+            "sh",
+            "-c",
+            "exec openvpn --disable-dco --dev tun-tcp --dev-type tun --proto tcp-server --local 198.18.191.1 --lport 1195 --tls-server --cert ${EVIDENCE}/openvpn/gwb.crt --key ${EVIDENCE}/openvpn/gwb.key --dh none --peer-fingerprint \"$(cat ${EVIDENCE}/openvpn/gwa.fp)\" --ifconfig 10.96.0.2 10.96.0.1 --verb 3"
+          ],
+          "port": 1195
+        },
+        {
+          "name": "iperf3",
+          "run": [
+            "iperf3",
+            "-s"
+          ],
+          "port": 5201
+        },
+        {
+          "name": "tcp5002",
+          "run": [
+            "${BIN}/tcplab",
+            "serve",
+            "-addr",
+            ":5002",
+            "-mode",
+            "discard",
+            "-quiet"
+          ],
+          "port": 5002
+        },
+        {
+          "name": "sshd",
+          "run": [
+            "/usr/sbin/sshd",
+            "-D",
+            "-e",
+            "-f",
+            "${EVIDENCE}/ssh/sshd_22.conf"
+          ],
+          "port": 22
+        },
+        {
+          "name": "sshd-noforward",
+          "run": [
+            "/usr/sbin/sshd",
+            "-D",
+            "-e",
+            "-f",
+            "${EVIDENCE}/ssh/sshd_2222.conf"
+          ],
+          "port": 2222
+        }
+      ]
+    },
+    {
+      "name": "wan",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1",
+        "net.ipv4.conf.all.rp_filter": "0",
+        "net.ipv4.conf.default.rp_filter": "0"
+      },
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "ip tuntap add dev pl-ab mode tun && ip tuntap add dev pl-ba mode tun && ip link set pl-ab up && ip link set pl-ba up && sysctl -qw net.ipv4.conf.pl-ab.rp_filter=0 net.ipv4.conf.pl-ba.rp_filter=0 && ip rule add iif eth0 table 100 && ip route add default dev pl-ab table 100 && ip rule add iif eth1 table 101 && ip route add default dev pl-ba table 101"
+        ]
+      ],
+      "services": [
+        {
+          "name": "pathlab",
+          "run": [
+            "${BIN}/pathlab",
+            "run",
+            "-control",
+            "0.0.0.0:9911"
+          ],
+          "port": 9911
+        }
+      ]
+    },
+    {
+      "name": "gwa",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.190.254"
+        }
+      ],
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "(ip link add wga type wireguard 2>/dev/null || wireguard-go wga >/dev/null 2>&1) && wg set wga private-key ${EVIDENCE}/wg/gwa.key listen-port 51820 peer $(cat ${EVIDENCE}/wg/gwb.pub) endpoint 198.18.191.1:51820 allowed-ips 10.2.0.0/24,10.99.0.2/32 && ip addr add 10.99.0.1/24 dev wga && ip link set wga up && ip route add 10.2.0.0/24 dev wga"
+        ]
+      ],
+      "services": [
+        {
+          "name": "charon",
+          "run": [
+            "sh",
+            "-c",
+            "mount -t tmpfs netlab-run /run && STRONGSWAN_CONF=${EVIDENCE}/ipsec/gwa/strongswan.conf exec /usr/lib/ipsec/charon"
+          ],
+          "udp_port": 500
+        },
+        {
+          "name": "openvpn-udp",
+          "run": [
+            "sh",
+            "-c",
+            "exec openvpn --disable-dco --dev tun-udp --dev-type tun --proto udp --remote 198.18.191.1 1194 --nobind --tls-client --cert ${EVIDENCE}/openvpn/gwa.crt --key ${EVIDENCE}/openvpn/gwa.key --peer-fingerprint \"$(cat ${EVIDENCE}/openvpn/gwb.fp)\" --ifconfig 10.97.0.1 10.97.0.2 --connect-retry 1 --verb 3"
+          ]
+        },
+        {
+          "name": "openvpn-tcp",
+          "run": [
+            "sh",
+            "-c",
+            "exec openvpn --disable-dco --dev tun-tcp --dev-type tun --proto tcp-client --remote 198.18.191.1 1195 --nobind --tls-client --cert ${EVIDENCE}/openvpn/gwa.crt --key ${EVIDENCE}/openvpn/gwa.key --peer-fingerprint \"$(cat ${EVIDENCE}/openvpn/gwb.fp)\" --ifconfig 10.96.0.1 10.96.0.2 --connect-retry 1 --verb 3"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lana",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "10.1.0.1"
+        }
+      ]
+    },
+    {
+      "name": "home",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.192.254"
+        }
+      ],
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE"
+        ]
+      ]
+    },
+    {
+      "name": "laptop",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "192.168.50.1"
+        }
+      ],
+      "setup": [
+        [
+          "sh",
+          "-c",
+          "(ip link add wgl type wireguard 2>/dev/null || wireguard-go wgl >/dev/null 2>&1) && wg set wgl private-key ${EVIDENCE}/wg/laptop.key peer $(cat ${EVIDENCE}/wg/gwb.pub) endpoint 198.18.191.1:51820 allowed-ips 10.99.0.0/24,10.2.0.0/24 && ip addr add 10.99.0.3/24 dev wgl && ip link set wgl up && ip route add 10.2.0.0/24 dev wgl"
+        ]
+      ],
+      "services": [
+        {
+          "name": "web",
+          "run": [
+            "${BIN}/weblab",
+            "serve",
+            "-tls",
+            "",
+            "-plain",
+            "127.0.0.1:3000",
+            "-id",
+            "laptop"
+          ],
+          "port": 3000
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "lana",
+        "if": "eth0",
+        "addr": [
+          "10.1.0.10/24",
+          "10.1.1.10/24"
+        ]
+      },
+      "b": {
+        "node": "gwa",
+        "if": "eth0",
+        "addr": [
+          "10.1.0.1/24",
+          "10.1.1.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "gwa",
+        "if": "eth1",
+        "addr": [
+          "198.18.190.1/24"
+        ]
+      },
+      "b": {
+        "node": "wan",
+        "if": "eth0",
+        "addr": [
+          "198.18.190.254/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "gwb",
+        "if": "eth1",
+        "addr": [
+          "198.18.191.1/24"
+        ]
+      },
+      "b": {
+        "node": "wan",
+        "if": "eth1",
+        "addr": [
+          "198.18.191.254/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "lanb",
+        "if": "eth0",
+        "addr": [
+          "10.2.0.10/24",
+          "10.2.1.10/24"
+        ]
+      },
+      "b": {
+        "node": "gwb",
+        "if": "eth0",
+        "addr": [
+          "10.2.0.1/24",
+          "10.2.1.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "home",
+        "if": "eth1",
+        "addr": [
+          "198.18.192.2/24"
+        ]
+      },
+      "b": {
+        "node": "wan",
+        "if": "eth2",
+        "addr": [
+          "198.18.192.254/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "laptop",
+        "if": "eth0",
+        "addr": [
+          "192.168.50.10/24"
+        ]
+      },
+      "b": {
+        "node": "home",
+        "if": "eth0",
+        "addr": [
+          "192.168.50.1/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "WireGuard is configured but silent: no handshake until there is traffic to send",
+      "run": [
+        "wg",
+        "show",
+        "wga"
+      ],
+      "save": "wg-before.txt",
+      "expect_contains": [
+        "listening port: 51820",
+        "allowed ips: 10.2.0.0/24, 10.99.0.2/32",
+        "endpoint: 198.18.191.1:51820"
+      ],
+      "expect_absent": [
+        "latest handshake"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "wan",
+      "if": "eth0",
+      "filter": "udp port 51820",
+      "name": "on the internet: a 148-byte handshake initiation, a 92-byte response, then data \u2014 UDP only, the inner ICMP is invisible",
+      "during": {
+        "node": "lana",
+        "run": [
+          "ping",
+          "-c",
+          "3",
+          "-s",
+          "1000",
+          "10.2.0.10"
+        ]
+      },
+      "save": "wg-wire.pcap",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "expect_contains": [
+        "198.18.190.1.51820 > 198.18.191.1.51820: UDP, length 148",
+        "198.18.191.1.51820 > 198.18.190.1.51820: UDP, length 92",
+        "UDP, length 1072",
+        "proto UDP (17), length 1100",
+        "3 received"
+      ],
+      "expect_absent": [
+        "ICMP echo"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "overhead: the 1028-byte inner packet became a 1100-byte outer one (20 IP + 8 UDP + 16 WireGuard header + 16 tag + padding to 16)",
+      "run": [
+        "sh",
+        "-c",
+        "wg show wga | grep -E 'latest handshake|transfer'; ip link show wga | grep -o 'mtu [0-9]*'"
+      ],
+      "save": "wg-after.txt",
+      "expect_contains": [
+        "latest handshake",
+        "transfer",
+        "mtu 1420"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "lana",
+      "name": "inner MTU 1420: a 1392-byte DF ping fits; 1393 is refused by gwa with 'Frag needed \u2026 mtu = 1420' (PMTUD inside the tunnel works)",
+      "run": [
+        "sh",
+        "-c",
+        "ping -c1 -W2 -M do -s 1392 10.2.0.10 | grep -E 'bytes from|received'; ping -c1 -W2 -M do -s 1393 10.2.0.10 | grep -E 'From|received'; ip route get 10.2.0.10 | grep -o 'mtu [0-9]*'"
+      ],
+      "save": "wg-mtu.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "1400 bytes from 10.2.0.10",
+        "Frag needed and DF set (mtu = 1420)",
+        "mtu 1420"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "lana",
+      "name": "a 2 MB TCP transfer through the tunnel: MSS 1368 (1420 \u2212 40 \u2212 12 for timestamps)",
+      "run": [
+        "${BIN}/tcplab",
+        "send",
+        "-to",
+        "10.2.0.10:5001",
+        "-bytes",
+        "2000000",
+        "-timeout",
+        "10s"
+      ],
+      "save": "wg-send.txt",
+      "expect_contains": [
+        "transfer  complete",
+        "mss 1368"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "wan",
+      "name": "the black hole: a link that silently drops packets over 1400 bytes (no ICMP \u2014 like a mis-sized hop with filtered errors)",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -I FORWARD -m length --length 1401:65535 -j DROP -m comment --comment 'course: silent 1400-byte hop' && iptables -vnL FORWARD | head -3"
+      ],
+      "save": "blackhole-rule.txt"
+    },
+    {
+      "type": "command",
+      "node": "lana",
+      "name": "through the black hole: ping 1300 works, ping 1350 vanishes, and TCP connects but stalls (SYN and ACKs are small, data is not)",
+      "run": [
+        "sh",
+        "-c",
+        "ping -c1 -W2 -s 1300 10.2.0.10 | grep received; ping -c1 -W2 -s 1350 10.2.0.10 | grep received; ${BIN}/tcplab send -to 10.2.0.10:5001 -bytes 2000000 -timeout 5s"
+      ],
+      "save": "blackhole.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "1 received",
+        "0 received",
+        "connect",
+        "INCOMPLETE"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "fix 1, MSS clamping on gwa (both directions, 1280: room for WireGuard's padding): TCP now completes; ping 1350 still vanishes \u2014 clamping only helps TCP",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -t mangle -A FORWARD -o wga -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 && iptables -t mangle -A FORWARD -i wga -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 && ip netns exec nl-tunnels-lana ${BIN}/tcplab send -to 10.2.0.10:5001 -bytes 2000000 -timeout 10s; ip netns exec nl-tunnels-lana ping -c1 -W2 -s 1350 10.2.0.10 | grep received; iptables -t mangle -vnL FORWARD"
+      ],
+      "save": "fix-clamp.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "transfer  complete",
+        "mss 1268",
+        "0 received",
+        "TCPMSS set 1280"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "fix 2, the right tunnel MTU (1340 on both ends, clamp removed): TCP completes and a 1313-byte DF ping is told mtu = 1340",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -t mangle -F FORWARD && ip link set wga mtu 1340 && ip netns exec nl-tunnels-gwb ip link set wgb mtu 1340 && ip netns exec nl-tunnels-lana ip route flush cache; ip netns exec nl-tunnels-lana ${BIN}/tcplab send -to 10.2.0.10:5001 -bytes 2000000 -timeout 10s; ip netns exec nl-tunnels-lana ping -c1 -W2 -M do -s 1312 10.2.0.10 | grep received; ip netns exec nl-tunnels-lana ping -c1 -W2 -M do -s 1313 10.2.0.10 2>&1 | grep -oE 'mtu ?= ?1340' | tr -d ' '"
+      ],
+      "save": "fix-mtu.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "transfer  complete",
+        "mss 1288",
+        "1 received",
+        "mtu=1340"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "wan",
+      "name": "restore: remove the black hole; MTU back to 1420",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -D FORWARD 1 && ip netns exec nl-tunnels-gwa ip link set wga mtu 1420 && ip netns exec nl-tunnels-gwb ip link set wgb mtu 1420 && ip netns exec nl-tunnels-lana ip route flush cache && iptables -S FORWARD"
+      ],
+      "expect_absent": [
+        "1401:65535"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "break it: gwa has the wrong public key for gwb",
+      "run": [
+        "sh",
+        "-c",
+        "wg set wga peer $(cat ${EVIDENCE}/wg/gwb.pub) remove && wg genkey | wg pubkey > ${EVIDENCE}/wg/wrong.pub && wg set wga peer $(cat ${EVIDENCE}/wg/wrong.pub) endpoint 198.18.191.1:51820 allowed-ips 10.2.0.0/24,10.99.0.2/32 && ip route replace 10.2.0.0/24 dev wga && wg show wga peers"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "wan",
+      "if": "eth0",
+      "filter": "udp port 51820",
+      "name": "wrong key: initiations (148 bytes) every ~5 s, never a response \u2014 WireGuard does not answer what it cannot authenticate",
+      "during": {
+        "node": "lana",
+        "run": [
+          "ping",
+          "-c",
+          "7",
+          "-W",
+          "1",
+          "10.2.0.10"
+        ]
+      },
+      "save": "wg-wrongkey.pcap",
+      "decode": [
+        "-nn",
+        "-tttt"
+      ],
+      "expect_contains": [
+        "UDP, length 148",
+        "0 received"
+      ],
+      "expect_absent": [
+        "length 92"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "wrong key: no 'latest handshake' for the peer; this is what 'wg show' looks like",
+      "run": [
+        "sh",
+        "-c",
+        "wg show wga"
+      ],
+      "save": "wg-wrongkey.txt",
+      "expect_absent": [
+        "latest handshake"
+      ],
+      "expect_contains": [
+        "peer:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "repair: the right key; traffic flows again",
+      "run": [
+        "sh",
+        "-c",
+        "wg set wga peer $(cat ${EVIDENCE}/wg/wrong.pub) remove && wg set wga peer $(cat ${EVIDENCE}/wg/gwb.pub) endpoint 198.18.191.1:51820 allowed-ips 10.2.0.0/24,10.99.0.2/32 && ip route replace 10.2.0.0/24 dev wga && ip netns exec nl-tunnels-lana ping -c2 -W2 10.2.0.10 | grep received"
+      ],
+      "expect_contains": [
+        "2 received"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwb",
+      "name": "break it differently: gwb's AllowedIPs for gwa lose 10.1.0.0/24",
+      "run": [
+        "sh",
+        "-c",
+        "wg set wgb peer $(cat ${EVIDENCE}/wg/gwa.pub) allowed-ips 10.99.0.1/32 && wg show wgb allowed-ips"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwb",
+      "name": "AllowedIPs: the handshake works and the packets arrive (gwb's received bytes grow), but gwb drops them \u2014 source 10.1.0.10 is not allowed from that peer",
+      "run": [
+        "sh",
+        "-c",
+        "before=$(wg show wgb transfer | grep $(cat ${EVIDENCE}/wg/gwa.pub) | cut -f2); ip netns exec nl-tunnels-lana ping -c3 -W1 10.2.0.10 | grep received; after=$(wg show wgb transfer | grep $(cat ${EVIDENCE}/wg/gwa.pub) | cut -f2); echo \"gwb received from gwa: $before -> $after bytes\"; wg show wgb latest-handshakes | grep -c $(cat ${EVIDENCE}/wg/gwa.pub)"
+      ],
+      "save": "wg-allowedips.txt",
+      "expect_contains": [
+        "0 received",
+        "gwb received from gwa"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwb",
+      "name": "repair AllowedIPs",
+      "run": [
+        "sh",
+        "-c",
+        "wg set wgb peer $(cat ${EVIDENCE}/wg/gwa.pub) allowed-ips 10.1.0.0/24,10.99.0.1/32 && ip netns exec nl-tunnels-lana ping -c2 -W2 10.2.0.10 | grep received"
+      ],
+      "expect_contains": [
+        "2 received"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "laptop",
+      "name": "the laptop (behind home NAT) reaches LAN B through its WireGuard client tunnel",
+      "run": [
+        "sh",
+        "-c",
+        "ping -c2 -W2 10.2.0.10 | grep received; wg show wgl | grep -E 'endpoint|latest|keepalive'"
+      ],
+      "save": "laptop.txt",
+      "expect_contains": [
+        "2 received",
+        "endpoint: 198.18.191.1:51820"
+      ],
+      "expect_absent": [
+        "keepalive"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwb",
+      "name": "gwb learned the laptop's endpoint from its packets: the NAT's public address and port, not 192.168.50.10",
+      "run": [
+        "sh",
+        "-c",
+        "wg show wgb endpoints | grep $(cat ${EVIDENCE}/wg/laptop.pub)"
+      ],
+      "save": "laptop-endpoint.txt",
+      "expect_contains": [
+        "198.18.192.2:"
+      ],
+      "expect_absent": [
+        "192.168.50.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "home",
+      "name": "the home router's NAT mapping: UDP mappings expire after 30 s idle by default (120 s once replies have been seen) \u2014 set to 5 s here, then a fresh mapping",
+      "run": [
+        "sh",
+        "-c",
+        "sysctl net.netfilter.nf_conntrack_udp_timeout net.netfilter.nf_conntrack_udp_timeout_stream; sysctl -qw net.netfilter.nf_conntrack_udp_timeout=5 net.netfilter.nf_conntrack_udp_timeout_stream=5 && conntrack -F 2>/dev/null; ip netns exec nl-tunnels-laptop ping -c1 -W2 10.2.0.10 | grep received; conntrack -L -p udp 2>/dev/null"
+      ],
+      "save": "nat-mapping.txt",
+      "expect_contains": [
+        "net.netfilter.nf_conntrack_udp_timeout = 30",
+        "1 received",
+        "src=192.168.50.10",
+        "dport=51820"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "lanb",
+      "name": "8 s of silence later the mapping is gone: LAN B can no longer reach the laptop (gwb still sends to the old NAT port)",
+      "run": [
+        "sh",
+        "-c",
+        "sleep 8; ip netns exec nl-tunnels-home conntrack -L -p udp 2>&1 | tail -1; ping -c2 -W2 10.99.0.3 | grep received"
+      ],
+      "save": "nat-expired.txt",
+      "expect_contains": [
+        "0 flow entries",
+        "0 received"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "laptop",
+      "name": "PersistentKeepalive = 2 s on the laptop keeps the mapping alive: after another 8 s of no traffic, LAN B reaches it",
+      "run": [
+        "sh",
+        "-c",
+        "wg set wgl peer $(cat ${EVIDENCE}/wg/gwb.pub) persistent-keepalive 2 && sleep 8 && ip netns exec nl-tunnels-lanb ping -c2 -W2 10.99.0.3 | grep received; ip netns exec nl-tunnels-gwb wg show wgb endpoints | grep $(cat ${EVIDENCE}/wg/laptop.pub); ip netns exec nl-tunnels-home conntrack -L -p udp 2>/dev/null"
+      ],
+      "save": "nat-keepalive.txt",
+      "expect_contains": [
+        "2 received",
+        "198.18.192.2:",
+        "src=192.168.50.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "load the IKE configuration on both gateways (PSK, IKE aes256-sha256-x25519, ESP aes256gcm16, 10.1.1.0/24 \u21c4 10.2.1.0/24)",
+      "run": [
+        "sh",
+        "-c",
+        "swanctl --load-all --file ${EVIDENCE}/ipsec/gwa/swanctl.conf --uri unix://${EVIDENCE}/ipsec/gwa/charon.vici 2>/dev/null; ip netns exec nl-tunnels-gwb swanctl --load-all --file ${EVIDENCE}/ipsec/gwb/swanctl.conf --uri unix://${EVIDENCE}/ipsec/gwb/charon.vici 2>/dev/null"
+      ],
+      "expect_contains": [
+        "loaded connection 'site-b'",
+        "loaded connection 'site-a'"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "wan",
+      "if": "eth0",
+      "filter": "udp port 500 or udp port 4500 or esp",
+      "name": "IKEv2 on the wire: IKE_SA_INIT on UDP 500, IKE_AUTH moved to 4500, then ESP (IP protocol 50) carrying the pings \u2014 inner addresses invisible",
+      "during": {
+        "node": "gwa",
+        "run": [
+          "sh",
+          "-c",
+          "swanctl --initiate --child lan-b --uri unix://${EVIDENCE}/ipsec/gwa/charon.vici 2>&1 | grep -E 'established|selected|TS'; ip netns exec nl-tunnels-lana ping -c3 -s 1000 -I 10.1.1.10 10.2.1.10 | grep received"
+        ]
+      },
+      "save": "ipsec-wire.pcap",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "expect_contains": [
+        "198.18.190.1.500 > 198.18.191.1.500",
+        "ikev2_init[I]",
+        "ikev2_auth[I]",
+        "proto ESP (50), length 1084",
+        "ESP(spi=",
+        "IKE_SA site-b[1] established",
+        "CHILD_SA lan-b{1} established",
+        "TS 10.1.1.0/24 === 10.2.1.0/24",
+        "3 received"
+      ],
+      "expect_absent": [
+        "ICMP echo"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "the SAs: one IKE SA, one CHILD_SA with an SPI per direction, counters, rekey timers",
+      "run": [
+        "sh",
+        "-c",
+        "swanctl --list-sas --uri unix://${EVIDENCE}/ipsec/gwa/charon.vici 2>&1 | grep -v -e 'opening directory' -e 'plugin '"
+      ],
+      "save": "ipsec-sas.txt",
+      "expect_contains": [
+        "ESTABLISHED, IKEv2",
+        "INSTALLED, TUNNEL, ESP:AES_GCM_16-256",
+        "local  10.1.1.0/24",
+        "remote 10.2.1.0/24"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwb",
+      "name": "failure 1: gwb's pre-shared key differs \u2014 IKE_SA_INIT succeeds, IKE_AUTH fails",
+      "run": [
+        "sh",
+        "-c",
+        "sed -i 's/course-psk-not-for-production/a-different-key/' ${EVIDENCE}/ipsec/gwb/swanctl.conf && swanctl --load-all --file ${EVIDENCE}/ipsec/gwb/swanctl.conf --uri unix://${EVIDENCE}/ipsec/gwb/charon.vici >/dev/null 2>&1; swanctl --terminate --ike site-a --uri unix://${EVIDENCE}/ipsec/gwb/charon.vici >/dev/null 2>&1; sleep 1; ip netns exec nl-tunnels-gwa swanctl --initiate --child lan-b --uri unix://${EVIDENCE}/ipsec/gwa/charon.vici 2>&1 | grep -E 'AUTHENTICATION_FAILED|failed'; grep -E 'MAC mismatched|AUTHENTICATION_FAILED' ${EVIDENCE}/ipsec/gwb/charon.log | tail -2"
+      ],
+      "save": "ipsec-psk.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "received AUTHENTICATION_FAILED notify error",
+        "MAC mismatched"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwb",
+      "name": "failure 2: matching key, but gwb only accepts IKE aes128-sha256-modp2048 \u2014 the initiator is told NO_PROPOSAL_CHOSEN",
+      "run": [
+        "sh",
+        "-c",
+        "sed -i 's/a-different-key/course-psk-not-for-production/; s/proposals = aes256-sha256-x25519/proposals = aes128-sha256-modp2048/' ${EVIDENCE}/ipsec/gwb/swanctl.conf && swanctl --load-all --file ${EVIDENCE}/ipsec/gwb/swanctl.conf --uri unix://${EVIDENCE}/ipsec/gwb/charon.vici >/dev/null 2>&1; ip netns exec nl-tunnels-gwa swanctl --initiate --child lan-b --uri unix://${EVIDENCE}/ipsec/gwa/charon.vici 2>&1 | grep -E 'NO_PROPOSAL|failed'; grep -E 'received proposals|configured proposals|no acceptable' ${EVIDENCE}/ipsec/gwb/charon.log | tail -3"
+      ],
+      "save": "ipsec-proposal.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "received NO_PROPOSAL_CHOSEN notify error",
+        "received proposals",
+        "configured proposals"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwb",
+      "name": "failure 3: IKE agrees but gwb's traffic selectors expect 10.1.9.0/24 \u2014 the IKE SA comes up and the CHILD_SA is refused with TS_UNACCEPTABLE ('phase 1 up, phase 2 down')",
+      "run": [
+        "sh",
+        "-c",
+        "sed -i 's/proposals = aes128-sha256-modp2048/proposals = aes256-sha256-x25519/; s#remote_ts = 10.1.1.0/24#remote_ts = 10.1.9.0/24#' ${EVIDENCE}/ipsec/gwb/swanctl.conf && swanctl --load-all --file ${EVIDENCE}/ipsec/gwb/swanctl.conf --uri unix://${EVIDENCE}/ipsec/gwb/charon.vici >/dev/null 2>&1; ip netns exec nl-tunnels-gwa swanctl --initiate --child lan-b --uri unix://${EVIDENCE}/ipsec/gwa/charon.vici 2>&1 | grep -E 'TS_UNACCEPTABLE|IKE_SA .* established|failed'; grep -E 'traffic selectors .* unacceptable|no matching CHILD_SA' ${EVIDENCE}/ipsec/gwb/charon.log | tail -2"
+      ],
+      "save": "ipsec-ts.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "IKE_SA site-b",
+        "established",
+        "TS_UNACCEPTABLE"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwb",
+      "name": "repair gwb's configuration; the CHILD_SA is negotiated again and traffic flows",
+      "run": [
+        "sh",
+        "-c",
+        "sed -i 's#remote_ts = 10.1.9.0/24#remote_ts = 10.1.1.0/24#' ${EVIDENCE}/ipsec/gwb/swanctl.conf && swanctl --load-all --file ${EVIDENCE}/ipsec/gwb/swanctl.conf --uri unix://${EVIDENCE}/ipsec/gwb/charon.vici >/dev/null 2>&1; ip netns exec nl-tunnels-gwa swanctl --initiate --child lan-b --uri unix://${EVIDENCE}/ipsec/gwa/charon.vici 2>&1 | grep -E 'CHILD_SA .* established'; ip netns exec nl-tunnels-lana ping -c2 -W2 -I 10.1.1.10 10.2.1.10 | grep received"
+      ],
+      "expect_contains": [
+        "established",
+        "2 received"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "a VXLAN segment (VNI 42) between the gateways, bound to the underlay interface: Linux sets its MTU to 1450 and refuses 1500",
+      "run": [
+        "sh",
+        "-c",
+        "ip link add vx42 type vxlan id 42 local 198.18.190.1 remote 198.18.191.1 dstport 4789 dev eth1 2>/dev/null && ip addr add 10.98.0.1/24 dev vx42 && ip link set vx42 up && ip netns exec nl-tunnels-gwb sh -c 'ip link add vx42 type vxlan id 42 local 198.18.191.1 remote 198.18.190.1 dstport 4789 dev eth1 2>/dev/null && ip addr add 10.98.0.2/24 dev vx42 && ip link set vx42 up' && ip link show vx42 | grep -o 'mtu [0-9]*'; ip -d link show vx42 | grep -oE 'vxlan id [0-9]+|dstport [0-9]+'; ip link set vx42 mtu 1500 2>&1"
+      ],
+      "save": "vxlan-link.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "mtu 1450",
+        "vxlan id 42",
+        "dstport 4789",
+        "Invalid argument"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "wan",
+      "if": "eth0",
+      "filter": "udp port 4789",
+      "name": "VXLAN on the wire: ARP and ICMP inside UDP 4789, in clear text; a 1028-byte inner packet is a 1078-byte outer one (+50: 14 inner Ethernet + 8 VXLAN + 8 UDP + 20 IP)",
+      "during": {
+        "node": "gwa",
+        "run": [
+          "sh",
+          "-c",
+          "ping -c2 -s 1000 10.98.0.2 | grep received"
+        ]
+      },
+      "save": "vxlan-wire.pcap",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "expect_contains": [
+        "VXLAN, flags [I] (0x08), vni 42",
+        "ARP",
+        "proto UDP (17), length 1078",
+        "10.98.0.1 > 10.98.0.2: ICMP echo request",
+        "2 received"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "rebuilt without 'dev': now the VXLAN link keeps MTU 1500 \u2014 50 bytes more than the underlay can carry",
+      "run": [
+        "sh",
+        "-c",
+        "ip link del vx42 && ip link add vx42 type vxlan id 42 local 198.18.190.1 remote 198.18.191.1 dstport 4789 2>/dev/null && ip addr add 10.98.0.1/24 dev vx42 && ip link set vx42 up && ip netns exec nl-tunnels-gwb sh -c 'ip link del vx42 && ip link add vx42 type vxlan id 42 local 198.18.191.1 remote 198.18.190.1 dstport 4789 2>/dev/null && ip addr add 10.98.0.2/24 dev vx42 && ip link set vx42 up' && ip link show vx42 | grep -o 'mtu [0-9]*'"
+      ],
+      "save": "vxlan-1500.txt",
+      "expect_contains": [
+        "mtu 1500"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "wan",
+      "if": "eth0",
+      "filter": "udp port 4789 or (ip[6:2] & 0x1fff != 0)",
+      "name": "a full-size 1500-byte inner packet (no DF) becomes a 1550-byte outer one, so the sender FRAGMENTS the outer packet: 1500 + 70 (VXLAN does not set DF)",
+      "during": {
+        "node": "gwa",
+        "run": [
+          "sh",
+          "-c",
+          "ping -c1 -W2 -M dont -s 1472 10.98.0.2 | grep received"
+        ]
+      },
+      "save": "vxlan-frag.pcap",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "expect_contains": [
+        "flags [+]",
+        "length 1500",
+        "offset 1480",
+        "length 70",
+        "1 received"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "Linux's VXLAN driver then records a 1450-byte path MTU for the inner destination: DF senders are told mtu=1450, the rest are fragmented before encapsulation",
+      "run": [
+        "sh",
+        "-c",
+        "ip route get 10.98.0.2 | grep -o 'mtu [0-9]*'; ping -c1 -W2 -M do -s 1472 10.98.0.2 2>&1 | grep -oE 'mtu ?= ?[0-9]+' | tr -d ' '; ping -c1 -W2 -M do -s 1422 10.98.0.2 | grep received"
+      ],
+      "save": "vxlan-pmtu.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "mtu 1450",
+        "mtu=1450",
+        "1 received"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "laptop",
+      "name": "-L: a local port that leads, through the bastion, to the private db.internal web service; the service sees the BASTION (10.2.0.1) as its client",
+      "run": [
+        "sh",
+        "-c",
+        "ssh -i ${EVIDENCE}/ssh/laptop -o UserKnownHostsFile=${EVIDENCE}/ssh/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=5 -f -N -o ExitOnForwardFailure=yes -E ${EVIDENCE}/ssh/L.log -L 127.0.0.1:18080:10.2.0.10:8080 -L 127.0.0.1:18081:10.2.0.10:9999 root@198.18.191.1 </dev/null >/dev/null 2>&1; unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy;  curl -sS http://127.0.0.1:18080/; ss -Hltn sport = :18080"
+      ],
+      "save": "ssh-L.txt",
+      "expect_contains": [
+        "served-by lanb",
+        "from 10.2.0.1:",
+        "127.0.0.1:18080"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "laptop",
+      "name": "-L to a port where nothing listens: the LOCAL connect succeeds, then the connection is reset; ssh logs 'open failed: connect failed: Connection refused'",
+      "run": [
+        "sh",
+        "-c",
+        "unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy;  curl -sS http://127.0.0.1:18081/; sleep 0.3; cat ${EVIDENCE}/ssh/L.log"
+      ],
+      "save": "ssh-L-refused.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "Recv failure: Connection reset by peer",
+        "open failed: connect failed: Connection refused"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "laptop",
+      "name": "-D: a SOCKS proxy; --socks5-hostname lets the bastion resolve db.internal, plain --socks5 resolves on the laptop and fails",
+      "run": [
+        "sh",
+        "-c",
+        "ssh -i ${EVIDENCE}/ssh/laptop -o UserKnownHostsFile=${EVIDENCE}/ssh/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=5 -f -N -o ExitOnForwardFailure=yes -E ${EVIDENCE}/ssh/D.log -D 127.0.0.1:1080 root@198.18.191.1 </dev/null >/dev/null 2>&1; unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy;  curl -sS --socks5-hostname 127.0.0.1:1080 http://db.internal:8080/; curl -sS --socks5 127.0.0.1:1080 http://db.internal:8080/"
+      ],
+      "save": "ssh-D.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "served-by lanb",
+        "Could not resolve host: db.internal"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "laptop",
+      "name": "-R 0.0.0.0:9000: exposes the laptop's local web app on the bastion \u2014 but GatewayPorts no binds it to the bastion's loopback only",
+      "run": [
+        "sh",
+        "-c",
+        "ssh -i ${EVIDENCE}/ssh/laptop -o UserKnownHostsFile=${EVIDENCE}/ssh/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=5 -f -N -o ExitOnForwardFailure=yes -E ${EVIDENCE}/ssh/R.log -R 0.0.0.0:9000:127.0.0.1:3000 root@198.18.191.1 </dev/null >/dev/null 2>&1; sleep 0.5; ip netns exec nl-tunnels-gwb ss -Hltn sport = :9000; unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy;  ip netns exec nl-tunnels-gwb curl -sS http://127.0.0.1:9000/; ip netns exec nl-tunnels-lanb curl -sS --max-time 2 http://10.2.0.1:9000/"
+      ],
+      "save": "ssh-R.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "127.0.0.1:9000",
+        "served-by laptop",
+        "Failed to connect to 10.2.0.1 port 9000"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "laptop",
+      "name": "a bastion with AllowTcpForwarding no: login works, forwarding is 'administratively prohibited'",
+      "run": [
+        "sh",
+        "-c",
+        "ssh -i ${EVIDENCE}/ssh/laptop -o UserKnownHostsFile=${EVIDENCE}/ssh/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=5 -p 2222 -f -N -E ${EVIDENCE}/ssh/L2.log -L 127.0.0.1:18090:10.2.0.10:8080 root@198.18.191.1 </dev/null >/dev/null 2>&1; unset HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy;  curl -sS http://127.0.0.1:18090/; sleep 0.3; cat ${EVIDENCE}/ssh/L2.log; ssh -i ${EVIDENCE}/ssh/laptop -o UserKnownHostsFile=${EVIDENCE}/ssh/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=5 -p 2222 root@198.18.191.1 echo logged in"
+      ],
+      "save": "ssh-prohibited.txt",
+      "allow_fail": true,
+      "expect_contains": [
+        "administratively prohibited: open failed",
+        "logged in"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "OpenVPN up over UDP (1194) and TCP (1195): tun MTU 1500, and OpenVPN's default mssfix shrinks TCP's MSS so the encapsulated packet fits",
+      "run": [
+        "sh",
+        "-c",
+        "ping -c1 -W2 10.97.0.2 | grep received && ping -c1 -W2 10.96.0.2 | grep received && ip link show tun-udp | grep -o 'mtu [0-9]*' && ${BIN}/tcplab send -to 10.97.0.2:5002 -bytes 200000 -timeout 5s | grep -oE 'transfer  complete|mss [0-9]+'"
+      ],
+      "save": "openvpn.txt",
+      "timeout": "30s",
+      "expect_contains": [
+        "1 received",
+        "mtu 1500",
+        "transfer  complete",
+        "mss "
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "bulk TCP over a 20 ms path at 0 % and 2 % random loss: direct, WireGuard, OpenVPN-UDP, OpenVPN-TCP",
+      "run": [
+        "sh",
+        "-c",
+        "for loss in 0 0.02; do ${BIN}/pathlab set -c 198.18.190.254:9911 delay=10ms loss=$loss >/dev/null; for t in 198.18.191.1:direct 10.99.0.2:wireguard 10.97.0.2:openvpn-udp 10.96.0.2:openvpn-tcp; do for try in 1 2 3; do iperf3 -c ${t%%:*} -t 4 -C cubic -J > ${EVIDENCE}/iperf.json; grep -q '\"error\"' ${EVIDENCE}/iperf.json || break; sleep 1; done; python3 -c 'import json,sys; j=json.load(sys.stdin); e=j.get(\"end\",{}); print(\"loss %-4s %-12s %s\" % (sys.argv[1], sys.argv[2], j.get(\"error\") or \"%6.1f Mbit/s, inner retransmissions %s\" % (e[\"sum_received\"][\"bits_per_second\"]/1e6, e[\"sum_sent\"].get(\"retransmits\"))))' $loss ${t#*:} < ${EVIDENCE}/iperf.json; done; done; rm -f ${EVIDENCE}/iperf.json"
+      ],
+      "save": "tcp-over-tcp-throughput.txt",
+      "expect_contains": [
+        "loss 0.02 openvpn-tcp",
+        "Mbit/s"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "gwa",
+      "name": "the same path (2 % loss each way) seen by pings: UDP tunnels lose ~4 % of round trips with steady RTT; the TCP tunnel loses none but turns loss into delay spikes",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/pathlab set -c 198.18.190.254:9911 delay=10ms loss=0.02 >/dev/null; for t in 10.99.0.2:wireguard 10.97.0.2:openvpn-udp 10.96.0.2:openvpn-tcp; do echo \"${t#*:}: $(ping -q -i 0.05 -c 100 -W 3 ${t%%:*} | tail -2 | tr '\\n' ' ')\"; done; ${BIN}/pathlab set -c 198.18.190.254:9911 delay=0 loss=0 >/dev/null"
+      ],
+      "save": "tcp-over-tcp-ping.txt",
+      "expect_contains": [
+        "openvpn-tcp: 100 packets transmitted, 100 received, 0% packet loss"
+      ]
+    }
+  ]
+}

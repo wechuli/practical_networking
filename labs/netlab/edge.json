@@ -1,0 +1,415 @@
+{
+  "name": "edge",
+  "description": "Module 23: load balancing and proxies \u2014 round robin, HTTP vs TCP health checks, the failover window and redispatch, X-Forwarded-For (append vs overwrite), PROXY protocol and its two mismatches, cookie vs source-hash stickiness, and a forward proxy with http_proxy / HTTP_PROXY / NO_PROXY",
+  "requires": {
+    "haproxy": "apt-get install haproxy",
+    "nginx": "apt-get install nginx-light",
+    "curl": "apt-get install curl",
+    "iptables": "apt-get install iptables"
+  },
+  "nodes": [
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.232.1"
+        }
+      ]
+    },
+    {
+      "name": "lb",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "files": {
+        "/etc/haproxy/haproxy.cfg": "global\n  log stdout format raw local0 info\n  maxconn 2000\n\ndefaults\n  mode http\n  log global\n  option httplog\n  timeout connect 1s\n  timeout client 10s\n  timeout server 10s\n\n# stats as CSV: curl \"http://LB:8404/stats;csv\"\nfrontend stats\n  bind :8404\n  stats enable\n  stats uri /stats\n\n# :80 round robin, HTTP health check (GET /health must return 200), adds X-Forwarded-For\nfrontend http_rr\n  bind :80\n  option forwardfor\n  default_backend app_http\nbackend app_http\n  balance roundrobin\n  option httpchk GET /health\n  http-check expect status 200\n  default-server inter 500ms fall 2 rise 2\n  server b1 198.18.233.11:8080 check\n  server b2 198.18.233.12:8080 check\n  server b3 198.18.233.13:8080 check\n\n# :81 the same servers with a plain TCP check (a connect is all it tests)\nfrontend tcp_checked\n  bind :81\n  default_backend app_tcp\nbackend app_tcp\n  balance roundrobin\n  default-server inter 500ms fall 2 rise 2\n  server b1 198.18.233.11:8080 check\n  server b2 198.18.233.12:8080 check\n  server b3 198.18.233.13:8080 check\n\n# :82 cookie stickiness: HAProxy inserts SRV=<server>\nfrontend sticky\n  bind :82\n  default_backend app_cookie\nbackend app_cookie\n  balance roundrobin\n  cookie SRV insert indirect nocache\n  default-server inter 500ms fall 2 rise 2\n  server b1 198.18.233.11:8080 check cookie b1\n  server b2 198.18.233.12:8080 check cookie b2\n  server b3 198.18.233.13:8080 check cookie b3\n\n# :83 source-IP hash\nfrontend srchash\n  bind :83\n  default_backend app_source\nbackend app_source\n  balance source\n  hash-type consistent\n  default-server inter 500ms fall 2 rise 2\n  server b1 198.18.233.11:8080 check\n  server b2 198.18.233.12:8080 check\n  server b3 198.18.233.13:8080 check\n\n# :84 layer 4 (mode tcp) with PROXY protocol v1 to backends that expect it (port 9090)\nfrontend l4_proxyproto\n  mode tcp\n  option tcplog\n  bind :84\n  default_backend app_pp\nbackend app_pp\n  mode tcp\n  balance roundrobin\n  server b1 198.18.233.11:9090 send-proxy check\n  server b2 198.18.233.12:9090 send-proxy check\n  server b3 198.18.233.13:9090 send-proxy check\n\n# :85 misconfigured: PROXY protocol sent to backends that do not expect it\nfrontend l4_mismatch\n  mode tcp\n  option tcplog\n  bind :85\n  default_backend app_pp_wrong\nbackend app_pp_wrong\n  mode tcp\n  server b1 198.18.233.11:8080 send-proxy\n  server b2 198.18.233.12:8080 send-proxy\n  server b3 198.18.233.13:8080 send-proxy\n\n# :86 like :80, plus retry a failed connection on another server\nfrontend http_redispatch\n  bind :86\n  default_backend app_redispatch\nbackend app_redispatch\n  balance roundrobin\n  option httpchk GET /health\n  retries 2\n  option redispatch 1\n  default-server inter 500ms fall 2 rise 2\n  server b1 198.18.233.11:8080 check\n  server b2 198.18.233.12:8080 check\n  server b3 198.18.233.13:8080 check\n",
+        "/etc/nginx/nginx.conf": "worker_processes 1;\npid /tmp/nl-edge-nginx.pid;\nerror_log stderr warn;\nevents {}\nhttp {\n  access_log off;\n  client_body_temp_path /tmp/nl-edge-nginx-body;\n  proxy_temp_path /tmp/nl-edge-nginx-proxy;\n  fastcgi_temp_path /tmp/nl-edge-nginx-fastcgi;\n  uwsgi_temp_path /tmp/nl-edge-nginx-uwsgi;\n  scgi_temp_path /tmp/nl-edge-nginx-scgi;\n  upstream app { server 198.18.233.11:8080; server 198.18.233.12:8080; server 198.18.233.13:8080; }\n  # :8000 the edge overwrites X-Forwarded-For with the address it saw\n  server { listen 8000; location / { proxy_pass http://app; proxy_set_header X-Forwarded-For $remote_addr; } }\n  # :8001 the edge appends to whatever the client sent\n  server { listen 8001; location / { proxy_pass http://app; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; } }\n}\n"
+      },
+      "services": [
+        {
+          "name": "haproxy",
+          "run": [
+            "haproxy",
+            "-db",
+            "-f",
+            "/etc/haproxy/haproxy.cfg"
+          ],
+          "port": 80
+        },
+        {
+          "name": "nginx",
+          "run": [
+            "nginx",
+            "-g",
+            "daemon off;",
+            "-c",
+            "/etc/nginx/nginx.conf"
+          ],
+          "port": 8000
+        },
+        {
+          "name": "fproxy",
+          "run": [
+            "${BIN}/edgelab",
+            "fproxy",
+            "-addr",
+            ":3128"
+          ],
+          "port": 3128
+        }
+      ]
+    },
+    {
+      "name": "switch",
+      "bridges": [
+        {
+          "name": "br0"
+        }
+      ]
+    },
+    {
+      "name": "b1",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.233.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "http",
+          "run": [
+            "${BIN}/edgelab",
+            "backend",
+            "-addr",
+            ":8080",
+            "-id",
+            "b1"
+          ],
+          "port": 8080
+        },
+        {
+          "name": "proxyproto",
+          "run": [
+            "${BIN}/edgelab",
+            "backend",
+            "-addr",
+            ":9090",
+            "-id",
+            "b1-pp",
+            "-proxy-protocol"
+          ],
+          "port": 9090
+        }
+      ]
+    },
+    {
+      "name": "b2",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.233.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "http",
+          "run": [
+            "${BIN}/edgelab",
+            "backend",
+            "-addr",
+            ":8080",
+            "-id",
+            "b2"
+          ],
+          "port": 8080
+        },
+        {
+          "name": "proxyproto",
+          "run": [
+            "${BIN}/edgelab",
+            "backend",
+            "-addr",
+            ":9090",
+            "-id",
+            "b2-pp",
+            "-proxy-protocol"
+          ],
+          "port": 9090
+        }
+      ]
+    },
+    {
+      "name": "b3",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.233.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "http",
+          "run": [
+            "${BIN}/edgelab",
+            "backend",
+            "-addr",
+            ":8080",
+            "-id",
+            "b3"
+          ],
+          "port": 8080
+        },
+        {
+          "name": "proxyproto",
+          "run": [
+            "${BIN}/edgelab",
+            "backend",
+            "-addr",
+            ":9090",
+            "-id",
+            "b3-pp",
+            "-proxy-protocol"
+          ],
+          "port": 9090
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.232.10/24"
+        ]
+      },
+      "b": {
+        "node": "lb",
+        "if": "eth0",
+        "addr": [
+          "198.18.232.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "lb",
+        "if": "eth1",
+        "addr": [
+          "198.18.233.1/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p0",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "b1",
+        "if": "eth0",
+        "addr": [
+          "198.18.233.11/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p1",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "b2",
+        "if": "eth0",
+        "addr": [
+          "198.18.233.12/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p2",
+        "bridge": "br0"
+      }
+    },
+    {
+      "a": {
+        "node": "b3",
+        "if": "eth0",
+        "addr": [
+          "198.18.233.13/24"
+        ]
+      },
+      "b": {
+        "node": "switch",
+        "if": "p3",
+        "bridge": "br0"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "command",
+      "node": "client",
+      "name": "round robin: once the health checks pass (rise 2 \u00d7 inter 500 ms), 30 requests split 10/10/10; each backend sees the load balancer as its peer and the client only in X-Forwarded-For",
+      "run": [
+        "sh",
+        "-c",
+        "for i in $(seq 50); do [ $(curl -s 'http://198.18.232.1:8404/stats;csv' | grep -cE ',(DOWN|DOWN [0-9]/[0-9]|UP [0-9]/[0-9]),') = 0 ] && break; sleep 0.2; done; curl -s 'http://198.18.232.1:8404/stats;csv' | cut -d, -f1,2,18 | grep -E 'app_http,b'; ${BIN}/edgelab hits -url http://198.18.232.1:80/ -n 30 -show 2"
+      ],
+      "save": "round-robin.txt",
+      "expect_contains": [
+        "app_http,b1,UP",
+        "10 \u00d7 HTTP 200 from b1",
+        "10 \u00d7 HTTP 200 from b2",
+        "10 \u00d7 HTTP 200 from b3",
+        "peer=198.18.233.1:",
+        "xff=198.18.232.10 "
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "health checks: b2's application breaks (its /health and its pages return 500) but the port stays open \u2014 the HTTP check takes b2 out within ~1 s; the TCP check on :81 keeps sending it a third of the traffic",
+      "run": [
+        "sh",
+        "-c",
+        "ip netns exec nl-edge-b2 curl -s http://127.0.0.1:8080/admin/health?code=500; sleep 1.5; curl -s 'http://198.18.232.1:8404/stats;csv' | cut -d, -f1,2,18 | grep -E '(app_http|app_tcp),b2'; grep -o 'Server app_http/b2 is DOWN, reason: [^,]*, code: [0-9]*' ${EVIDENCE}/service-lb-haproxy.log | head -1; ${BIN}/edgelab hits -url http://198.18.232.1:80/?app=health -n 30; ${BIN}/edgelab hits -url http://198.18.232.1:81/?app=health -n 30; ip netns exec nl-edge-b2 curl -s http://127.0.0.1:8080/admin/health?code=200; for i in $(seq 50); do [ $(curl -s 'http://198.18.232.1:8404/stats;csv' | grep -cE ',(DOWN|DOWN [0-9]/[0-9]|UP [0-9]/[0-9]),') = 0 ] && break; sleep 0.2; done"
+      ],
+      "save": "health-checks.txt",
+      "expect_contains": [
+        "app_http,b2,DOWN",
+        "app_tcp,b2,UP",
+        "Layer7 wrong status, code: 500",
+        "15 \u00d7 HTTP 200 from b1",
+        "10 \u00d7 HTTP 500 from b2"
+      ],
+      "expect_absent": [
+        "HTTP 200 from b2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "failover when a backend's host goes silent (DROP): on :80 the one request that lands on b3 waits out 4 connect timeouts (1 + retries 3, 1 s each) and gets a 503; on :86 'option redispatch' retries it on another server after one timeout \u2014 slow, but it succeeds",
+      "run": [
+        "sh",
+        "-c",
+        "echo '--- :80, b3 starts to DROP at 1.5 s:'; ${BIN}/edgelab hits -url http://198.18.232.1:80/ -n 60 -interval 50ms -timeout 8s > ${EVIDENCE}/h.txt & H=$!; sleep 1.5; ip netns exec nl-edge-b3 iptables -I INPUT -p tcp --dport 8080 -j DROP; wait $H; sed 1d ${EVIDENCE}/h.txt; ip netns exec nl-edge-b3 iptables -D INPUT -p tcp --dport 8080 -j DROP; for i in $(seq 50); do [ $(curl -s 'http://198.18.232.1:8404/stats;csv' | grep -cE ',(DOWN|DOWN [0-9]/[0-9]|UP [0-9]/[0-9]),') = 0 ] && break; sleep 0.2; done; echo '--- :86, b3 starts to DROP at 1.5 s:'; ${BIN}/edgelab hits -url http://198.18.232.1:86/ -n 60 -interval 50ms -timeout 8s > ${EVIDENCE}/h.txt & H=$!; sleep 1.5; ip netns exec nl-edge-b3 iptables -I INPUT -p tcp --dport 8080 -j DROP; wait $H; sed 1d ${EVIDENCE}/h.txt; ip netns exec nl-edge-b3 iptables -D INPUT -p tcp --dport 8080 -j DROP; for i in $(seq 50); do [ $(curl -s 'http://198.18.232.1:8404/stats;csv' | grep -cE ',(DOWN|DOWN [0-9]/[0-9]|UP [0-9]/[0-9]),') = 0 ] && break; sleep 0.2; done; echo '--- haproxy log for the 503 (timers Tq/Tw/Tc/Tr/Ta, termination state):'; grep -E 'app_http/b3 .* 503 ' ${EVIDENCE}/service-lb-haproxy.log | tail -1 | cut -c1-140"
+      ],
+      "save": "failover-drop.txt",
+      "expect_contains": [
+        "1 \u00d7 HTTP 503",
+        "(took 4.0s)",
+        "(took 1.0s)",
+        "sC--"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "failover when the process is gone (RST): refusals are instant but HAProxy waits ~1 s between retries \u2014 3 s then a 503 on :80; with redispatch on :86 nobody notices",
+      "run": [
+        "sh",
+        "-c",
+        "echo '--- :80, b3 starts to REJECT at 1.5 s:'; ${BIN}/edgelab hits -url http://198.18.232.1:80/ -n 60 -interval 50ms -timeout 8s > ${EVIDENCE}/h.txt & H=$!; sleep 1.5; ip netns exec nl-edge-b3 iptables -I INPUT -p tcp --dport 8080 -j REJECT --reject-with tcp-reset; wait $H; sed 1d ${EVIDENCE}/h.txt; ip netns exec nl-edge-b3 iptables -D INPUT -p tcp --dport 8080 -j REJECT --reject-with tcp-reset; for i in $(seq 50); do [ $(curl -s 'http://198.18.232.1:8404/stats;csv' | grep -cE ',(DOWN|DOWN [0-9]/[0-9]|UP [0-9]/[0-9]),') = 0 ] && break; sleep 0.2; done; echo '--- :86, b3 starts to REJECT at 1.5 s:'; ${BIN}/edgelab hits -url http://198.18.232.1:86/ -n 60 -interval 50ms -timeout 8s > ${EVIDENCE}/h.txt & H=$!; sleep 1.5; ip netns exec nl-edge-b3 iptables -I INPUT -p tcp --dport 8080 -j REJECT --reject-with tcp-reset; wait $H; sed 1d ${EVIDENCE}/h.txt; ip netns exec nl-edge-b3 iptables -D INPUT -p tcp --dport 8080 -j REJECT --reject-with tcp-reset; for i in $(seq 50); do [ $(curl -s 'http://198.18.232.1:8404/stats;csv' | grep -cE ',(DOWN|DOWN [0-9]/[0-9]|UP [0-9]/[0-9]),') = 0 ] && break; sleep 0.2; done"
+      ],
+      "save": "failover-rst.txt",
+      "expect_contains": [
+        "1 \u00d7 HTTP 503",
+        "(took 3.0s)"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "X-Forwarded-For: the client forges 6.6.6.6. HAProxy (option forwardfor) adds its own header line after it, nginx with $proxy_add_x_forwarded_for appends to it, nginx with $remote_addr overwrites it \u2014 only the entry your own proxy added can be trusted",
+      "run": [
+        "sh",
+        "-c",
+        "for p in 80 8001 8000; do echo \"--- :$p\"; ${BIN}/edgelab hits -url http://198.18.232.1:$p/ -n 1 -show 1 -xff 6.6.6.6 | sed -n 2p; done"
+      ],
+      "save": "xff.txt",
+      "expect_contains": [
+        "xff=6.6.6.6 | 198.18.232.10 ",
+        "xff=6.6.6.6, 198.18.232.10 ",
+        "xff=198.18.232.10 proxy"
+      ],
+      "expect_absent": [
+        "xff=6.6.6.6 proxy"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "PROXY protocol: :84 balances at layer 4 (mode tcp) \u2014 no HTTP headers are touched, so there is no X-Forwarded-For; the client address arrives in the PROXY header the load balancer writes before the first byte",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/edgelab hits -url http://198.18.232.1:84/ -n 3 -show 3; echo '--- backend log:'; grep 'PROXY header' ${EVIDENCE}/service-b1-proxyproto.log | tail -1"
+      ],
+      "save": "proxy-protocol.txt",
+      "expect_contains": [
+        "backend=b1-pp peer=198.18.233.1:",
+        "xff=- proxy-protocol-client=198.18.232.10:",
+        "(PROXY header: client 198.18.232.10:"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "PROXY protocol mismatches: sent to a backend that does not expect it (:85), the backend reads 'PROXY TCP4 \u2026' as a request line and answers 400; a client that skips the header to a backend that requires it is cut off",
+      "run": [
+        "sh",
+        "-c",
+        "echo '--- via :85 to plain backends:'; ${BIN}/edgelab raw -to 198.18.232.1:85 'GET / HTTP/1.1\\r\\nHost: x\\r\\n\\r\\n'; echo '--- straight to b1:9090:'; ${BIN}/edgelab raw -to 198.18.233.11:9090 'GET / HTTP/1.1\\r\\nHost: x\\r\\n\\r\\n'; grep 'instead of a PROXY header' ${EVIDENCE}/service-b1-proxyproto.log | tail -1 | cut -d' ' -f2-"
+      ],
+      "save": "proxy-protocol-mismatch.txt",
+      "expect_contains": [
+        "reply: HTTP/1.1 400 Bad Request",
+        "no reply (EOF)",
+        "sent \"GET / HTTP/1.1\" instead of a PROXY header \u2014 closing"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "stickiness: a cookie jar alone changes nothing on :80; on :82 HAProxy sets SRV=<server> and every later request goes to that server; :83 hashes the source IP, so one client always lands on one backend \u2014 cookie or not",
+      "run": [
+        "sh",
+        "-c",
+        "echo '--- :80 with cookies:'; ${BIN}/edgelab hits -url http://198.18.232.1:80/ -n 12 -cookies | sed 1d; echo '--- :82 without cookies:'; ${BIN}/edgelab hits -url http://198.18.232.1:82/ -n 12 | sed 1d; echo '--- :82 with cookies:'; ${BIN}/edgelab hits -url http://198.18.232.1:82/ -n 12 -cookies -show 2 | sed 1d; echo '--- :83 (source hash) without cookies:'; ${BIN}/edgelab hits -url http://198.18.232.1:83/ -n 12 | sed 1d; echo \"--- the cookie HAProxy sets: $(curl -si http://198.18.232.1:82/ | grep -i '^set-cookie' | tr -d '\\r')\""
+      ],
+      "save": "sticky.txt",
+      "expect_contains": [
+        "--- :82 with cookies:\n  response 1: HTTP 200 backend=b",
+        "12 \u00d7 HTTP 200 from b",
+        "4 \u00d7 HTTP 200 from b3",
+        "set-cookie: SRV=b"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "forward proxy: curl uses http_proxy but ignores upper-case HTTP_PROXY (a CGI 'httpoxy' safeguard); Go's ProxyFromEnvironment honors both; NO_PROXY sends a host direct, unless a lower-case no_proxy is also set (curl reads that one first); CONNECT (-p) makes the proxy a blind tunnel that sees only host:port",
+      "run": [
+        "sh",
+        "-c",
+        "echo \"curl, http_proxy:          $(env -i PATH=$PATH http_proxy=http://198.18.232.1:3128 curl -s http://198.18.233.11:8080/)\"; echo \"curl, HTTP_PROXY:          $(env -i PATH=$PATH HTTP_PROXY=http://198.18.232.1:3128 curl -s http://198.18.233.11:8080/)\"; echo \"Go,   HTTP_PROXY:          $(env -i PATH=$PATH HTTP_PROXY=http://198.18.232.1:3128 ${BIN}/edgelab hits -env-proxy -url http://198.18.233.11:8080/ -n 1 -show 1 | sed -n 2p)\"; echo \"curl, http_proxy+NO_PROXY: $(env -i PATH=$PATH http_proxy=http://198.18.232.1:3128 NO_PROXY=198.18.233.11 curl -s http://198.18.233.11:8080/)\"; echo \"curl, no_proxy=other.example NO_PROXY=198.18.233.11: $(env -i PATH=$PATH http_proxy=http://198.18.232.1:3128 no_proxy=other.example NO_PROXY=198.18.233.11 curl -s http://198.18.233.11:8080/)\"; echo \"curl -p (CONNECT):         $(curl -s -p -x http://198.18.232.1:3128 http://198.18.233.12:8080/)\"; echo '--- proxy log:'; tail -4 ${EVIDENCE}/service-lb-fproxy.log | cut -d' ' -f2-"
+      ],
+      "save": "forward-proxy.txt",
+      "expect_contains": [
+        "curl, http_proxy:          backend=b1 peer=198.18.233.1:",
+        "curl, HTTP_PROXY:          backend=b1 peer=198.18.232.10:",
+        "Go,   HTTP_PROXY:            response 1: HTTP 200 backend=b1 peer=198.18.233.1:",
+        "curl, http_proxy+NO_PROXY: backend=b1 peer=198.18.232.10:",
+        "NO_PROXY=198.18.233.11: backend=b1 peer=198.18.233.1:",
+        "CONNECT 198.18.233.12:8080 from 198.18.232.10"
+      ]
+    }
+  ]
+}

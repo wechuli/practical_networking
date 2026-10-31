@@ -1,0 +1,56 @@
+{
+  "name": "osi",
+  "description": "One client, one server: observe each layer, then fail each layer on purpose",
+  "nodes": [
+    { "name": "client" },
+    { "name": "server",
+      "setup": [
+        ["iptables", "-A", "INPUT", "-p", "tcp", "--dport", "8081", "-j", "DROP"],
+        ["iptables", "-A", "INPUT", "-p", "tcp", "--dport", "8082", "-j", "REJECT", "--reject-with", "tcp-reset"]
+      ],
+      "services": [
+        { "name": "web", "port": 8443,
+          "run": ["${BIN}/labserver", "-addr", "198.18.4.2:8443", "-http-addr", "198.18.4.2:8080",
+                  "-name", "server.test", "-size", "300", "-ca-out", "/tmp/netlab-osi-ca.pem"] }
+      ] }
+  ],
+  "links": [
+    { "a": { "node": "client", "if": "eth0", "addr": ["198.18.4.1/24"] },
+      "b": { "node": "server", "if": "eth0", "addr": ["198.18.4.2/24"] } }
+  ],
+  "checks": [
+    { "type": "capture", "node": "client", "if": "eth0", "filter": "tcp port 8080", "save": "http.pcap",
+      "name": "Layers 2-7 in one plain-HTTP request: Ethernet, IPv4, TCP handshake with MSS, HTTP",
+      "during": { "node": "client", "run": ["curl", "-sS", "--noproxy", "*", "-o", "/dev/null", "http://198.18.4.2:8080/"] },
+      "expect_contains": ["ethertype IPv4 (0x0800)", "Flags [S]", "Flags [S.]", "mss 1460", "GET / HTTP/1.1", "HTTP/1.1 200 OK"] },
+    { "type": "command", "node": "client", "run": ["ip", "neigh", "show", "dev", "eth0"], "save": "neigh.txt",
+      "name": "Layer 2: the client resolved the server's MAC with ARP", "expect_contains": ["198.18.4.2 lladdr"] },
+    { "type": "ping", "from": "client", "to": "198.18.4.2", "expect": "reachable", "name": "Layer 3: ICMP echo to the server" },
+    { "type": "command", "node": "client", "save": "tls-ok.txt",
+      "name": "Layers 5-7: HTTPS with the lab CA trusted",
+      "run": ["curl", "-sS", "--noproxy", "*", "--cacert", "/tmp/netlab-osi-ca.pem", "--resolve", "server.test:8443:198.18.4.2",
+              "-o", "/dev/null", "-w", "HTTP %{http_code} over %{scheme}\n", "https://server.test:8443/"],
+      "expect_exit": 0, "expect_contains": ["HTTP 200"] },
+    { "type": "command", "node": "client", "save": "tls-untrusted.txt",
+      "name": "Layer 5/6 failure: TCP connects, certificate verification fails",
+      "run": ["openssl", "s_client", "-connect", "198.18.4.2:8443", "-servername", "server.test", "-verify_return_error"],
+      "expect_exit": 1, "expect_contains": ["CONNECTED", "verify error"] },
+    { "type": "capture", "node": "client", "if": "eth0", "filter": "tcp port 9", "save": "refused.pcap",
+      "name": "Layer 4 failure, nothing listening: the SYN is answered by RST",
+      "during": { "node": "client", "run": ["curl", "-sS", "--noproxy", "*", "--max-time", "3", "http://198.18.4.2:9/"] },
+      "expect_contains": ["Flags [S]", "Flags [R.]"] },
+    { "type": "command", "node": "client", "name": "same refusal, sent by a firewall REJECT rule: curl cannot tell the difference",
+      "run": ["curl", "-sS", "--noproxy", "*", "--max-time", "3", "http://198.18.4.2:8082/"],
+      "expect_exit": 7, "expect_contains": ["Couldn't connect to server"] },
+    { "type": "capture", "node": "client", "if": "eth0", "filter": "tcp port 8081", "save": "dropped.pcap",
+      "name": "Layer 3/4 failure, firewall DROP: SYNs retried, nothing comes back",
+      "during": { "node": "client", "run": ["curl", "-sS", "--noproxy", "*", "--max-time", "3", "http://198.18.4.2:8081/"] },
+      "expect_contains": ["Flags [S]"], "expect_absent": ["Flags [R", "Flags [S.]"] },
+    { "type": "capture", "node": "client", "if": "eth0", "filter": "arp or icmp", "save": "no-host.pcap",
+      "name": "Layer 2 failure behind a Layer 3 error: ARP for an on-link address nobody owns",
+      "during": { "node": "client", "run": ["ping", "-c", "4", "-i", "0.5", "198.18.4.99"] },
+      "expect_contains": ["Request who-has 198.18.4.99 tell 198.18.4.1"], "expect_absent": ["is-at"] },
+    { "type": "command", "node": "client", "name": "what ping reported for that address",
+      "run": ["ping", "-c", "4", "-i", "0.5", "198.18.4.99"], "expect_exit": 1, "expect_contains": ["Destination Host Unreachable"] }
+  ]
+}

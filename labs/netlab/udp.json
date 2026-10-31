@@ -1,0 +1,573 @@
+{
+  "name": "udp",
+  "description": "UDP on the wire and in the kernel: DNS over UDP and TCP, truncation, no handshake, ICMP errors and which sockets see them, loss and retries measured, truncated reads, conntrack idle timeouts",
+  "nodes": [
+    {
+      "name": "client",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.40.1"
+        }
+      ]
+    },
+    {
+      "name": "fw",
+      "sysctls": {
+        "net.ipv4.ip_forward": "1"
+      },
+      "setup": [
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-m",
+          "conntrack",
+          "--ctstate",
+          "ESTABLISHED,RELATED",
+          "-j",
+          "ACCEPT"
+        ],
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-i",
+          "eth0",
+          "-j",
+          "ACCEPT"
+        ],
+        [
+          "iptables",
+          "-A",
+          "FORWARD",
+          "-j",
+          "DROP"
+        ]
+      ]
+    },
+    {
+      "name": "server",
+      "routes": [
+        {
+          "dst": "default",
+          "via": "198.18.41.1"
+        }
+      ],
+      "services": [
+        {
+          "name": "dns",
+          "run": [
+            "dnsmasq",
+            "--keep-in-foreground",
+            "--conf-file=/dev/null",
+            "--no-resolv",
+            "--no-hosts",
+            "--host-record=api.lab.test,192.0.2.10",
+            "--txt-record=big.lab.test,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB,CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+            "--listen-address=198.18.41.10",
+            "--bind-interfaces",
+            "--user=root",
+            "--log-facility=-"
+          ]
+        },
+        {
+          "name": "echo",
+          "run": [
+            "${BIN}/udplab",
+            "echo",
+            "-addr",
+            "198.18.41.10:9999"
+          ]
+        },
+        {
+          "name": "slow",
+          "run": [
+            "${BIN}/udplab",
+            "echo",
+            "-addr",
+            "198.18.41.10:9998",
+            "-delay",
+            "8s"
+          ]
+        }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "a": {
+        "node": "client",
+        "if": "eth0",
+        "addr": [
+          "198.18.40.10/24"
+        ]
+      },
+      "b": {
+        "node": "fw",
+        "if": "eth0",
+        "addr": [
+          "198.18.40.1/24"
+        ]
+      }
+    },
+    {
+      "a": {
+        "node": "fw",
+        "if": "eth1",
+        "addr": [
+          "198.18.41.1/24"
+        ]
+      },
+      "b": {
+        "node": "server",
+        "if": "eth0",
+        "addr": [
+          "198.18.41.10/24"
+        ]
+      }
+    }
+  ],
+  "checks": [
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "port 53",
+      "decode": [
+        "-nn",
+        "-v"
+      ],
+      "save": "dns-udp.pcap",
+      "name": "a DNS query over UDP: two packets, no handshake",
+      "during": {
+        "node": "client",
+        "run": [
+          "dig",
+          "+short",
+          "@198.18.41.10",
+          "api.lab.test",
+          "A"
+        ]
+      },
+      "expect_contains": [
+        "proto UDP (17)",
+        ".53: ",
+        "A? api.lab.test.",
+        "A 192.0.2.10",
+        "192.0.2.10"
+      ],
+      "expect_absent": [
+        "Flags [S]"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "port 53",
+      "decode": [
+        "-nn"
+      ],
+      "save": "dns-tcp.pcap",
+      "name": "the same query over TCP: handshake, query, answer, teardown",
+      "during": {
+        "node": "client",
+        "run": [
+          "dig",
+          "+short",
+          "+tcp",
+          "@198.18.41.10",
+          "api.lab.test",
+          "A"
+        ]
+      },
+      "expect_contains": [
+        "Flags [S]",
+        "Flags [S.]",
+        "A? api.lab.test.",
+        "Flags [F.]",
+        "192.0.2.10"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "count them",
+      "run": [
+        "sh",
+        "-c",
+        "echo \"udp packets: $(tcpdump -nn -r $NETLAB_EVIDENCE/dns-udp.pcap 2>/dev/null | wc -l)\"; echo \"tcp packets: $(tcpdump -nn -r $NETLAB_EVIDENCE/dns-tcp.pcap 2>/dev/null | wc -l)\""
+      ],
+      "save": "dns-count.txt",
+      "expect_contains": [
+        "udp packets: 2"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "port 53",
+      "decode": [
+        "-nn"
+      ],
+      "save": "dns-truncated.pcap",
+      "name": "a 737-byte answer without EDNS: the server sets TC (truncated), dig retries over TCP",
+      "during": {
+        "node": "client",
+        "run": [
+          "dig",
+          "+noedns",
+          "@198.18.41.10",
+          "big.lab.test",
+          "TXT"
+        ]
+      },
+      "expect_contains": [
+        ";; Truncated, retrying in TCP mode.",
+        "(TCP)",
+        "MSG SIZE  rcvd: 737",
+        "Flags [S]"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the truncated UDP answer itself, as dig sees it when told not to retry",
+      "run": [
+        "dig",
+        "+noedns",
+        "+ignore",
+        "@198.18.41.10",
+        "big.lab.test",
+        "TXT"
+      ],
+      "save": "dns-tc.txt",
+      "expect_contains": [
+        "flags: qr aa tc rd ra",
+        "ANSWER: 0"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "udp port 9999",
+      "decode": [
+        "-nn"
+      ],
+      "save": "echo.pcap",
+      "name": "an application exchange: one datagram each way; the receiver saw message boundaries intact",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/udplab",
+          "send",
+          "-to",
+          "198.18.41.10:9999",
+          "-n",
+          "1",
+          "-size",
+          "100"
+        ]
+      },
+      "expect_contains": [
+        "198.18.40.10.",
+        "> 198.18.41.10.9999: UDP, length 100",
+        "198.18.41.10.9999 > 198.18.40.10.",
+        "answered 1/1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "while it runs, a connected UDP socket shows as ESTAB in ss \u2014 a local setting, no packet is sent",
+      "run": [
+        "sh",
+        "-c",
+        "${BIN}/udplab send -to 198.18.41.10:9999 -n 30 -interval 50ms >/dev/null & sleep 0.5; ss -uanp | grep -E 'State|udplab'; wait"
+      ],
+      "save": "ss.txt",
+      "expect_contains": [
+        "ESTAB",
+        "198.18.41.10:9999",
+        "udplab"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "the server's socket is UNCONN: it answers anyone",
+      "run": [
+        "sh",
+        "-c",
+        "ss -ulnp | grep -E 'State|9999'"
+      ],
+      "save": "ss-server.txt",
+      "expect_contains": [
+        "UNCONN",
+        "198.18.41.10:9999"
+      ]
+    },
+    {
+      "type": "capture",
+      "node": "client",
+      "if": "eth0",
+      "filter": "udp or icmp",
+      "decode": [
+        "-nn"
+      ],
+      "save": "closed-port.pcap",
+      "name": "a closed port answers with ICMP port unreachable; the connected socket reports ECONNREFUSED",
+      "during": {
+        "node": "client",
+        "run": [
+          "${BIN}/udplab",
+          "send",
+          "-to",
+          "198.18.41.10:9997",
+          "-n",
+          "2",
+          "-timeout",
+          "300ms"
+        ]
+      },
+      "expect_contains": [
+        "ICMP 198.18.41.10 udp port 9997 unreachable",
+        "connection refused (ICMP port unreachable) \u00d7 2"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same ICMP, an unconnected socket: the kernel never tells it, so it waits out its timeout",
+      "run": [
+        "${BIN}/udplab",
+        "send",
+        "-to",
+        "198.18.41.10:9997",
+        "-n",
+        "2",
+        "-timeout",
+        "300ms",
+        "-unconnected"
+      ],
+      "save": "closed-unconnected.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "answered 0/2",
+        "never told about ICMP errors"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "a reply bigger than the read buffer is cut, not split: MSG_TRUNC, and the rest is gone",
+      "run": [
+        "${BIN}/udplab",
+        "send",
+        "-to",
+        "198.18.41.10:9999",
+        "-n",
+        "1",
+        "-size",
+        "1000",
+        "-recvbuf",
+        "100"
+      ],
+      "save": "truncated-read.txt",
+      "expect_contains": [
+        "truncated 1",
+        "MSG_TRUNC"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "loss: drop 30% of datagrams in each direction (iptables statistic; netem is not needed)",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -A INPUT -p udp --dport 9999 -m statistic --mode random --probability 0.3 -j DROP; iptables -A OUTPUT -p udp --sport 9999 -m statistic --mode random --probability 0.3 -j DROP"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "500 requests, no retries: expect 0.7 \u00d7 0.7 = 49% answered",
+      "run": [
+        "${BIN}/udplab",
+        "send",
+        "-to",
+        "198.18.41.10:9999",
+        "-n",
+        "500",
+        "-interval",
+        "2ms",
+        "-timeout",
+        "100ms"
+      ],
+      "save": "loss-0retries.txt",
+      "expect_contains": [
+        "answered"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the same with 2 retries: expect 1 \u2212 0.51\u00b3 \u2248 87% answered, at the cost of extra datagrams",
+      "run": [
+        "${BIN}/udplab",
+        "send",
+        "-to",
+        "198.18.41.10:9999",
+        "-n",
+        "500",
+        "-interval",
+        "2ms",
+        "-timeout",
+        "100ms",
+        "-retries",
+        "2"
+      ],
+      "save": "loss-2retries.txt",
+      "expect_contains": [
+        "answered",
+        "retries"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "DNS under 50% loss each way, both transports",
+      "run": [
+        "sh",
+        "-c",
+        "for proto in udp tcp; do iptables -A INPUT -p $proto --dport 53 -m statistic --mode random --probability 0.5 -j DROP; iptables -A OUTPUT -p $proto --sport 53 -m statistic --mode random --probability 0.5 -j DROP; done; iptables -S | grep -c statistic"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "40 lookups, one UDP try each (expect ~25%)",
+      "run": [
+        "sh",
+        "-c",
+        "ok=0; for i in $(seq 40); do if timeout 20 dig +short +tries=1 +time=1 @198.18.41.10 api.lab.test A 2>/dev/null | grep -qx 192.0.2.10; then ok=$((ok+1)); fi; done; echo \"udp, 1 try: $ok/40 answered\""
+      ],
+      "save": "dns-loss-udp1.txt",
+      "expect_contains": [
+        "answered"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "40 lookups, three UDP tries each (expect ~58%)",
+      "run": [
+        "sh",
+        "-c",
+        "ok=0; for i in $(seq 40); do if timeout 20 dig +short +tries=3 +time=1 @198.18.41.10 api.lab.test A 2>/dev/null | grep -qx 192.0.2.10; then ok=$((ok+1)); fi; done; echo \"udp, 3 tries: $ok/40 answered\""
+      ],
+      "save": "dns-loss-udp3.txt",
+      "expect_contains": [
+        "answered"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "40 lookups over TCP, which retransmits on its own (one try, 6 s each)",
+      "run": [
+        "sh",
+        "-c",
+        "ok=0; for i in $(seq 40); do if timeout 20 dig +short +tcp +tries=1 +time=6 @198.18.41.10 api.lab.test A 2>/dev/null | grep -qx 192.0.2.10; then ok=$((ok+1)); fi; done; echo \"tcp, 1 try: $ok/40 answered\""
+      ],
+      "save": "dns-loss-tcp.txt",
+      "expect_contains": [
+        "answered"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "server",
+      "name": "remove the loss",
+      "run": [
+        "iptables",
+        "-F"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "the slow service replies after 8 s; with the firewall's default 30 s UDP timeout the reply gets through",
+      "run": [
+        "${BIN}/udplab",
+        "send",
+        "-to",
+        "198.18.41.10:9998",
+        "-n",
+        "1",
+        "-timeout",
+        "10s"
+      ],
+      "save": "slow-default.txt",
+      "expect_contains": [
+        "answered 1/1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "fw",
+      "name": "the firewall's idle timeout for UDP flows that have not seen a reply: 30 s; lower it to 5 s",
+      "run": [
+        "sh",
+        "-c",
+        "sysctl net.netfilter.nf_conntrack_udp_timeout net.netfilter.nf_conntrack_udp_timeout_stream; sysctl -w net.netfilter.nf_conntrack_udp_timeout=5"
+      ],
+      "save": "fw-timeouts.txt",
+      "expect_contains": [
+        "nf_conntrack_udp_timeout = 30",
+        "nf_conntrack_udp_timeout_stream = 120"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "client",
+      "name": "now the 8-second reply arrives after the firewall forgot the flow, and is dropped",
+      "run": [
+        "${BIN}/udplab",
+        "send",
+        "-to",
+        "198.18.41.10:9998",
+        "-n",
+        "1",
+        "-timeout",
+        "10s"
+      ],
+      "save": "slow-expired.txt",
+      "expect_exit": 1,
+      "expect_contains": [
+        "answered 0/1"
+      ]
+    },
+    {
+      "type": "command",
+      "node": "fw",
+      "name": "the evidence: the default-drop rule counted the late reply; conntrack lists only flows still alive",
+      "run": [
+        "sh",
+        "-c",
+        "iptables -L FORWARD -v -n -x; conntrack -L -p udp 2>/dev/null | grep 9998 || echo 'no conntrack entry for port 9998'"
+      ],
+      "save": "fw-evidence.txt",
+      "expect_contains": [
+        "DROP"
+      ],
+      "expect_absent": [
+        "     0        0 DROP"
+      ]
+    }
+  ]
+}
