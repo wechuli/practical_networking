@@ -146,3 +146,12 @@ console.log(`PASS: ${embeddedPython} embedded Python blocks/heredocs compiled`);
 console.log(
   "Static validation does not execute privileged Linux, container, or cloud labs.",
 );
+// mdBook link rewriting (tools/book-links.sh) against its fixture tree.
+if (requested.length === 0) {
+  const result = spawnSync("bash", ["tools/test-book-links.sh"], {
+    encoding: "utf8",
+    timeout: 60000,
+  });
+  assert.equal(result.status, 0, `tools/test-book-links.sh:\n${result.stdout}${result.stderr}`);
+  process.stdout.write(result.stdout);
+}
