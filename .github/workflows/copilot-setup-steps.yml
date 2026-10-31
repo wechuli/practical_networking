@@ -1,0 +1,32 @@
+name: Copilot setup steps
+
+# Prepares the environment the Copilot coding agent works in.
+on:
+  workflow_dispatch:
+  push:
+    paths: [.github/workflows/copilot-setup-steps.yml]
+  pull_request:
+    paths: [.github/workflows/copilot-setup-steps.yml]
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: labs/go/go.mod
+          cache-dependency-path: labs/go/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install mdBook (prebuilt binary)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook
+      - name: Show versions
+        run: go version && node --version && mdbook --version
+      - name: Course check
+        run: node tools/check-course.mjs

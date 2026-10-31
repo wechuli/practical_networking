@@ -1,0 +1,58 @@
+name: Book (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.configured.outputs.yes }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip until the book is configured
+        id: configured
+        run: |
+          if [ -f book.toml ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "book.toml not found; nothing to build yet"; fi
+      - name: Install mdBook (prebuilt binary)
+        if: steps.configured.outputs.yes == 'true'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook
+      - name: Rewrite links to non-Markdown files (on a copy)
+        if: steps.configured.outputs.yes == 'true'
+        run: |
+          rm -rf "$RUNNER_TEMP/src" && mkdir -p "$RUNNER_TEMP/src"
+          git ls-files -z | xargs -0 cp --parents -t "$RUNNER_TEMP/src"
+          bash tools/book-links.sh "$RUNNER_TEMP/src" "https://github.com/${{ github.repository }}" "${{ github.sha }}"
+      - name: Build
+        if: steps.configured.outputs.yes == 'true'
+        run: mdbook build "$RUNNER_TEMP/src" --dest-dir "$GITHUB_WORKSPACE/book"
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.configured.outputs.yes == 'true' && github.event_name != 'pull_request'
+        with:
+          path: book
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.configured == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
