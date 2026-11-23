@@ -37,12 +37,7 @@ The backends, forward proxy, NTP servers and TLS clock client come from the cour
 
 DHCPv4 (RFC 2131) runs over UDP: clients send from port 68 to port 67, servers send from 67 to 68. Captured in the lab and decoded with `tshark`, a first lease looks like this. The client is c1 and the server is dnsmasq on 198.18.230.1.
 
-```
-  0.000s  DISCOVER 0.0.0.0 → 255.255.255.255
-  3.060s  OFFER    198.18.230.1 → 198.18.230.101  yiaddr 198.18.230.101  router 198.18.230.1  lease 120s
-  3.068s  REQUEST  0.0.0.0 → 255.255.255.255  requested 198.18.230.101
-  3.070s  ACK      198.18.230.1 → 198.18.230.101  yiaddr 198.18.230.101  router 198.18.230.1  lease 120s
-```
+![Client c1 and the server dnsmasq at 198.18.230.1 exchange four messages: at 0.000s DISCOVER from 0.0.0.0 to 255.255.255.255; at 3.060s OFFER from 198.18.230.1 to 198.18.230.101 with yiaddr 198.18.230.101, router 198.18.230.1, lease 120s; at 3.068s REQUEST from 0.0.0.0 to 255.255.255.255 for 198.18.230.101; at 3.070s ACK from 198.18.230.1 to 198.18.230.101 with the same yiaddr, router and lease.](./img/23/dhcp-dora.svg)
 
 - **DISCOVER** is broadcast from 0.0.0.0, because the client has no address yet.
 - **OFFER** carries the proposed address (`yiaddr`) and options: subnet mask, router (option 3), DNS servers (option 6) and lease time (option 51).
@@ -216,15 +211,7 @@ Prefer stateless backends with shared session storage, and keep stickiness for c
 
 A client sends a request and gets back four timestamps:
 
-```
-t1  client sends        (client clock)
-t2  server receives     (server clock)
-t3  server sends        (server clock)
-t4  client receives     (client clock)
-
-offset = ((t2 − t1) + (t3 − t4)) / 2      how far the server's clock is ahead of the client's
-delay  = (t4 − t1) − (t3 − t2)            round trip, minus time spent in the server
-```
+![The client sends at t1 (client clock), the server receives at t2 and sends at t3 (server clock), and the client receives at t4 (client clock); offset = ((t2 − t1) + (t3 − t4)) / 2 is how far the server's clock is ahead of the client's, and delay = (t4 − t1) − (t3 − t2) is the round trip minus time spent in the server.](./img/23/ntp-timestamps.svg)
 
 The lab adds 10 ms each way and measures with `edgelab ntp query`, five samples per server; the results were the same in three runs.
 
@@ -395,17 +382,17 @@ Both sides must agree, and both ways of disagreeing were measured:
 
 ### Lab Part 1: Run the Labs
 
-```
-dhcp:   c1 c2 c3 ── switch (br0) ── server dnsmasq 198.18.230.1 (pool .100–.101)
-                        │  └─ rogue dnsmasq 198.18.230.66
-                        └─ relay 198.18.230.2 / 198.18.231.1 ── remote
+**dhcp:**
 
-edge:   client 198.18.232.10 ── lb 198.18.232.1 (HAProxy :80–:86, nginx :8000/:8001, proxy :3128)
-                                  └─ 198.18.233.1 ── b1 b2 b3 (:8080 HTTP, :9090 PROXY protocol)
+![Clients c1, c2 and c3 attach to a switch (br0) together with the server, dnsmasq at 198.18.230.1 with pool .100–.101, a rogue dnsmasq at 198.18.230.66, and a relay at 198.18.230.2 / 198.18.231.1 with the client remote behind it.](./img/23/dhcp-lab-topology.svg)
 
-time:   client ── switch ── ntp1 ntp2 ntp3 (correct) · bad (+5 min) · asym (10 ms in / 50 ms out)
-                         └─ web (TLS, certificate valid from now−1 h to now+30 days)
-```
+**edge:**
+
+![The client at 198.18.232.10 reaches lb at 198.18.232.1, which runs HAProxy on :80–:86, nginx on :8000/:8001 and a proxy on :3128, and reaches backends b1, b2 and b3 from 198.18.233.1; the backends serve HTTP on :8080 and PROXY protocol on :9090.](./img/23/edge-lab-topology.svg)
+
+**time:**
+
+![A client attaches to a switch with NTP servers ntp1, ntp2 and ntp3 (correct), bad (+5 min) and asym (10 ms in / 50 ms out), and web, a TLS server whose certificate is valid from now−1 h to now+30 days.](./img/23/time-lab-topology.svg)
 
 ```bash
 cd labs/go

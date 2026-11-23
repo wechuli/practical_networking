@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img" aria-labelledby="t d"><title id="t">The TCP three-way handshake</title><desc id="d">Client 198.18.42.10 port 48628 sends SYN with seq 2999890995, win 64240, mss 1460, sackOK, TS and wscale 10; the server 198.18.43.10 port 8080 enters SYN_RECV and answers SYN-ACK with seq 3450125985, ack 2999890996, win 65160, mss 1460, sackOK, TS and wscale 10; the client sends ACK with relative ack 1 and is ESTABLISHED, and so is the server. Data can follow immediately or ride on packet 3.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="398" rx="16"/>
+<text class="zl" x="24" y="28">Three-way handshake</text>
+<rect class="net" x="50" y="42" width="200" height="50" rx="10"/><text class="t" x="150" y="63" text-anchor="middle">client</text><text class="m" x="150" y="82" text-anchor="middle">198.18.42.10:48628</text>
+<rect class="net" x="550" y="42" width="200" height="50" rx="10"/><text class="t" x="650" y="63" text-anchor="middle">server</text><text class="m" x="650" y="82" text-anchor="middle">198.18.43.10:8080</text>
+<path class="line" d="M150 92 V370"/><path class="line" d="M650 92 V370"/>
+<text class="l" x="400" y="130" text-anchor="middle">1  SYN  seq=2999890995</text>
+<text class="m" x="400" y="148" text-anchor="middle">win 64240, mss 1460, sackOK, TS, wscale 10</text>
+<path class="arrow" d="M150 160 H648"/>
+<text class="l" x="662" y="164">SYN_RECV</text>
+<text class="l" x="400" y="210" text-anchor="middle">2  SYN-ACK  seq=3450125985 ack=2999890996</text>
+<text class="m" x="400" y="228" text-anchor="middle">win 65160, mss 1460, sackOK, TS, wscale 10</text>
+<path class="arrow" d="M650 240 H152"/>
+<text class="l" x="400" y="290" text-anchor="middle">3  ACK  ack=1 (relative)</text>
+<path class="arrow" d="M150 302 H648"/>
+<text class="l" x="138" y="306" text-anchor="end">ESTAB</text>
+<text class="l" x="662" y="306">ESTABLISHED</text>
+<rect class="ok" x="220" y="330" width="360" height="32" rx="10"/><text class="s" x="400" y="351" text-anchor="middle">data can follow immediately (or ride on packet 3)</text>
+</svg>

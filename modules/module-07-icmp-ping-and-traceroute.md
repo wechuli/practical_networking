@@ -48,78 +48,31 @@ ICMP never generates errors about ICMP errors, about broadcast or multicast pack
 
 ### How ICMP Fits in the Stack
 
-```
-ICMP IS INSIDE IP — NOT ABOVE IT
+![A protocol stack: TCP (protocol 6) and UDP (protocol 17) at layer 4, IP at layer 3 carrying TCP (Protocol = 6), UDP (Protocol = 17) and ICMP (Protocol = 1), and Ethernet at layer 2; below it, an ICMP packet on the wire is an Ethernet header, an IP header with Proto=1, and the ICMP message with Type, Code, Checksum and message-specific data.](./img/07/icmp-in-ip.svg)
 
-  ┌────────────────────────────────────────────┐
-  │ Layer 4:  TCP (Proto 6) / UDP (Proto 17)   │
-  ├────────────────────────────────────────────┤
-  │ Layer 3:  IP                               │
-  │           ├── Carries TCP   (Protocol = 6) │
-  │           ├── Carries UDP   (Protocol = 17)│
-  │           └── Carries ICMP  (Protocol = 1) │  ← ICMP is here
-  ├────────────────────────────────────────────┤
-  │ Layer 2:  Ethernet                         │
-  └────────────────────────────────────────────┘
-
-  ICMP is NOT a Layer 4 protocol. It does not ride on top of TCP or UDP.
-  It rides directly inside IP, at the same level as TCP and UDP.
-  IP header Protocol field = 1 means ICMP.
-
-  An ICMP packet on the wire:
-  ┌──────────┬──────────┬───────────────────────────┐
-  │ Ethernet │ IP Header│ ICMP Message              │
-  │ Header   │ Proto=1  │ (Type, Code, Checksum,    │
-  │          │          │  message-specific data)    │
-  └──────────┴──────────┴───────────────────────────┘
-```
+ICMP is NOT a Layer 4 protocol. It does not ride on top of TCP or UDP. It rides directly inside IP, at the same level as TCP and UDP. IP header Protocol field = 1 means ICMP.
 
 ### ICMP Message Format
 
-```
-ICMP MESSAGE STRUCTURE
-
-  0                   1                   2                   3
-  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |     Type      |     Code      |          Checksum             |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |                   Message-Specific Data                       |
-  |              (varies by Type and Code)                        |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-  Type (8 bits):  Identifies the ICMP message category
-  Code (8 bits):  Sub-type within the category — gives more detail
-  Checksum (16 bits): Error detection over the entire ICMP message
-
-  For error messages, the data section contains:
-  ┌────────────────────────────────────────────────────────────┐
-  │  IP Header of the original packet that caused the error    │
-  │  + First 8 bytes of the original packet's payload          │
-  │    (enough to identify the TCP/UDP src port + dst port)    │
-  └────────────────────────────────────────────────────────────┘
-  This is how the sender knows WHICH flow triggered the error.
-```
+![The ICMP message layout, 32 bits per row: an 8-bit Type, an 8-bit Code and a 16-bit Checksum, then message-specific data; for error messages the data holds the original packet's IP header plus the first 8 bytes of its payload, which identify the TCP or UDP ports of the flow that triggered the error.](./img/07/icmp-header.svg)
 
 ### Key ICMP Message Types (Summary)
 
-```
-TYPE  CODE   NAME                         WHEN GENERATED
-────  ────   ──────────────────────────   ─────────────────────────────────────────
-  0    0     Echo Reply                   Response to ping (Echo Request)
-  3    —     Destination Unreachable       Packet could not be delivered
-  3    0       Network Unreachable         No route to destination network
-  3    1       Host Unreachable            Route exists but host is down/unreachable
-  3    2       Protocol Unreachable        Destination host does not support protocol
-  3    3       Port Unreachable            No UDP listener — or a firewall REJECT
-  3    4       Fragmentation Needed        Packet too large, DF bit set (PMTUD)
-  3   10       Host Prohibited             Firewall (iptables icmp-host-prohibited)
-  3   13       Administratively Prohibited Firewall blocked the packet
-  5    —     Redirect                      Router tells sender to use a better path
-  8    0     Echo Request                  Ping — "are you there?"
- 11    0     Time Exceeded — TTL           TTL reached 0 in transit (traceroute)
- 11    1     Time Exceeded — Fragment      Fragment reassembly timeout
-```
+| Type | Code | Name | When generated |
+| --- | --- | --- | --- |
+| 0 | 0 | Echo Reply | Response to ping (Echo Request) |
+| 3 | — | Destination Unreachable | Packet could not be delivered |
+| 3 | 0 | Network Unreachable | No route to destination network |
+| 3 | 1 | Host Unreachable | Route exists but host is down/unreachable |
+| 3 | 2 | Protocol Unreachable | Destination host does not support protocol |
+| 3 | 3 | Port Unreachable | No UDP listener — or a firewall REJECT |
+| 3 | 4 | Fragmentation Needed | Packet too large, DF bit set (PMTUD) |
+| 3 | 10 | Host Prohibited | Firewall (iptables icmp-host-prohibited) |
+| 3 | 13 | Administratively Prohibited | Firewall blocked the packet |
+| 5 | — | Redirect | Router tells sender to use a better path |
+| 8 | 0 | Echo Request | Ping — "are you there?" |
+| 11 | 0 | Time Exceeded — TTL | TTL reached 0 in transit (traceroute) |
+| 11 | 1 | Time Exceeded — Fragment | Fragment reassembly timeout |
 
 ### Production Relevance
 
@@ -154,31 +107,7 @@ The lab produces every row and shows the application's message next to the packe
 
 ### How Ping Works
 
-```
-PING — ECHO REQUEST / ECHO REPLY
-
-  [Your Host]                                [Target Host]
-       │                                          │
-       │  ICMP Echo Request (Type 8, Code 0)      │
-       │  IP src=10.0.1.50, dst=8.8.8.8           │
-       │  Identifier=1234, Sequence=1              │
-       │  Payload: timestamp + padding data        │
-       │─────────────────────────────────────────▶│
-       │                                          │
-       │  ICMP Echo Reply (Type 0, Code 0)        │
-       │  IP src=8.8.8.8, dst=10.0.1.50           │
-       │  Identifier=1234, Sequence=1              │
-       │  Payload: echoed back unchanged           │
-       │◀─────────────────────────────────────────│
-       │                                          │
-       │  RTT = time(Reply received) -            │
-       │        time(Request sent)                │
-       │  = 12.3 ms                               │
-
-  The Identifier field links a reply to a specific ping process.
-  The Sequence field links a reply to a specific request.
-  Multiple ping processes on the same host use different Identifiers.
-```
+![A sequence diagram: your host 10.0.1.50 sends an ICMP Echo Request (Type 8, Code 0) to 8.8.8.8 with Identifier 1234, Sequence 1 and a timestamp-plus-padding payload; the target returns an ICMP Echo Reply (Type 0, Code 0) with the same Identifier and Sequence and the payload echoed unchanged; RTT is reply received minus request sent, 12.3 ms.](./img/07/ping-echo.svg)
 
 ### Reading Ping Output
 
@@ -213,35 +142,13 @@ rtt min/avg/max/mdev = 11.9/12.2/12.5/0.2 ms
 
 ### What Each Field Tells You
 
-```
-FIELD            WHAT IT MEANS                          WHAT TO WATCH FOR
-───────────────  ─────────────────────────────────────  ───────────────────────
-icmp_seq         Sequence number — increments by 1      Missing sequence numbers
-                 for each packet sent                   = packet loss
-
-ttl              TTL value in the reply. Tells you       Starting TTL varies by OS:
-                 how many hops the reply traversed.      64=Linux, 128=Windows, 255=net equip
-                 Original TTL - received TTL = hops.     Low TTL = many hops
-                                                         Varying TTL = path changes
-
-time             Round-trip time (RTT) in ms.            < 1 ms: same LAN or data center
-                 Includes: propagation delay,            Light in fiber: ~5 µs/km one
-                 processing delay, queuing delay.        way, so ≥ 1 ms RTT per 100 km
-                                                         of path (paths are longer than
-                                                         straight lines). Geostationary
-                                                         satellite: ≥ ~480 ms RTT.
-                                                         Highly variable = queuing
-
-packet loss      Percentage of sent packets that         0%: healthy
-                 received no reply.                      1-5%: marginal, investigate
-                                                         > 5%: problem
-                                                         100%: host unreachable or ICMP blocked
-
-mdev             Standard deviation of RTT samples       Low = less variation
-                 (iputils calls it mdev).
-                 How consistent the RTT is.              High = congestion, bufferbloat,
-                                                         or load-based path changes
-```
+| Field | What it means | What to watch for |
+| --- | --- | --- |
+| `icmp_seq` | Sequence number — increments by 1 for each packet sent | Missing sequence numbers = packet loss |
+| `ttl` | TTL value in the reply. Tells you how many hops the reply traversed. Original TTL - received TTL = hops. | Starting TTL varies by OS: 64=Linux, 128=Windows, 255=net equip. Low TTL = many hops. Varying TTL = path changes. |
+| `time` | Round-trip time (RTT) in ms. Includes: propagation delay, processing delay, queuing delay. | < 1 ms: same LAN or data center. Light in fiber: ~5 µs/km one way, so ≥ 1 ms RTT per 100 km of path (paths are longer than straight lines). Geostationary satellite: ≥ ~480 ms RTT. Highly variable = queuing. |
+| packet loss | Percentage of sent packets that received no reply. | 0%: healthy. 1-5%: marginal, investigate. > 5%: problem. 100%: host unreachable or ICMP blocked. |
+| `mdev` | Standard deviation of RTT samples (iputils calls it mdev). How consistent the RTT is. | Low = less variation. High = congestion, bufferbloat, or load-based path changes. |
 
 ### Useful Ping Options
 
@@ -279,72 +186,33 @@ ping -c 3 -I eth0 8.8.8.8
 
 ### What Ping Can and Cannot Tell You
 
-```
-PING CAN tell you:
-  ✓ Layer 3 reachability — can packets reach the destination and return?
-  ✓ Round-trip latency — how long does the journey take?
-  ✓ Packet loss rate — are packets being dropped?
-  ✓ TTL — how many hops (approximate)
-  ✓ Basic path stability — is latency consistent?
+**Ping CAN tell you:**
 
-PING CANNOT tell you:
-  ✗ Whether a specific TCP/UDP port is open (use nc -zv or hping3 for that)
-  ✗ Whether the application is working (use curl or protocol-specific tools)
-  ✗ Whether ICMP is filtered — "no reply" does NOT mean "host is down"
-  ✗ Where in the path the problem is (use traceroute/mtr for that)
-  ✗ One-way latency (RTT includes both directions)
-  ✗ Whether the forward and return paths are the same
+- ✓ Layer 3 reachability — can packets reach the destination and return?
+- ✓ Round-trip latency — how long does the journey take?
+- ✓ Packet loss rate — are packets being dropped?
+- ✓ TTL — how many hops (approximate)
+- ✓ Basic path stability — is latency consistent?
 
-CRITICAL RULE:
-  ping succeeds    → small ICMP packets get there and back. A TCP port can
-                     still be filtered, large packets can still be
-                     black-holed (7.3), and the application can be down.
-  ping fails       → EITHER Layer 3 is broken
-                     OR ICMP is filtered (cloud load balancers and many
-                     managed services never answer ping).
+**Ping CANNOT tell you:**
 
-  Never conclude a host is unreachable based on ping alone.
-  Always verify with a TCP probe: nc -zv <host> <port>
-```
+- ✗ Whether a specific TCP/UDP port is open (use `nc -zv` or `hping3` for that)
+- ✗ Whether the application is working (use `curl` or protocol-specific tools)
+- ✗ Whether ICMP is filtered — "no reply" does NOT mean "host is down"
+- ✗ Where in the path the problem is (use traceroute/mtr for that)
+- ✗ One-way latency (RTT includes both directions)
+- ✗ Whether the forward and return paths are the same
+
+**Critical rule:**
+
+- **ping succeeds** → small ICMP packets get there and back. A TCP port can still be filtered, large packets can still be black-holed (7.3), and the application can be down.
+- **ping fails** → EITHER Layer 3 is broken OR ICMP is filtered (cloud load balancers and many managed services never answer ping).
+
+Never conclude a host is unreachable based on ping alone. Always verify with a TCP probe: `nc -zv <host> <port>`
 
 ### Diagram: Ping Failure Modes
 
-```
-WHAT HAPPENS WHEN PING FAILS — THREE DIFFERENT CAUSES
-
-  Cause 1: A router (or your host) reports the failure
-  ────────────────────────────────────────────────────
-  [You] ──ICMP Echo──▶ [Router] ──▶ ✗ no route / no ARP answer
-                              │
-                              └──ICMP Dest Unreachable──▶ [You]
-
-  You see: "From <router> … Destination Net Unreachable" (no route at
-  that router) or "From <router> … Destination Host Unreachable" (the
-  last router could not ARP for the host, after ~3 s). "From <your own
-  IP>" means your own host failed the same way. Genuine L3/L2 problem.
-
-
-  Cause 2: ICMP filtered at firewall (host is alive)
-  ──────────────────────────────────────────────────
-  [You] ──ICMP Echo──▶ [Firewall] ──DROP──  (packet vanishes)
-
-  You see: silence. Linux ping prints nothing per lost packet (use -O to
-  print "no answer yet"); Windows prints "Request timed out".
-  Meaning: A firewall dropped the ICMP packet. The host may be fine.
-           Test with: nc -zv <host> 443 (TCP probe)
-
-
-  Cause 3: Asymmetric path (outbound works, return fails)
-  ───────────────────────────────────────────────────────
-  [You] ──ICMP Echo──▶ [Target]   ← Request arrives
-  [You]                [Target] ──ICMP Reply──▶ ✗ return path broken
-
-  You see: 100% packet loss.
-  Meaning: The target received the ping but its reply cannot reach you.
-           Common with: wrong default gateway on target, stateful firewall
-           blocking the return, or asymmetric routing.
-           Verify by: capturing on the target to confirm requests arrive.
-```
+![Three ways ping fails. Cause 1: a router, or your own host, has no route or no ARP answer and returns ICMP Destination Unreachable, a genuine L3/L2 problem. Cause 2: a firewall drops the echo request and you see silence, though the host may be fine. Cause 3: the request arrives but the reply's return path is broken, so you see 100% packet loss.](./img/07/ping-failure-modes.svg)
 
 ---
 
@@ -354,208 +222,58 @@ WHAT HAPPENS WHEN PING FAILS — THREE DIFFERENT CAUSES
 
 This is the most information-rich ICMP message type. The Code field tells you exactly why the packet could not be delivered.
 
-```
-ICMP TYPE 3 — DESTINATION UNREACHABLE — CODE TABLE
-
-  CODE  NAME                         GENERATED BY    WHAT IT MEANS
-  ────  ───────────────────────────  ──────────────  ──────────────────────────────────
-   0    Network Unreachable          Router          No route to the destination network.
-                                                     The last router in the path has no
-                                                     matching entry in its routing table.
-
-   1    Host Unreachable             Router          Route to the network exists, but the
-                                                     specific host did not respond to ARP.
-                                                     Host is down or not on that subnet.
-                                                     Arrives ~3 s late: the ARP attempts.
-
-   2    Protocol Unreachable         Dest host       The destination host does not support
-                                                     the protocol in the IP header's Protocol
-                                                     field. Rare in practice.
-
-   3    Port Unreachable             Dest host       No process is listening on the
-                                                     or firewall     destination UDP port. The host received
-                                                                     the packet but had nowhere to deliver it.
-                                                     (TCP uses RST for this; UDP uses ICMP.)
-                                                     iptables REJECT sends this by default,
-                                                     for TCP too — and TCP reports it as
-                                                     "Connection refused".
-
-   4    Fragmentation Needed and     Router          The packet is too large for the next
-        DF Set                                       link, and the Don't Fragment bit is set.
-                                                     THE MOST IMPORTANT ICMP MESSAGE FOR
-                                                     PRODUCTION. Enables PMTUD. Includes
-                                                     the MTU of the next hop in the message.
-
-   9    Communication with Dest      Router          Administrative filtering is blocking
-        Network Administratively                     traffic to the entire network.
-        Prohibited
-
-  10    Communication with Dest      Firewall        iptables --reject-with
-        Host Administratively                        icmp-host-prohibited (common in older
-        Prohibited                                   RHEL/CentOS default rule sets).
-
-  13    Communication Administratively Firewall/     A firewall explicitly rejected the
-        Prohibited                     Router        packet based on a policy rule. This is
-                                                     the "the firewall blocked it" signal.
-                                                     Applications see "No route to host".
-```
+| Code | Name | Generated by | What it means |
+| --- | --- | --- | --- |
+| 0 | Network Unreachable | Router | No route to the destination network. The last router in the path has no matching entry in its routing table. |
+| 1 | Host Unreachable | Router | Route to the network exists, but the specific host did not respond to ARP. Host is down or not on that subnet. Arrives ~3 s late: the ARP attempts. |
+| 2 | Protocol Unreachable | Dest host | The destination host does not support the protocol in the IP header's Protocol field. Rare in practice. |
+| 3 | Port Unreachable | Dest host or firewall | No process is listening on the destination UDP port. The host received the packet but had nowhere to deliver it. (TCP uses RST for this; UDP uses ICMP.) iptables REJECT sends this by default, for TCP too — and TCP reports it as "Connection refused". |
+| 4 | Fragmentation Needed and DF Set | Router | The packet is too large for the next link, and the Don't Fragment bit is set. THE MOST IMPORTANT ICMP MESSAGE FOR PRODUCTION. Enables PMTUD. Includes the MTU of the next hop in the message. |
+| 9 | Communication with Dest Network Administratively Prohibited | Router | Administrative filtering is blocking traffic to the entire network. |
+| 10 | Communication with Dest Host Administratively Prohibited | Firewall | iptables `--reject-with icmp-host-prohibited` (common in older RHEL/CentOS default rule sets). |
+| 13 | Communication Administratively Prohibited | Firewall/Router | A firewall explicitly rejected the packet based on a policy rule. This is the "the firewall blocked it" signal. Applications see "No route to host". |
 
 ### Type 3 Code 4: Fragmentation Needed — The PMTUD Signal
 
 This message deserves special emphasis because blocking it causes one of the hardest-to-diagnose network failures.
 
-```
-PMTUD AND ICMP TYPE 3 CODE 4
+How Path MTU Discovery works:
 
-  How Path MTU Discovery works:
+![A sequence diagram: the sender sends a 1500-byte packet with DF=1; the router's next link has MTU 1400, so it cannot fragment and drops the packet, then returns ICMP Type 3 Code 4, Frag Needed, MTU=1400; the sender learns the maximum packet size of 1400 and retransmits with smaller packets, which arrive.](./img/07/pmtud-working.svg)
 
-  [Sender]                   [Router]                    [Destination]
-     │                          │                             │
-     │  IP packet, 1500 bytes   │                             │
-     │  DF bit = 1 (Don't Frag) │                             │
-     │─────────────────────────▶│                             │
-     │                          │  Next link MTU = 1400       │
-     │                          │  Packet too big, DF=1       │
-     │                          │  CANNOT fragment             │
-     │                          │  DROP the packet             │
-     │                          │                             │
-     │  ICMP Type 3 Code 4     │                             │
-     │  "Frag Needed, MTU=1400"│                             │
-     │◀─────────────────────────│                             │
-     │                          │                             │
-     │  Sender learns: max      │                             │
-     │  packet size = 1400      │                             │
-     │  Retransmits with        │                             │
-     │  smaller packets         │                             │
-     │─────────────────────────▶│─────────────────────────────▶│
-     │                                                        │
-                                                        Packets arrive
+PMTUD black hole — when ICMP Type 3 Code 4 is blocked:
 
+![A sequence diagram: the sender sends a 1500-byte packet with DF=1; the router drops it because the next link's MTU is 1400 and sends ICMP Type 3 Code 4, but a firewall blocks the message; the sender never learns the maximum packet size, keeps retransmitting 1500-byte packets that are all dropped, and the TCP connection hangs.](./img/07/pmtud-black-hole.svg)
 
-  PMTUD BLACK HOLE — when ICMP Type 3 Code 4 is blocked:
+**Symptom:** TCP handshake works (SYN/SYN-ACK are small, ~60 bytes). Connection establishes. But as soon as data transfer starts (large packets), everything stalls. This is pathologically hard to diagnose without knowing about PMTUD. The lab reproduces it exactly: a 300-byte response arrives in 0.7 ms; a 300 kB response from the same server over the same path times out with 0 bytes received.
 
-  [Sender]                   [Router]                    [Destination]
-     │                          │                             │
-     │  IP packet, 1500 bytes   │                             │
-     │  DF bit = 1              │                             │
-     │─────────────────────────▶│                             │
-     │                          │  Next link MTU = 1400       │
-     │                          │  DROP the packet            │
-     │                          │                             │
-     │  ICMP Type 3 Code 4     │                             │
-     │  ┌──────────────────┐   │                             │
-     │  │  BLOCKED by FW!  │   │                             │
-     │  └──────────────────┘   │                             │
-     │                          │                             │
-     │  Sender never learns     │                             │
-     │  Max packet size.        │                             │
-     │  Keeps retransmitting    │                             │
-     │  1500-byte packets.      │                             │
-     │  ALL are dropped.        │                             │
-     │  TCP connection hangs.   │                             │
-     │                          │                             │
-
-  SYMPTOM: TCP handshake works (SYN/SYN-ACK are small, ~60 bytes).
-  Connection establishes. But as soon as data transfer starts (large
-  packets), everything stalls. This is pathologically hard to diagnose
-  without knowing about PMTUD. The lab reproduces it exactly: a
-  300-byte response arrives in 0.7 ms; a 300 kB response from the same
-  server over the same path times out with 0 bytes received.
-
-  Whose packets are big matters. Downloads fail when the SERVER's
-  packets are too big, so the server must receive the ICMP message;
-  uploads fail when the client's are. And each side's advertised MSS
-  comes from its own route's MTU — including a path MTU it already
-  learned — so a host that has cached "mtu 1400" toward a peer starts
-  new connections with MSS 1360 and never triggers the problem. That is
-  why the black hole comes and goes, and why the lab flushes both ends.
-```
+Whose packets are big matters. Downloads fail when the SERVER's packets are too big, so the server must receive the ICMP message; uploads fail when the client's are. And each side's advertised MSS comes from its own route's MTU — including a path MTU it already learned — so a host that has cached "mtu 1400" toward a peer starts new connections with MSS 1360 and never triggers the problem. That is why the black hole comes and goes, and why the lab flushes both ends.
 
 **MSS clamping**, the usual fix when you cannot get ICMP through, rewrites the MSS option in SYN packets crossing a router so both ends agree on small segments from the start: `iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`. `--clamp-mss-to-pmtu` uses the MTU of the interface the SYN leaves through, so put the rule on the router at the edge of the small link (a VPN gateway, the tunnel endpoint) or use `--set-mss` with an explicit value. Cloud VPN gateways and many routers clamp by default; WireGuard and Docker overlay setups often need it added.
 
 ### Type 11: Time Exceeded — The Backbone of Traceroute
 
-```
-ICMP TYPE 11 — TIME EXCEEDED
+**Code 0: TTL expired in transit.** Generated by a router when it decrements a packet's TTL to 0. The router drops the packet and sends Type 11 Code 0 back to the sender. This is exactly how traceroute works:
 
-  Code 0: TTL expired in transit
-  ────────────────────────────
-  Generated by a router when it decrements a packet's TTL to 0.
-  The router drops the packet and sends Type 11 Code 0 back to the sender.
+![A sequence diagram across sender, router 1, router 2 and destination: a TTL=1 probe expires at router 1, which returns ICMP TTL Exceeded; a TTL=2 probe expires at router 2, which returns ICMP TTL Exceeded; a TTL=3 probe reaches the destination, which answers with Echo Reply or UDP Port Unreachable. Each hop reveals its address through its Time Exceeded message.](./img/07/traceroute-ttl.svg)
 
-  This is exactly how traceroute works:
-
-  [Sender]         [Router 1]      [Router 2]       [Destination]
-     │  TTL=1          │               │                  │
-     │────────────────▶│               │                  │
-     │                 │ TTL→0, DROP   │                  │
-     │  ICMP TTL Exc   │               │                  │
-     │◀────────────────│               │                  │
-     │  (from Router1)                 │                  │
-     │                                 │                  │
-     │  TTL=2          │               │                  │
-     │────────────────▶│  TTL=1        │                  │
-     │                 │──────────────▶│                  │
-     │                 │               │ TTL→0, DROP      │
-     │  ICMP TTL Exc   │               │                  │
-     │◀────────────────────────────────│                  │
-     │  (from Router2)                                    │
-     │                                                    │
-     │  TTL=3          │               │                  │
-     │────────────────▶│──────────────▶│─────────────────▶│
-     │                                                    │
-     │  Echo Reply (or UDP Port Unreachable)              │
-     │◀───────────────────────────────────────────────────│
-     │  Destination reached!
-
-  Each hop reveals its IP address by sending the ICMP Time Exceeded.
-  Traceroute increments TTL from 1 to N until the destination responds.
-
-  Code 1: Fragment reassembly time exceeded
-  ──────────────────────────────────────────
-  Generated when a host receives some (but not all) fragments of a
-  packet and the reassembly timer expires. Much rarer than Code 0.
-```
+**Code 1: Fragment reassembly time exceeded.** Generated when a host receives some (but not all) fragments of a packet and the reassembly timer expires. Much rarer than Code 0.
 
 ### Type 5: Redirect
 
+Generated by a router when it receives a packet AND the best route for that packet goes back out the SAME interface it arrived on. This means the sender could have sent directly to the better next hop.
+
+![Host A sends a packet for 10.0.2.50 to Router 1; Router 1's best route for 10.0.2.0/24 is via Router 2 on Host A's own subnet, so it answers with an ICMP Redirect saying send to Router 2 instead; Host A updates its routing cache to 10.0.2.50 via Router 2 and sends later packets for that address straight to Router 2.](./img/07/icmp-redirect.svg)
+
+Linux hosts accept redirects by default (and ignore them when they forward packets themselves). `secure_redirects=1` would limit them to gateways already in the routing table, but the kernel applies that only when `shared_media=0`; both default to 1, so a default Linux host accepts a redirect to any on-link address (the lab's r3 is not a configured gateway, and the client accepts it). The kernel first resolves the new gateway with ARP, then stores a route exception for that one destination, visible as `cache <redirected>` in `ip route get` and expiring after ~300 s. Many hardened baselines (CIS benchmarks) disable accepting and sending redirects, because an on-link attacker could use them to steer traffic.
+
 ```
-ICMP TYPE 5 — REDIRECT
-
-  Generated by a router when it receives a packet AND the best route
-  for that packet goes back out the SAME interface it arrived on.
-  This means the sender could have sent directly to the better next hop.
-
-  [Host A] ──packet for 10.0.2.50──▶ [Router 1]
-                                          │
-           Router 1's best route for      │
-           10.0.2.0/24 is via Router 2,   │
-           which is on the SAME subnet    │
-           as Host A.                     │
-                                          ▼
-  [Host A] ◀──ICMP Redirect: "Send to Router 2 instead"
-           │
-           └──updates routing cache: 10.0.2.50 via Router 2
-
-  Linux hosts accept redirects by default (and ignore them when they
-  forward packets themselves). secure_redirects=1 would limit them to
-  gateways already in the routing table, but the kernel applies that only
-  when shared_media=0; both default to 1, so a default Linux host accepts
-  a redirect to any on-link address (the lab's r3 is not a configured
-  gateway, and the client accepts it). The kernel first resolves the new gateway with ARP, then
-  stores a route exception for that one destination, visible as
-  "cache <redirected>" in `ip route get` and expiring after ~300 s.
-  Many hardened baselines (CIS benchmarks) disable accepting and sending
-  redirects, because an on-link attacker could use them to steer traffic.
-
-  sysctl net.ipv4.conf.all.accept_redirects        (default: 1)
-  sysctl net.ipv4.conf.all.secure_redirects        (default: 1)
-  sysctl net.ipv4.conf.all.send_redirects           (default: 1)
-
-  Seeing redirects in a capture usually means a host's default gateway
-  is not the best router for some destination on its own LAN — a design
-  smell worth fixing with a proper route.
+sysctl net.ipv4.conf.all.accept_redirects        (default: 1)
+sysctl net.ipv4.conf.all.secure_redirects        (default: 1)
+sysctl net.ipv4.conf.all.send_redirects           (default: 1)
 ```
+
+Seeing redirects in a capture usually means a host's default gateway is not the best router for some destination on its own LAN — a design smell worth fixing with a proper route.
 
 ### ICMPv6
 
@@ -586,45 +304,13 @@ Traceroute maps the hop-by-hop path between your host and a destination by explo
 
 Different traceroute implementations use different probe types. The mode matters because firewalls treat each type differently.
 
-```
-TRACEROUTE MODES
+**Mode 1: UDP (default on Linux — `traceroute`).** Sends UDP packets to high destination ports, starting at 33434 and adding one for every probe, so each reply can be matched to its probe. Each hop returns ICMP Time Exceeded. The destination returns ICMP Port Unreachable (Type 3 Code 3) because nothing is listening on that port. That Port Unreachable is how traceroute knows it reached the end. No root needed. A destination firewall that drops unknown UDP makes the last hop show `*` even though the host is up.
 
-  Mode 1: UDP (default on Linux — traceroute)
-  ────────────────────────────────────────────
-  Sends UDP packets to high destination ports, starting at 33434 and
-  adding one for every probe, so each reply can be matched to its probe.
-  Each hop returns ICMP Time Exceeded.
-  The destination returns ICMP Port Unreachable (Type 3 Code 3)
-  because nothing is listening on that port.
-  That Port Unreachable is how traceroute knows it reached the end.
-  No root needed. A destination firewall that drops unknown UDP makes
-  the last hop show * even though the host is up.
+**Mode 2: ICMP (default on Windows — `tracert`; Linux: `traceroute -I`).** Sends ICMP Echo Request packets with increasing TTL. Each hop returns ICMP Time Exceeded. The destination returns ICMP Echo Reply. More likely to be blocked than UDP mode because some devices rate-limit or drop ICMP Echo.
 
+**Mode 3: TCP (Linux: `traceroute -T -p 443`, needs root).** Sends TCP SYN packets to a specific port (e.g., 443). Each hop returns ICMP Time Exceeded. The destination returns TCP SYN-ACK (or RST); traceroute then sends an RST so no connection is left half-open. Most likely to succeed through firewalls because port 443 is typically allowed. Best mode for tracing to web servers — and it follows the same ECMP/load-balancer path as real HTTPS traffic to that port more often than UDP or ICMP probes do.
 
-  Mode 2: ICMP (default on Windows — tracert; Linux: traceroute -I)
-  ─────────────────────────────────────────────────────────────────
-  Sends ICMP Echo Request packets with increasing TTL.
-  Each hop returns ICMP Time Exceeded.
-  The destination returns ICMP Echo Reply.
-  More likely to be blocked than UDP mode because some devices
-  rate-limit or drop ICMP Echo.
-
-
-  Mode 3: TCP (Linux: traceroute -T -p 443, needs root)
-  ──────────────────────────────────────────────────────
-  Sends TCP SYN packets to a specific port (e.g., 443).
-  Each hop returns ICMP Time Exceeded.
-  The destination returns TCP SYN-ACK (or RST); traceroute then sends
-  an RST so no connection is left half-open.
-  Most likely to succeed through firewalls because port 443 is
-  typically allowed. Best mode for tracing to web servers — and it
-  follows the same ECMP/load-balancer path as real HTTPS traffic to
-  that port more often than UDP or ICMP probes do.
-
-  By default Linux traceroute sends 3 probes per hop and up to 16
-  probes at once (-N 16). Bursts like that trip routers' ICMP rate
-  limits, which shows up as random '*'s; -N 1 sends one at a time.
-```
+By default Linux traceroute sends 3 probes per hop and up to 16 probes at once (`-N 16`). Bursts like that trip routers' ICMP rate limits, which shows up as random `*`s; `-N 1` sends one at a time.
 
 ### Reading Traceroute Output
 
@@ -661,53 +347,34 @@ traceroute to 8.8.8.8 (8.8.8.8), 30 hops max, 60 byte packets
 
 ### Interpreting Results
 
-```
-PATTERN                    WHAT IT MEANS
-─────────────────────────  ──────────────────────────────────────────
-Steady increase in RTT     Consistent with longer paths, not a per-link measurement
-Big jump at one hop        Could be forward/return paths or reply processing;
-                           a difference of RTTs is not one-way link delay
-* * * at one hop           ICMP is filtered at that hop. If the next
-                           hops respond normally, this is NOT a problem.
-* * * from hop N onward    No replies within the probe timeout. Filtering,
-                           rate limits, return-path loss, or failure are possible.
-Two IPs alternating        Routing loop — packets bounce between two
-(A, B, A, B …)             routers until TTL expires. (One IP repeated
-                           at consecutive hops is usually something else:
-                           a device that does not decrement TTL, or
-                           replies from a different interface.)
-High RTT at one hop only   That specific router has high processing
-(next hops normal)         delay. NOT a problem for through-traffic.
-                           Routers deprioritize ICMP reply generation.
-High RTT at one hop AND    A useful correlation, not proof of the exact faulty
-all subsequent hops        link; compare destination traffic and reverse evidence.
-```
+| Pattern | What it means |
+| --- | --- |
+| Steady increase in RTT | Consistent with longer paths, not a per-link measurement |
+| Big jump at one hop | Could be forward/return paths or reply processing; a difference of RTTs is not one-way link delay |
+| `* * *` at one hop | ICMP is filtered at that hop. If the next hops respond normally, this is NOT a problem. |
+| `* * *` from hop N onward | No replies within the probe timeout. Filtering, rate limits, return-path loss, or failure are possible. |
+| Two IPs alternating (A, B, A, B …) | Routing loop — packets bounce between two routers until TTL expires. (One IP repeated at consecutive hops is usually something else: a device that does not decrement TTL, or replies from a different interface.) |
+| High RTT at one hop only (next hops normal) | That specific router has high processing delay. NOT a problem for through-traffic. Routers deprioritize ICMP reply generation. |
+| High RTT at one hop AND all subsequent hops | A useful correlation, not proof of the exact faulty link; compare destination traffic and reverse evidence. |
 
 ### Critical Concept: Asterisks Are Not Always a Problem
 
+Hop 4 shows `* * *`. But hops 5 and 6 respond with normal RTT.
+
 ```
- * * * IS NOT ALWAYS A FAILURE
-
-  Hop 4 shows * * *. But hops 5 and 6 respond with normal RTT.
-
   1  10.0.1.1      0.5 ms
   2  203.0.113.1   2.1 ms
   3  198.51.100.5  5.4 ms
   4  * * *                    ← Router exists. It just doesn't send ICMP.
   5  216.239.48.9  10.8 ms   ← Traffic is flowing through hop 4 just fine.
   6  8.8.8.8       12.1 ms   ← Destination reached.
+```
 
-  The router at hop 4 is FORWARDING packets normally. It simply does
-  not generate ICMP Time Exceeded messages (many routers are configured
-  this way to reduce CPU load or for security reasons), or rate-limits
-  them. Cloud networks are an extreme case: the virtual router that
-  forwards a VM's packets is not a hop in the usual sense, so a trace
-  from a VM may show '*' for the first hops, internal addresses that
-  are not publicly routable, or a jump straight to the provider's edge.
-  None of that tells you about your traffic's health. The lab reproduces a silent hop.
+The router at hop 4 is FORWARDING packets normally. It simply does not generate ICMP Time Exceeded messages (many routers are configured this way to reduce CPU load or for security reasons), or rate-limits them. Cloud networks are an extreme case: the virtual router that forwards a VM's packets is not a hop in the usual sense, so a trace from a VM may show `*` for the first hops, internal addresses that are not publicly routable, or a jump straight to the provider's edge. None of that tells you about your traffic's health. The lab reproduces a silent hop.
 
-  WHEN * * * NEEDS APPLICATION-PATH COMPARISON:
+When `* * *` needs application-path comparison:
 
+```
   1  10.0.1.1      0.5 ms
   2  203.0.113.1   2.1 ms
   3  * * *
@@ -719,25 +386,16 @@ all subsequent hops        link; compare destination traffic and reverse evidenc
 
 ### Asymmetric Paths
 
-```
-ASYMMETRIC PATHS — WHY TRACEROUTE CAN BE MISLEADING
+The forward path (Your Host → Destination) may be completely different from the return path (Destination → Your Host).
 
-  The forward path (Your Host → Destination) may be completely
-  different from the return path (Destination → Your Host).
+![Two rows of hops: the forward path runs You, ISP-A, IXP, ISP-B, Destination; the return path runs Destination, ISP-C, IXP, ISP-A, You.](./img/07/asymmetric-paths.svg)
 
-  Forward:  [You] → [ISP-A] → [IXP] → [ISP-B] → [Destination]
-  Return:   [Destination] → [ISP-C] → [IXP] → [ISP-A] → [You]
+Traceroute shows you the forward path routers (from their ICMP replies). But the RTT you measure includes BOTH directions:
 
-  Traceroute shows you the forward path routers (from their ICMP replies).
-  But the RTT you measure includes BOTH directions:
-  - Forward: probe travels from you to hop N
-  - Return: ICMP reply travels from hop N back to you
+- Forward: probe travels from you to hop N
+- Return: ICMP reply travels from hop N back to you
 
-  If the return path is congested but the forward path is clear,
-  you'll see high RTT at certain hops even though the forward path
-  is healthy. This makes per-hop RTT measurements unreliable for
-  pinpointing WHICH direction has the problem.
-```
+If the return path is congested but the forward path is clear, you'll see high RTT at certain hops even though the forward path is healthy. This makes per-hop RTT measurements unreliable for pinpointing WHICH direction has the problem.
 
 ### mtr — The Superior Tool
 
@@ -776,27 +434,11 @@ faulty. Probe paths, return paths, ECMP, sampling, and response policies can dif
 
 ### traceroute vs tracepath vs mtr
 
-```
-TOOL          WHAT IT DOES                                  WHEN TO USE
-────────────  ────────────────────────────────────────────  ─────────────────────
-traceroute    Sends probes with increasing TTL.              General-purpose path
-              Requires root for ICMP/TCP modes.              mapping. One-shot.
-              Modes: UDP (default), ICMP (-I), TCP (-T).
-
-tracepath     Like traceroute but automatically discovers    MTU debugging. Does not
-              path MTU. No root required (uses UDP).         require root access.
-              Prints "pmtu N" where it learns a smaller
-              MTU, and "Resume: pmtu N" for the path.
-              It also caches that MTU in the kernel, which
-              changes later TCP behavior (lab check 23).
-
-mtr           Continuous traceroute + ping combined.         Best for production
-              Shows per-hop statistics over many probes.     diagnosis. Run for 100+
-              Identifies where loss accumulates.             cycles for reliable data.
-              ICMP probes by default; -u UDP, -T TCP (-P     Share mtr reports in
-              port). Interactive by default, --report for    tickets, with the probe
-              batch. Intervals under 1 s need root.          mode and interval.
-```
+| Tool | What it does | When to use |
+| --- | --- | --- |
+| `traceroute` | Sends probes with increasing TTL. Requires root for ICMP/TCP modes. Modes: UDP (default), ICMP (`-I`), TCP (`-T`). | General-purpose path mapping. One-shot. |
+| `tracepath` | Like traceroute but automatically discovers path MTU. No root required (uses UDP). Prints "pmtu N" where it learns a smaller MTU, and "Resume: pmtu N" for the path. It also caches that MTU in the kernel, which changes later TCP behavior (lab check 23). | MTU debugging. Does not require root access. |
+| `mtr` | Continuous traceroute + ping combined. Shows per-hop statistics over many probes. Identifies where loss accumulates. ICMP probes by default; `-u` UDP, `-T` TCP (`-P` port). Interactive by default, `--report` for batch. Intervals under 1 s need root. | Best for production diagnosis. Run for 100+ cycles for reliable data. Share mtr reports in tickets, with the probe mode and interval. |
 
 ---
 
@@ -822,15 +464,7 @@ mtr           Continuous traceroute + ping combined.         Best for production
 
 [`icmp.json`](../labs/netlab/icmp.json) builds a small routed network:
 
-```
-  LAN 198.18.7.0/24 (bridge)                 transit, MTU 1400            server LAN
- client .1 ── r1 .254 ═══════════════════════ r2 .2  ─────────────── server 198.19.7.2
-         │    (eth1 198.18.8.1)                 (eth1 198.19.7.254)    labserver :8080 (300 kB)
-         │                                                                       :8081 (300 B)
-         └─── r3 .252 ── host2 198.19.8.2      r2 firewall: REJECT :8082 (default)
-              (r1's route to 198.19.8.0/24          REJECT :8083 (icmp-admin-prohibited)
-               points at r3: a redirect waits)
-```
+![The ICMP lab: client .1 (198.18.7.1), r1 .254 and r3 .252 share the bridged LAN 198.18.7.0/24; r1's eth1 198.18.8.1 links over a transit network with MTU 1400 to r2 .2 (198.18.8.2), whose eth1 198.19.7.254 leads over the server LAN to server 198.19.7.2 running labserver on :8080 (300 kB) and :8081 (300 B); r2's firewall REJECTs :8082 (default) and :8083 (icmp-admin-prohibited); r3 leads to host2 198.19.8.2, and r1's route to 198.19.8.0/24 points at r3, so a redirect waits.](./img/07/icmp-lab-topology.svg)
 
 r1 has no default route, so anything outside the lab is "net unreachable" there.
 

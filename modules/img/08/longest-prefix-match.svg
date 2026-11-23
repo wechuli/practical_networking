@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 584" role="img" aria-labelledby="t d"><title id="t">Longest prefix match: how the kernel chooses</title><desc id="d">A routing table with 0.0.0.0/0 via 10.0.1.1, 10.0.0.0/8 via 10.0.1.254, 10.0.5.0/24 via 10.0.1.100 and 10.0.5.20/32 via 10.0.1.200. A packet to 10.0.5.20 matches all four; the /32 wins as the longest match. A packet to 10.0.5.99 matches the /0, /8 and /24; the /24 wins. A packet to 10.0.99.1 matches the /0 and /8; the /8 wins. A packet to 8.8.8.8 matches only the default route, which wins.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="582" rx="16"/>
+<text class="zl" x="24" y="28">Longest prefix match — how the kernel chooses</text>
+<rect class="box" x="16" y="44" width="768" height="112" rx="10"/>
+<text class="zl" x="32" y="66">Routing table</text>
+<text class="m" x="32" y="90">0.0.0.0/0</text><text class="m" x="160" y="90">via 10.0.1.1</text><text class="s" x="300" y="90">(default route — matches everything)</text>
+<text class="m" x="32" y="108">10.0.0.0/8</text><text class="m" x="160" y="108">via 10.0.1.254</text><text class="s" x="300" y="108">(matches all 10.x.x.x)</text>
+<text class="m" x="32" y="126">10.0.5.0/24</text><text class="m" x="160" y="126">via 10.0.1.100</text><text class="s" x="300" y="126">(matches 10.0.5.0 – 10.0.5.255)</text>
+<text class="m" x="32" y="144">10.0.5.20/32</text><text class="m" x="160" y="144">via 10.0.1.200</text><text class="s" x="300" y="144">(matches ONLY 10.0.5.20)</text>
+<rect class="box" x="16" y="172" width="376" height="190" rx="10"/>
+<text class="t" x="28" y="196">Packet destined for 10.0.5.20</text>
+<text class="s" x="28" y="218">route</text><text class="s" x="138" y="218">prefix length</text>
+<text class="m" x="28" y="242">✓ 0.0.0.0/0</text>
+<text class="s" x="138" y="242">0 bits</text>
+<text class="m" x="28" y="266">✓ 10.0.0.0/8</text>
+<text class="s" x="138" y="266">8 bits</text>
+<text class="m" x="28" y="290">✓ 10.0.5.0/24</text>
+<text class="s" x="138" y="290">24 bits</text>
+<rect class="ok" x="22" y="298" width="364" height="22" rx="10"/>
+<text class="m" x="28" y="314">✓ 10.0.5.20/32</text>
+<text class="s" x="138" y="314">32 bits</text>
+<text class="l" x="200" y="314">WINNER (longest match)</text>
+<text class="m" x="28" y="346">Route selected: 10.0.5.20/32 via 10.0.1.200</text>
+<rect class="box" x="408" y="172" width="376" height="190" rx="10"/>
+<text class="t" x="420" y="196">Packet destined for 10.0.5.99</text>
+<text class="s" x="420" y="218">route</text><text class="s" x="530" y="218">prefix length</text>
+<text class="m" x="420" y="242">✓ 0.0.0.0/0</text>
+<text class="s" x="530" y="242">0 bits</text>
+<text class="m" x="420" y="266">✓ 10.0.0.0/8</text>
+<text class="s" x="530" y="266">8 bits</text>
+<rect class="ok" x="414" y="274" width="364" height="22" rx="10"/>
+<text class="m" x="420" y="290">✓ 10.0.5.0/24</text>
+<text class="s" x="530" y="290">24 bits</text>
+<text class="l" x="592" y="290">WINNER</text>
+<text class="m" x="420" y="314">✗ 10.0.5.20/32</text>
+<text class="s" x="530" y="314">does NOT match</text>
+<text class="m" x="420" y="346">Route selected: 10.0.5.0/24 via 10.0.1.100</text>
+<rect class="box" x="16" y="378" width="376" height="190" rx="10"/>
+<text class="t" x="28" y="402">Packet destined for 10.0.99.1</text>
+<text class="s" x="28" y="424">route</text><text class="s" x="138" y="424">prefix length</text>
+<text class="m" x="28" y="448">✓ 0.0.0.0/0</text>
+<text class="s" x="138" y="448">0 bits</text>
+<rect class="ok" x="22" y="456" width="364" height="22" rx="10"/>
+<text class="m" x="28" y="472">✓ 10.0.0.0/8</text>
+<text class="s" x="138" y="472">8 bits</text>
+<text class="l" x="200" y="472">WINNER</text>
+<text class="m" x="28" y="496">✗ 10.0.5.0/24</text>
+<text class="s" x="138" y="496">does NOT match</text>
+<text class="m" x="28" y="520">✗ 10.0.5.20/32</text>
+<text class="s" x="138" y="520">does NOT match</text>
+<text class="m" x="28" y="552">Route selected: 10.0.0.0/8 via 10.0.1.254</text>
+<rect class="box" x="408" y="378" width="376" height="190" rx="10"/>
+<text class="t" x="420" y="402">Packet destined for 8.8.8.8</text>
+<text class="s" x="420" y="424">route</text><text class="s" x="530" y="424">prefix length</text>
+<rect class="ok" x="414" y="432" width="364" height="22" rx="10"/>
+<text class="m" x="420" y="448">✓ 0.0.0.0/0</text>
+<text class="s" x="530" y="448">0 bits</text>
+<text class="l" x="592" y="448">WINNER (only match)</text>
+<text class="m" x="420" y="472">✗ 10.0.0.0/8</text>
+<text class="s" x="530" y="472">does NOT match</text>
+<text class="m" x="420" y="496">✗ 10.0.5.0/24</text>
+<text class="s" x="530" y="496">does NOT match</text>
+<text class="m" x="420" y="520">✗ 10.0.5.20/32</text>
+<text class="s" x="530" y="520">does NOT match</text>
+<text class="m" x="420" y="552">Route selected: default via 10.0.1.1</text>
+</svg>

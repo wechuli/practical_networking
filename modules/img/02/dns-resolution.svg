@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 540" role="img" aria-labelledby="t d"><title id="t">DNS resolution on a typical Ubuntu host (simplified)</title><desc id="d">A sequence diagram with four participants: the application, the C library and OS, the recursive resolver, and the root, TLD and authoritative servers. The application asks the OS for example.com; the OS checks /etc/hosts and then the stub resolver (systemd-resolved, 127.0.0.53), which sends A and AAAA queries to the recursive resolver. On a cache miss the resolver walks the hierarchy and gets answers with TTLs. The resolver returns 203.0.113.10 and 2001:db8::10, and the OS returns the addresses to the application. Cost ranges from well under a millisecond when cached nearby to tens or hundreds of milliseconds on a cache miss with a distant resolver.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="538" rx="16"/>
+<text class="zl" x="24" y="30">DNS resolution on a typical Ubuntu host (simplified)</text>
+<rect class="l7" x="20" y="44" width="180" height="56" rx="10"/><text class="t" x="110" y="67" text-anchor="middle">Application</text><text class="s" x="110" y="87" text-anchor="middle">(curl, a Go program)</text>
+<rect class="net" x="210" y="44" width="180" height="56" rx="10"/><text class="t" x="300" y="67" text-anchor="middle">C library / OS</text><text class="s" x="300" y="87" text-anchor="middle">(getaddrinfo, NSS)</text>
+<rect class="net" x="400" y="44" width="180" height="56" rx="10"/><text class="t" x="490" y="67" text-anchor="middle">Recursive resolver</text><text class="s" x="490" y="87" text-anchor="middle">(ISP, cloud, 1.1.1.1)</text>
+<rect class="net" x="600" y="44" width="180" height="56" rx="10"/><text class="t" x="690" y="67" text-anchor="middle">Root, TLD,</text><text class="s" x="690" y="87" text-anchor="middle">authoritative</text>
+<path class="line" d="M110 100 V440 M300 100 V440 M490 100 V440 M690 100 V440"/>
+<text class="m" x="205" y="132" text-anchor="middle">"example.com?"</text>
+<path class="arrow" d="M110 140 H298"/>
+<rect class="box" x="215" y="152" width="170" height="86" rx="10"/><text class="s" x="228" y="172">1. /etc/hosts</text><text class="s" x="228" y="190">2. stub resolver</text><text class="s" x="244" y="208">(systemd-resolved,</text><text class="m" x="244" y="226">127.0.0.53)</text>
+<text class="l" x="395" y="262" text-anchor="middle">A? and AAAA?</text>
+<path class="arrow" d="M300 270 H488"/>
+<text class="s" x="590" y="290" text-anchor="middle">(walks the hierarchy</text><text class="s" x="590" y="306" text-anchor="middle">on a cache miss)</text>
+<path class="arrow" d="M490 316 H688"/>
+<text class="s" x="590" y="340" text-anchor="middle">answers + TTLs</text>
+<path class="arrow" d="M690 348 H492"/>
+<text class="m" x="395" y="372" text-anchor="middle">203.0.113.10,</text><text class="m" x="395" y="388" text-anchor="middle">2001:db8::10</text>
+<path class="arrow" d="M490 398 H302"/>
+<text class="s" x="205" y="420" text-anchor="middle">addresses</text>
+<path class="arrow" d="M300 428 H112"/>
+<rect class="box" x="20" y="456" width="760" height="64" rx="10"/><text class="l" x="36" y="480">Cost:</text><text class="s" x="78" y="480">from well under a millisecond (cached nearby) to tens or hundreds of</text><text class="s" x="78" y="500">milliseconds (cache miss, distant resolver).</text>
+</svg>

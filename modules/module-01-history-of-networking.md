@@ -38,31 +38,7 @@ The solution was shared infrastructure: a common medium that any machine could u
 
 ### Diagram
 
-```
-FULL MESH OF DEDICATED LINKS (does not scale)
-
-  [A]───[B]
-   │╲   /│
-   │  ╲╱  │
-   │  ╱╲  │
-   │╱   ╲│
-  [C]───[D]
-
-  4 machines = 6 dedicated links
-  10 machines = 45 links
-  100 machines = 4,950 links
-
-
-SHARED INFRASTRUCTURE (scales)
-
-  [A]   [B]   [C]   [D]
-    \    |    |    /
-     \   |    |   /
-      [shared medium / switch]
-          |
-         ...
-      Add more machines: add one link each
-```
+![A full mesh of dedicated links does not scale: 4 machines need 6 links, 10 need 45 and 100 need 4,950. Shared infrastructure scales: each machine has one link to a shared medium or switch, so adding a machine adds one link.](./img/01/mesh-vs-shared.svg)
 
 ### What You Will See in Production
 
@@ -120,29 +96,7 @@ queue — and when the queue is full, they are dropped.
 
 ### Diagram
 
-```
-CIRCUIT SWITCHING
-                    [Reserved path — held for duration of call]
-  [Caller] ═══════════════════════════════════════════════ [Callee]
-              Hop 1       Hop 2       Hop 3
-            [Switch A]─[Switch B]─[Switch C]
-                │                       │
-         Capacity reserved       Capacity reserved
-         Can't be used           Can't be used
-         by anyone else          by anyone else
-
-
-PACKET SWITCHING
-  [Sender]                                           [Receiver]
-     │                                                   ▲
-     │  Packet 1 ──▶ [Router A] ──▶ [Router B] ──────────┤
-     │  Packet 2 ──▶ [Router A] ──▶ [Router C] ──────────┤
-     │  Packet 3 ──▶ [Router D] ──▶ [Router B] ──────────┘
-     │
-  Each packet forwarded independently.
-  Links shared with other traffic; each router has a queue.
-  If Router B fails, packets can be routed around it.
-```
+![Circuit switching versus packet switching. With circuit switching, a path from caller to callee through switches A, B and C is reserved for the whole call and its capacity cannot be used by anyone else. With packet switching, three packets from the same sender take different routes through routers A, B, C and D to the receiver; each is forwarded independently over shared, queued links, and traffic can be routed around a failed router.](./img/01/circuit-vs-packet.svg)
 
 ### What You Will See in Production
 
@@ -194,17 +148,7 @@ The first message on ARPANET was sent on October 29, 1969, from UCLA to the Stan
 
 ### Diagram
 
-```
-ARPANET, end of 1969 — the first four sites
-
-   [UCLA host]        [SRI host]        [UCSB host]       [Utah host]
-        │                  │                  │                  │
-      [IMP]              [IMP]              [IMP]              [IMP]
-        └──────────── 50 kbit/s leased lines between IMPs ───────┘
-
-  IMP = Interface Message Processor: a packet switch.
-  Hosts talked only to their local IMP; IMPs moved packets between sites.
-```
+![ARPANET at the end of 1969: hosts at UCLA, SRI, UCSB and Utah each attach to a local IMP (Interface Message Processor, a packet switch), and the four IMPs are joined by 50 kbit/s leased lines; hosts talked only to their local IMP, and IMPs moved packets between sites.](./img/01/arpanet-1969.svg)
 
 This separation of concerns — the host does not run the network, the network does
 not run the host — is the same principle behind layering, TCP/IP, and the virtual
@@ -258,19 +202,7 @@ management and cost-effectiveness, then low-effort host attachment.
 
 ### Diagram
 
-```
-INTERNETWORKING — the design every packet still follows
-
-  [Host A]──[ Network 1 ]──[Gateway]──[ Network 2 ]──[Gateway]──[ Network 3 ]──[Host B]
-     │                        │                         │                        │
-     │                    forwards IP               forwards IP                  │
-     │                    (no per-connection        (no per-connection           │
-     │                     state, best effort)       state, best effort)         │
-     │                                                                           │
-     └────────── TCP: reliability, ordering, flow control — endpoints only ──────┘
-
-  Intelligence at the edges, a simple core.
-```
+![Internetworking: Host A reaches Host B through Network 1, a gateway, Network 2, another gateway and Network 3; each gateway forwards IP with no per-connection state, best effort, while TCP provides reliability, ordering and flow control between the endpoints only. Intelligence at the edges, a simple core.](./img/01/internetworking.svg)
 
 ### What You Will See in Production
 
@@ -340,33 +272,27 @@ mandates them. Hence its maxim: "rough consensus and running code."
 
 ### Diagram
 
-```
-HOW A PROTOCOL BECOMES AN RFC, AND HOW IT CHANGES
+![How a protocol becomes an RFC: an Internet-Draft (work in progress, expires, not citable) becomes an RFC as a Proposed Standard and can advance to Internet Standard with an STD number; later RFCs may update it, and both stay valid, or obsolete it, and you read the new one.](./img/01/rfc-lifecycle.svg)
 
-  Internet-Draft ──▶ RFC: Proposed Standard ──▶ RFC: Internet Standard (+ STD number)
-  (work in progress,        │                          │
-   expires, not citable)    │  later RFCs may...       │
-                            ▼                          ▼
-                  UPDATE it (both stay valid)   OBSOLETE it (read the new one)
+**Key RFCs you will encounter in this course**
 
-KEY RFCs YOU WILL ENCOUNTER IN THIS COURSE
+| RFC | Topic | Year |
+| --- | --- | --- |
+| RFC 768 | UDP | 1980 |
+| RFC 791 | IPv4 | 1981 |
+| RFC 1034 | DNS concepts | 1987 |
+| RFC 1035 | DNS implementation | 1987 |
+| RFC 1122 | Requirements for Internet hosts | 1989 |
+| RFC 4271 | BGP-4 | 2006 |
+| RFC 8200 | IPv6 (obsoletes RFC 2460) | 2017 |
+| RFC 8446 | TLS 1.3 | 2018 |
+| RFC 9000 | QUIC | 2021 |
+| RFC 9110 | HTTP semantics | 2022 |
+| RFC 9113 | HTTP/2 (obsoletes RFC 7540) | 2022 |
+| RFC 9114 | HTTP/3 | 2022 |
+| RFC 9293 | TCP (obsoletes RFC 793) | 2022 |
 
-  RFC 768   ──  UDP                                     (1980)
-  RFC 791   ──  IPv4                                    (1981)
-  RFC 1034  ──  DNS concepts                            (1987)
-  RFC 1035  ──  DNS implementation                      (1987)
-  RFC 1122  ──  Requirements for Internet hosts         (1989)
-  RFC 4271  ──  BGP-4                                   (2006)
-  RFC 8200  ──  IPv6 (obsoletes RFC 2460)               (2017)
-  RFC 8446  ──  TLS 1.3                                 (2018)
-  RFC 9000  ──  QUIC                                    (2021)
-  RFC 9110  ──  HTTP semantics                          (2022)
-  RFC 9113  ──  HTTP/2 (obsoletes RFC 7540)             (2022)
-  RFC 9114  ──  HTTP/3                                  (2022)
-  RFC 9293  ──  TCP (obsoletes RFC 793)                 (2022)
-
-  This list was current when written. Check before citing — that is the lab.
-```
+This list was current when written. Check before citing — that is the lab.
 
 ### What You Will See in Production
 
@@ -382,93 +308,7 @@ These are not dates to memorize. They are the moments when a specific constraint
 
 ### The Timeline
 
-```
-NETWORKING TIMELINE — production-relevant milestones
-
-1969 ── ARPANET first message (UCLA → SRI)
-        └─ Packet switching becomes the model
-
-1973 ── Ethernet invented at Xerox PARC (Metcalfe)
-
-1974 ── Cerf and Kahn: gateways connecting separate networks
-        └─ The internetworking design every packet still follows
-
-1980 ── DIX Ethernet II specification; IEEE 802.3 follows (1983)
-        └─ Maximum payload of 1500 bytes. RFC 894 (1984) carries IP over it:
-           the 1500-byte IP MTU you will meet for your entire career
-
-1981 ── IPv4 (RFC 791) and TCP (RFC 793) specified
-        └─ 32-bit addresses: about 4.3 billion. Seemed enormous. Was not.
-
-1983 ── ARPANET's NCP-to-TCP/IP transition deadline (1 January)
-1983 ── First DNS specifications (RFC 882/883); base specs RFC 1034/1035 in 1987
-        └─ Replaces one shared hosts.txt file
-           The hosts file still exists on your machine and still overrides DNS
-
-1986 ── Congestion collapse: throughput between LBL and UC Berkeley drops
-        from 32 kbit/s to 40 bit/s
-1988 ── Jacobson's congestion avoidance and control added to TCP
-        └─ Slow start, congestion window, retransmit backoff — why TCP slows
-           down when it sees loss (Modules 11, 14)
-
-1988 ── Morris worm (sendmail, fingerd, rsh trust, weak passwords)
-        └─ Security was not in the original design; CERT/CC is founded
-
-1989 ── BGP (RFC 1105); BGP-4 in 1994, current spec RFC 4271 (2006)
-        └─ Policy routing between independent networks
-
-1991 ── The World Wide Web goes public (Berners-Lee, CERN)
-        └─ HTTP on top of TCP; networking becomes mainstream infrastructure
-
-1993 ── CIDR (RFC 1518/1519) replaces class-based addressing
-        └─ Buys IPv4 decades and makes route aggregation possible
-
-1994 ── NAT described (RFC 1631)
-        └─ Many hosts share one public IP. Breaks end-to-end reachability;
-           NAT state is behind many idle-timeout and port-exhaustion incidents
-
-1995 ── NSFNET backbone retired; the commercial internet takes over
-1995 ── First IPv6 specification (RFC 1883); current spec RFC 8200 (2017)
-        └─ 128-bit addresses — and three decades of partial adoption
-
-1995 ── SSL 2.0 (Netscape); SSL 3.0 in 1996
-1999 ── TLS 1.0 (RFC 2246)
-
-2006 ── Amazon EC2 launches
-        └─ Networks become API objects: VPCs, security groups, route tables
-
-2008 ── Kaminsky DNS cache-poisoning attack
-        └─ Resolvers randomise source ports as well as query IDs
-           (you will watch this in the lab)
-
-2011 ── IANA allocates its last free IPv4 blocks to the regional registries
-        └─ IPv4 becomes something you buy; CGNAT and paid cloud public IPs follow
-
-2013 ── Docker; 2014 ── Kubernetes
-        └─ Network namespaces, veth pairs, and overlays become everyday tools
-
-2015 ── HTTP/2 (RFC 7540; now RFC 9113)
-        └─ Fixes HTTP head-of-line blocking, not TCP head-of-line blocking
-2015 ── Let's Encrypt opens to the public
-        └─ Free automated certificates; HTTPS becomes the default
-
-2016 ── Mirai botnet floods Dyn's DNS service
-        └─ Many large sites unreachable for hours because their DNS provider was
-
-2018 ── TLS 1.3 (RFC 8446)
-        └─ 1-RTT handshake, encrypted certificate, forward secrecy required
-
-2021 ── TLS 1.0 and 1.1 formally deprecated (RFC 8996)
-2021 ── Facebook withdraws its own BGP routes
-        └─ Its DNS servers become unreachable, so its names stop resolving
-           worldwide — and its internal tools fail with them
-
-2021 ── QUIC (RFC 9000); 2022 ── HTTP/3 (RFC 9114)
-        └─ Transport over UDP, encrypted by design; no TCP head-of-line blocking
-
-2022 ── TCP consolidated in RFC 9293
-        └─ Folds in decades of updates; wire format and handshake unchanged
-```
+![A timeline of production-relevant networking milestones from the first ARPANET message in 1969 to TCP's consolidation in RFC 9293 in 2022, including Ethernet and its 1500-byte MTU, IPv4 and TCP, DNS, the 1986 congestion collapse and Jacobson's fix, BGP, the Web, CIDR, NAT, IPv6, TLS, EC2, IPv4 exhaustion, containers, HTTP/2, TLS 1.3, QUIC and HTTP/3, and incidents such as the Morris worm, the Kaminsky attack, Mirai and the 2021 Facebook outage.](./img/01/timeline.svg)
 
 ### What You Will See in Production
 
@@ -503,30 +343,14 @@ practice ("running code"). It was implemented before OSI and does not map cleanl
 onto it. The internet runs on TCP/IP. RFC 1122 describes its layers as link,
 internet, transport, and application.
 
-```
-OSI MODEL (7 layers)         TCP/IP MODEL (4 layers)     WHAT RUNS HERE
+![The seven OSI layers mapped to the four TCP/IP layers: OSI Application, Presentation and Session map to TCP/IP Application (HTTP, DNS, SSH, SMTP, gRPC, with TLS between TCP and the app); Transport maps to Transport (TCP, UDP, QUIC on UDP); Network maps to Internet (IP, ICMP); Data Link and Physical map to Link (Ethernet, Wi-Fi, ARP).](./img/01/osi-vs-tcpip.svg)
 
-7  Application  ────────────┐
-6  Presentation ────────────┼──  Application  ─────────  HTTP, DNS, SSH,
-5  Session      ────────────┘                             SMTP, gRPC
-                                                          (TLS sits between
-                                                           TCP and the app)
+OSI is the vocabulary. TCP/IP is the implementation. You need to know both because:
 
-4  Transport    ────────────────  Transport   ─────────  TCP, UDP, QUIC (on UDP)
-
-3  Network      ────────────────  Internet    ─────────  IP, ICMP
-
-2  Data Link    ────────────┐
-1  Physical     ────────────┴──  Link         ─────────  Ethernet, Wi-Fi, ARP
-
-OSI is the vocabulary.
-TCP/IP is the implementation.
-You need to know both because:
-  - Engineers say "Layer 3" and "Layer 7" using OSI numbering
-  - The protocols you capture follow the TCP/IP structure
-  - Some protocols straddle layers (ARP maps Layer 3 addresses to Layer 2 ones;
-    TLS and QUIC don't fit one layer) — don't let the model argue with the packets
-```
+- Engineers say "Layer 3" and "Layer 7" using OSI numbering
+- The protocols you capture follow the TCP/IP structure
+- Some protocols straddle layers (ARP maps Layer 3 addresses to Layer 2 ones;
+  TLS and QUIC don't fit one layer) — don't let the model argue with the packets
 
 ### What You Will See in Production
 
@@ -549,52 +373,7 @@ firewall policies. A cloud subnet is not necessarily an ordinary Ethernet broadc
 domain; providers can proxy neighbor resolution and restrict broadcast/multicast.
 The underlying physical devices are managed by the provider.
 
-```
-TRADITIONAL DATA CENTER
-
-  Your Application
-        │
-  Your OS Network Stack
-        │
-  Physical NIC ──────── Physical Cable
-                               │
-                        Physical Switch
-                               │
-                        Physical Router
-                               │
-                        Physical Firewall
-                               │
-                           Internet
-
-  You control: everything above the internet boundary
-  You can inspect: everything
-
-
-CLOUD (Azure VNet / AWS VPC / GCP VPC)
-
-  Your Application
-        │
-  Your OS Network Stack
-        │
-  Virtual NIC (appears physical to your OS)
-        │
-  [─────────────────────────────────────────]
-  [  Provider's software-defined network    ]  ← you configure it,
-  [  Virtual routing, NSGs / security       ]    you cannot inspect it
-  [  groups / firewall rules, NAT gateways, ]
-  [  route tables, private DNS — software   ]
-  [─────────────────────────────────────────]
-        │
-  [Physical provider network — not visible to you]
-        │
-    Internet
-
-  You control: network, subnet, filtering, route-table, and NAT configuration
-  You can inspect: flow logs (Layer 3/4 metadata), effective-rule and
-                   reachability tools, captures on your own instances
-  You cannot inspect: the physical network, the hypervisor's packet path,
-                      or the root cause of provider-side latency
-```
+![Traditional data center versus cloud. In a data center the path runs from your application and OS network stack through a physical NIC, cable, switch, router and firewall to the internet, and you control and can inspect all of it. In the cloud the path runs through a virtual NIC into the provider's software-defined network, which you configure but cannot inspect, and a physical provider network you cannot see; you can inspect flow logs, effective-rule and reachability tools, and captures on your own instances.](./img/01/datacenter-vs-cloud.svg)
 
 ### What You Will See in Production
 

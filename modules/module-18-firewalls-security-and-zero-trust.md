@@ -63,13 +63,7 @@ Three lessons:
 
 ### The packet path
 
-```
-                       ┌──────────── for this host ────────────┐
- in → PREROUTING → routing ─┤                                       ├→ INPUT → local process
-      raw, mangle,          └→ FORWARD (mangle, filter) ─┐          │
-      nat (DNAT)                                         ↓          │  local process → OUTPUT → routing → POSTROUTING → out
-                                                    POSTROUTING ←───┘   (raw, mangle, nat, filter)     (mangle, nat: SNAT)
-```
+![An incoming packet passes PREROUTING (raw, mangle, nat for DNAT) and the routing decision; packets for this host go to INPUT and the local process, others go through FORWARD (mangle, filter) to POSTROUTING (mangle, nat for SNAT) and out; packets from a local process go through OUTPUT (raw, mangle, nat, filter), routing and POSTROUTING.](./img/18/netfilter-packet-path.svg)
 
 Tables group rules by job:
 
@@ -337,10 +331,7 @@ The lab changes one host setting: `net.netfilter.nf_log_all_netns`. It saves the
 
 ### Lab Part 1: Run the Lab
 
-```
-  client 198.18.180.10 ── fw ── server 198.18.181.10 (.11, .12)   tcp 22 80 443 8080(backlog 4) 9090 9091 · mTLS 8443
-         (tcp 5000)         └── db 198.18.182.10 (tcp 5432)
-```
+![The client at 198.18.180.10 (tcp 5000) connects through fw to the server at 198.18.181.10 (also .11 and .12), listening on tcp 22, 80, 443, 8080 (backlog 4), 9090 and 9091 and mTLS 8443; fw also connects to db at 198.18.182.10 on tcp 5432.](./img/18/fw-lab-topology.svg)
 
 ```bash
 cd labs/go

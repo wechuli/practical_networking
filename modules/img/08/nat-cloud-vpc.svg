@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="t d"><title id="t">NAT in a cloud VPC</title><desc id="d">App servers 10.0.1.50, 10.0.1.51 and 10.0.1.52 in a private subnet 10.0.1.0/24 reach the internet through a NAT gateway doing SNAT with public IP 52.1.2.3. An outbound packet from 10.0.1.50:54321 to 198.51.100.80:443 leaves with source 52.1.2.3:40001. The return packet arrives for 52.1.2.3:40001 and is translated back to 10.0.1.50:54321. The internet only sees 52.1.2.3, and the app server never knows NAT happened.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="498" rx="16"/>
+<text class="zl" x="24" y="28">NAT in a cloud VPC</text>
+<rect class="zone" x="16" y="44" width="280" height="158" rx="12"/>
+<text class="zl" x="30" y="66">Private Subnet (10.0.1.0/24)</text>
+<rect class="net" x="32" y="78" width="248" height="32" rx="10"/><text class="l" x="48" y="99">App Server</text><text class="m" x="150" y="99">10.0.1.50</text>
+<rect class="net" x="32" y="118" width="248" height="32" rx="10"/><text class="l" x="48" y="139">App Server</text><text class="m" x="150" y="139">10.0.1.51</text>
+<rect class="net" x="32" y="158" width="248" height="32" rx="10"/><text class="l" x="48" y="179">App Server</text><text class="m" x="150" y="179">10.0.1.52</text>
+<path class="arrow" d="M296 127 H338"/>
+<rect class="net" x="340" y="84" width="180" height="86" rx="10"/>
+<text class="t" x="430" y="110" text-anchor="middle">NAT Gateway</text>
+<text class="s" x="430" y="130" text-anchor="middle">(SNAT)</text>
+<text class="m" x="430" y="152" text-anchor="middle">Public IP: 52.1.2.3</text>
+<path class="arrow" d="M520 127 H588"/>
+<rect class="zone" x="564" y="44" width="220" height="158" rx="12"/>
+<text class="zl" x="578" y="66">Public Internet</text>
+<rect class="box" x="590" y="104" width="168" height="46" rx="10"/><text class="t" x="674" y="132" text-anchor="middle">Internet</text>
+<rect class="box" x="16" y="222" width="768" height="98" rx="10"/>
+<text class="l" x="32" y="246">Outbound packet from 10.0.1.50 to 198.51.100.80</text>
+<text class="s" x="32" y="274">Before NAT:</text><text class="m" x="150" y="274">src=10.0.1.50:54321</text><text class="m" x="380" y="274">dst=198.51.100.80:443</text>
+<rect class="ok" x="142" y="284" width="160" height="22" rx="10"/>
+<text class="s" x="32" y="300">After NAT:</text><text class="m" x="150" y="300">src=52.1.2.3:40001</text><text class="m" x="380" y="300">dst=198.51.100.80:443</text>
+<rect class="box" x="16" y="336" width="768" height="98" rx="10"/>
+<text class="l" x="32" y="360">Return packet from 198.51.100.80</text>
+<text class="s" x="32" y="388">Arrives:</text><text class="m" x="150" y="388">src=198.51.100.80:443</text><text class="m" x="380" y="388">dst=52.1.2.3:40001</text>
+<rect class="ok" x="372" y="398" width="160" height="22" rx="10"/>
+<text class="s" x="32" y="414">After NAT:</text><text class="m" x="150" y="414">src=198.51.100.80:443</text><text class="m" x="380" y="414">dst=10.0.1.50:54321</text>
+<text class="s" x="24" y="460">The internet sees 52.1.2.3. It never sees 10.0.1.50.</text>
+<text class="s" x="24" y="480">The app server sees 198.51.100.80. It never knows NAT happened.</text>
+</svg>

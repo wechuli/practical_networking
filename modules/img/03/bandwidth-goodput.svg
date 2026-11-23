@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380" role="img" aria-labelledby="t d"><title id="t">Bandwidth versus goodput on a gigabit link</title><desc id="d">Two bars. The link capacity, the bandwidth, is 1,000 Mbit/s. The best possible single TCP flow on a perfect link gets 941 Mbit/s of goodput; the difference is Ethernet framing and IP and TCP headers, because each 1,538 bytes on the wire carry 1,448 payload bytes. What you measure on a real path is lower again when the TCP window is smaller than bandwidth times RTT, when packets are lost and TCP retransmits and slows down, when another flow shares the bottleneck, or when the application, CPU or disk can't keep up.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="378" rx="16"/>
+<text class="zl" x="24" y="30">Bandwidth vs latency vs throughput</text>
+<text class="l" x="40" y="58">Link capacity:</text>
+<rect class="net" x="40" y="66" width="720" height="34" rx="8"/><text class="t" x="400" y="89" text-anchor="middle">1,000 Mbit/s (bandwidth)</text>
+<text class="l" x="40" y="132">Best possible single TCP flow, perfect link:</text>
+<rect class="warn" x="712" y="140" width="48" height="34" rx="6"/>
+<rect class="l4" x="40" y="140" width="677" height="34" rx="8"/><text class="t" x="378" y="163" text-anchor="middle">941 Mbit/s goodput</text>
+<path class="arrow" d="M736 212 V178"/>
+<text class="s" x="760" y="230" text-anchor="end">Ethernet framing, IP and TCP headers:</text>
+<text class="s" x="760" y="248" text-anchor="end">1,448 payload bytes per 1,538 on the wire</text>
+<rect class="box" x="20" y="266" width="760" height="98" rx="10"/>
+<text class="l" x="36" y="288">What you measure on a real path is lower again when:</text>
+<text class="s" x="36" y="308">• the TCP window is smaller than bandwidth × RTT (BDP, below)</text>
+<text class="s" x="36" y="324">• packets are lost, so TCP retransmits and slows down</text>
+<text class="s" x="36" y="340">• another flow shares the bottleneck</text>
+<text class="s" x="36" y="356">• the application, CPU, or disk can't keep up</text>
+</svg>

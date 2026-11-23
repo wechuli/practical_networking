@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 532" role="img" aria-labelledby="t d"><title id="t">Reading ip route show, field by field</title><desc id="d">Three routes split into their fields. Default route: default is 0.0.0.0/0 and matches any destination not matched by a more specific route; via 10.0.1.1 is the gateway (next hop); dev eth0 is the outgoing interface; proto dhcp means the route was learned from DHCP; src 10.0.1.50 is the source IP for packets; metric 100 is the preference, lower is better. Connected route 10.0.1.0/24: the destination network 10.0.1.0 through 10.0.1.255; dev eth0 with no gateway means direct delivery; proto kernel means it was auto-created when the IP was assigned to eth0; scope link means directly connected; src 10.0.1.50 is the source IP for this network. Docker bridge route 172.17.0.0/16 on docker0: linkdown means the interface is down because no containers are running.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="530" rx="16"/>
+<text class="zl" x="24" y="40">Default route</text>
+<rect class="l3" x="24" y="52" width="69" height="28" rx="10"/>
+<text class="m" x="58" y="70" text-anchor="middle">default</text>
+<rect class="l3" x="101" y="52" width="105" height="28" rx="10"/>
+<text class="m" x="154" y="70" text-anchor="middle">via 10.0.1.1</text>
+<rect class="l3" x="214" y="52" width="76" height="28" rx="10"/>
+<text class="m" x="252" y="70" text-anchor="middle">dev eth0</text>
+<rect class="l3" x="298" y="52" width="90" height="28" rx="10"/>
+<text class="m" x="343" y="70" text-anchor="middle">proto dhcp</text>
+<rect class="l3" x="396" y="52" width="112" height="28" rx="10"/>
+<text class="m" x="452" y="70" text-anchor="middle">src 10.0.1.50</text>
+<rect class="l3" x="516" y="52" width="90" height="28" rx="10"/>
+<text class="m" x="561" y="70" text-anchor="middle">metric 100</text>
+<path class="line" d="M561 80 V98 H567"/>
+<text class="s" x="571" y="102">Preference (lower = better)</text>
+<path class="line" d="M452 80 V120 H458"/>
+<text class="s" x="462" y="124">Use this as source IP for packets</text>
+<path class="line" d="M343 80 V142 H349"/>
+<text class="s" x="353" y="146">Route learned from DHCP</text>
+<path class="line" d="M252 80 V164 H258"/>
+<text class="s" x="262" y="168">Send packets out this interface</text>
+<path class="line" d="M154 80 V186 H160"/>
+<text class="s" x="164" y="190">Forward to this gateway (next hop)</text>
+<path class="line" d="M58 80 V208 H64"/>
+<text class="s" x="68" y="212">0.0.0.0/0 — matches ANY destination not matched by a more specific route</text>
+<text class="zl" x="24" y="256">Connected route</text>
+<rect class="l3" x="24" y="268" width="98" height="28" rx="10"/>
+<text class="m" x="73" y="286" text-anchor="middle">10.0.1.0/24</text>
+<rect class="l3" x="130" y="268" width="76" height="28" rx="10"/>
+<text class="m" x="168" y="286" text-anchor="middle">dev eth0</text>
+<rect class="l3" x="214" y="268" width="105" height="28" rx="10"/>
+<text class="m" x="266" y="286" text-anchor="middle">proto kernel</text>
+<rect class="l3" x="327" y="268" width="90" height="28" rx="10"/>
+<text class="m" x="372" y="286" text-anchor="middle">scope link</text>
+<rect class="l3" x="425" y="268" width="112" height="28" rx="10"/>
+<text class="m" x="481" y="286" text-anchor="middle">src 10.0.1.50</text>
+<rect class="box" x="545" y="268" width="90" height="28" rx="10"/>
+<text class="m" x="590" y="286" text-anchor="middle">metric 100</text>
+<path class="line" d="M481 296 V314 H487"/>
+<text class="s" x="491" y="318">Source IP for this network</text>
+<path class="line" d="M372 296 V336 H378"/>
+<text class="s" x="382" y="340">"link" scope = directly connected</text>
+<path class="line" d="M266 296 V358 H272"/>
+<text class="s" x="276" y="362">Auto-created when IP was assigned to eth0</text>
+<path class="line" d="M168 296 V380 H174"/>
+<text class="s" x="178" y="384">Packets go directly out eth0 (no gateway — direct delivery)</text>
+<path class="line" d="M73 296 V402 H79"/>
+<text class="s" x="83" y="406">Destination network: 10.0.1.0 through 10.0.1.255</text>
+<text class="zl" x="24" y="450">Docker bridge route</text>
+<rect class="box" x="24" y="462" width="482" height="28" rx="10"/>
+<text class="m" x="265" y="480" text-anchor="middle">172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1</text>
+<rect class="l3" x="514" y="462" width="76" height="28" rx="10"/>
+<text class="m" x="552" y="480" text-anchor="middle">linkdown</text>
+<path class="line" d="M552 490 V508 H546"/>
+<text class="s" x="542" y="512" text-anchor="end">Interface is DOWN (no containers running)</text>
+</svg>

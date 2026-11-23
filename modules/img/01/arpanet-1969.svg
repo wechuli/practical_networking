@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" role="img" aria-labelledby="t d"><title id="t">ARPANET at the end of 1969</title><desc id="d">The first four ARPANET sites: hosts at UCLA, SRI, UCSB and Utah, each attached to its own IMP. The IMPs are connected by 50 kbit/s leased lines. IMP means Interface Message Processor, a packet switch. Hosts talked only to their local IMP; IMPs moved packets between sites.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="278" rx="16"/>
+<text class="zl" x="24" y="34">ARPANET, end of 1969 — the first four sites</text>
+<rect class="box" x="40" y="54" width="150" height="38" rx="10"/>
+<text class="t" x="115.0" y="78.0" text-anchor="middle">UCLA host</text>
+<path class="line" d="M115 92 V122"/>
+<rect class="net" x="65" y="122" width="100" height="38" rx="10"/>
+<text class="t" x="115.0" y="146.0" text-anchor="middle">IMP</text>
+<rect class="box" x="230" y="54" width="150" height="38" rx="10"/>
+<text class="t" x="305.0" y="78.0" text-anchor="middle">SRI host</text>
+<path class="line" d="M305 92 V122"/>
+<rect class="net" x="255" y="122" width="100" height="38" rx="10"/>
+<text class="t" x="305.0" y="146.0" text-anchor="middle">IMP</text>
+<rect class="box" x="420" y="54" width="150" height="38" rx="10"/>
+<text class="t" x="495.0" y="78.0" text-anchor="middle">UCSB host</text>
+<path class="line" d="M495 92 V122"/>
+<rect class="net" x="445" y="122" width="100" height="38" rx="10"/>
+<text class="t" x="495.0" y="146.0" text-anchor="middle">IMP</text>
+<rect class="box" x="610" y="54" width="150" height="38" rx="10"/>
+<text class="t" x="685.0" y="78.0" text-anchor="middle">Utah host</text>
+<path class="line" d="M685 92 V122"/>
+<rect class="net" x="635" y="122" width="100" height="38" rx="10"/>
+<text class="t" x="685.0" y="146.0" text-anchor="middle">IMP</text>
+<path class="line" d="M165 141 H255"/>
+<path class="line" d="M355 141 H445"/>
+<path class="line" d="M545 141 H635"/>
+<text class="l" x="400" y="184" text-anchor="middle">50 kbit/s leased lines between IMPs</text>
+<text class="s" x="24" y="224">IMP = Interface Message Processor: a packet switch.</text>
+<text class="s" x="24" y="244">Hosts talked only to their local IMP; IMPs moved packets between sites.</text>
+</svg>

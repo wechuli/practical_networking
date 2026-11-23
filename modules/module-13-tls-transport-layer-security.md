@@ -36,19 +36,14 @@ Authorization: Basic YWxpY2U6czNjcmV0          ← echo YWxpY2U6czNjcmV0 | base6
 
 Basic authentication is base64, not encryption. The same request over HTTPS produces a capture in which neither the header nor the password appears anywhere — but the string `shop.test` does, once: in the ClientHello's **SNI** extension, which tells the server which site the client wants (13.6). TLS hides content; it does not hide who talks to whom, the server name (unless ECH is used), how much, or when.
 
-```
-WHAT TLS PROVIDES
-  Confidentiality   Application data is encrypted with a symmetric AEAD cipher
-                    (AES-GCM or ChaCha20-Poly1305) under keys only the endpoints know.
-  Integrity         Every record carries an authentication tag; a changed bit makes the
-                    record fail and the connection end (with an alert).
-  Authentication    The server proves it holds the private key for a certificate that
-                    names it and chains to a root the client trusts. Optionally the client
-                    proves the same (mutual TLS, 13.8).
-  NOT provided      Hiding the endpoints' addresses, the SNI (without ECH), traffic volume
-                    and timing; authorisation (who may do what); protection of data once it
-                    leaves TLS at a load balancer or proxy (13.9).
-```
+**What TLS provides**
+
+| Property | What it means |
+| --- | --- |
+| Confidentiality | Application data is encrypted with a symmetric AEAD cipher (AES-GCM or ChaCha20-Poly1305) under keys only the endpoints know. |
+| Integrity | Every record carries an authentication tag; a changed bit makes the record fail and the connection end (with an alert). |
+| Authentication | The server proves it holds the private key for a certificate that names it and chains to a root the client trusts. Optionally the client proves the same (mutual TLS, 13.8). |
+| NOT provided | Hiding the endpoints' addresses, the SNI (without ECH), traffic volume and timing; authorisation (who may do what); protection of data once it leaves TLS at a load balancer or proxy (13.9). |
 
 ---
 
@@ -70,34 +65,21 @@ An X.509 certificate binds a public key to names, signed by an issuer. The lab's
     valid    2026-10-29 → 2029-10-29 (1095 days left)
 ```
 
-```
-FIELD                  WHAT CLIENTS CHECK
-─────────────────────  ──────────────────────────────────────────────────────────────────
-subjectAltName (SAN)   The name in the URL must match one entry (RFC 6125). A wildcard
-                       *.wild.test matches exactly one label: a.wild.test, but not wild.test
-                       or a.b.wild.test (all three measured). IP addresses must appear as IP
-                       entries. The subject CN is ignored for hostnames by modern clients.
-Validity               notBefore ≤ now ≤ notAfter, by the CLIENT's clock — a wrong clock
-                       makes valid certificates "expired" or "not yet valid".
-Issuer + signature     Must be signed by the next certificate up the chain.
-Basic constraints      Only certificates with CA:TRUE may sign others; pathLen limits depth.
-Key usage / EKU        serverAuth for servers, clientAuth for client certificates.
-Public key             ECDSA P-256 or RSA 2048+ in practice.
-```
+| Field | What clients check |
+| --- | --- |
+| subjectAltName (SAN) | The name in the URL must match one entry (RFC 6125). A wildcard `*.wild.test` matches exactly one label: `a.wild.test`, but not `wild.test` or `a.b.wild.test` (all three measured). IP addresses must appear as IP entries. The subject CN is ignored for hostnames by modern clients. |
+| Validity | notBefore ≤ now ≤ notAfter, by the CLIENT's clock — a wrong clock makes valid certificates "expired" or "not yet valid". |
+| Issuer + signature | Must be signed by the next certificate up the chain. |
+| Basic constraints | Only certificates with CA:TRUE may sign others; pathLen limits depth. |
+| Key usage / EKU | serverAuth for servers, clientAuth for client certificates. |
+| Public key | ECDSA P-256 or RSA 2048+ in practice. |
 
 ### Chains and trust stores
 
-```
-  Lab Root CA            self-signed; in the client's TRUST STORE (never needs to be sent)
-      │ signs
-  Lab Issuing CA 1       intermediate; the SERVER must send it
-      │ signs
-  shop.test              the leaf; the server sends it first
+![A certificate chain: Lab Root CA is self-signed and sits in the client's trust store, so it never needs to be sent; it signs Lab Issuing CA 1, an intermediate the server must send; that signs shop.test, the leaf, which the server sends first.](./img/13/cert-chain.svg)
 
-  The server sends: leaf + intermediate(s)       (the lab's shop-chain.pem; certbot's fullchain.pem)
-  The client builds: leaf → intermediate → a root it already has, checks every signature,
-  validity, constraint and usage, and that the name matches.
-```
+- The server sends: leaf + intermediate(s) (the lab's `shop-chain.pem`; certbot's `fullchain.pem`).
+- The client builds: leaf → intermediate → a root it already has, checks every signature, validity, constraint and usage, and that the name matches.
 
 A **trust store** is the set of roots a client accepts. Each operating system and many runtimes keep their own (13.10). Public CAs are in the stores because browsers' and OS vendors' root programs accepted them; an organisation's private CA is trusted only where someone installed it.
 
@@ -111,21 +93,7 @@ Publicly trusted certificates are issued after **domain validation**, now almost
 
 ## 13.3 The TLS 1.2 Handshake
 
-```
-TLS 1.2 FULL HANDSHAKE (ECDHE) — 2 round trips after TCP
-
-  Client                                                   Server
-    │── ClientHello ─────────────────────────────────────▶│  versions, cipher suites, random,
-    │   (SNI, supported groups, signature algorithms, ALPN)│  extensions
-    │◀────────────────────────────────────── ServerHello ─│  chosen suite, random
-    │◀────────────────────────────────────── Certificate ─│  chain — IN CLEARTEXT
-    │◀──────────────────────────────── ServerKeyExchange ─│  ECDHE public key, signed with the
-    │◀────────────────────────────────── ServerHelloDone ─│  certificate's key
-    │── ClientKeyExchange ───────────────────────────────▶│  client's ECDHE public key
-    │── ChangeCipherSpec, Finished (encrypted) ──────────▶│  both now derive the keys
-    │◀────────────────────── ChangeCipherSpec, Finished ──│
-    │══ application data ════════════════════════════════│
-```
+![The TLS 1.2 full handshake with ECDHE, two round trips after TCP: the client sends ClientHello (versions, cipher suites, random and extensions such as SNI, supported groups, signature algorithms and ALPN); the server answers ServerHello (chosen suite, random), Certificate (the chain, in cleartext), ServerKeyExchange (its ECDHE public key, signed with the certificate's key) and ServerHelloDone; the client sends ClientKeyExchange (its ECDHE public key), then ChangeCipherSpec and an encrypted Finished, after which both derive the keys; the server sends ChangeCipherSpec and Finished, and application data follows.](./img/13/tls12-handshake.svg)
 
 The lab's capture of a TLS 1.2 handshake, decoded with tshark (handshake message types: 1 ClientHello, 2 ServerHello, 11 Certificate, 12 ServerKeyExchange, 14 ServerHelloDone, 16 ClientKeyExchange):
 
@@ -139,13 +107,7 @@ The lab's capture of a TLS 1.2 handshake, decoded with tshark (handshake message
 
 **Cipher suites** in TLS 1.2 name everything at once:
 
-```
-TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256      (what the lab negotiated)
-    │     │          │           └── hash for the key derivation (PRF)
-    │     │          └── bulk cipher and mode: AES-128 in GCM (AEAD)
-    │     └── certificate / signature type: ECDSA (RSA for an RSA certificate)
-    └── key exchange: ECDHE
-```
+![The cipher suite TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, which the lab negotiated, read part by part: ECDHE is the key exchange; ECDSA is the certificate or signature type (RSA for an RSA certificate); AES_128_GCM is the bulk cipher and mode, AES-128 in GCM (AEAD); SHA256 is the hash for the key derivation (PRF).](./img/13/cipher-suite.svg)
 
 Use ECDHE with AES-GCM or ChaCha20-Poly1305. Avoid static RSA key exchange, CBC-mode suites (a long history of padding-oracle attacks), RC4, 3DES, and anything EXPORT or NULL. TLS 1.0 and 1.1 are formally deprecated (RFC 8996); the lab's server that only speaks them is refused by every modern client (13.7).
 
@@ -153,39 +115,21 @@ Use ECDHE with AES-GCM or ChaCha20-Poly1305. Avoid static RSA key exchange, CBC-
 
 ## 13.4 TLS 1.3
 
-```
-TLS 1.3 FULL HANDSHAKE — 1 round trip after TCP
-
-  Client                                                   Server
-    │── ClientHello + key_share ─────────────────────────▶│  the client GUESSES a group and
-    │   (SNI, supported_versions, groups, ALPN)            │  sends its public key at once
-    │◀──────────────────────────── ServerHello + key_share│  keys are derived HERE
-    │◀───── {EncryptedExtensions} {Certificate}            │  everything from here on is
-    │       {CertificateVerify} {Finished} ───────────────│  encrypted, including the certificate
-    │── {Finished} ──────────────────────────────────────▶│
-    │══ application data (the client may send right away) │
-    │◀──────────────────────────── {NewSessionTicket} ────│  for resumption, after the handshake
-```
+![The TLS 1.3 full handshake, one round trip after TCP: the client sends ClientHello with a key_share (SNI, supported_versions, groups, ALPN), guessing a group and sending its public key at once; the server answers ServerHello with its key_share, where the keys are derived; everything after that is encrypted, including the certificate: EncryptedExtensions, Certificate, CertificateVerify and Finished from the server, then Finished from the client; application data follows and the client may send right away; after the handshake the server sends NewSessionTicket for resumption.](./img/13/tls13-handshake.svg)
 
 The lab's capture of TLS 1.3 shows a passive observer **only two handshake messages**: the ClientHello (with SNI) and the ServerHello. The certificate and everything after travel inside encrypted records. With the session secrets curl wrote to `SSLKEYLOGFILE`, tshark decrypts the rest: `8,11,15,20,4` — EncryptedExtensions, Certificate, CertificateVerify, Finished, NewSessionTicket — and the request itself, `GET shop.test /`.
 
 What else changed:
 
-```
-TLS 1.3 (RFC 8446, 2018)
-  Removed   static RSA and static DH key exchange, CBC and RC4 suites, SHA-1 and MD5 signatures,
-            compression, renegotiation, custom DH groups
-  Suites    only the AEAD and hash: TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384,
-            TLS_CHACHA20_POLY1305_SHA256 (plus two CCM suites). Key exchange and authentication
-            are negotiated separately (groups, signature algorithms), so "TLS_AES_128_GCM_SHA256"
-            says nothing about them.
-  Groups    X25519 and P-256 classically; the hybrid post-quantum group X25519MLKEM768 is now the
-            default in Chrome, Firefox, Go 1.24+ and OpenSSL 3.5+
-  Resumption  PSK from a session ticket, normally combined with a fresh (EC)DHE exchange
-  0-RTT     a resuming client may send "early data" with its first flight. It can be replayed by
-            an attacker and is not forward-secret, so servers must accept it only for requests
-            that are safe to repeat — many disable it.
-```
+**TLS 1.3 (RFC 8446, 2018)**
+
+| | |
+| --- | --- |
+| Removed | static RSA and static DH key exchange, CBC and RC4 suites, SHA-1 and MD5 signatures, compression, renegotiation, custom DH groups |
+| Suites | only the AEAD and hash: `TLS_AES_128_GCM_SHA256`, `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256` (plus two CCM suites). Key exchange and authentication are negotiated separately (groups, signature algorithms), so "TLS_AES_128_GCM_SHA256" says nothing about them. |
+| Groups | X25519 and P-256 classically; the hybrid post-quantum group X25519MLKEM768 is now the default in Chrome, Firefox, Go 1.24+ and OpenSSL 3.5+ |
+| Resumption | PSK from a session ticket, normally combined with a fresh (EC)DHE exchange |
+| 0-RTT | a resuming client may send "early data" with its first flight. It can be replayed by an attacker and is not forward-secret, so servers must accept it only for requests that are safe to repeat — many disable it. |
 
 **The post-quantum key share makes ClientHellos bigger.** The lab captured both clients' ClientHellos: curl with OpenSSL 3.0 sent a **583-byte** frame; Go 1.24, which adds an X25519MLKEM768 share of 1,216 bytes, sent **1,555 bytes**. A ClientHello that no longer fits in one TCP segment breaks some middleboxes that expect it to — one cause of "TLS fails from this network only, with this newer client".
 
@@ -305,11 +249,7 @@ Clients built on OpenSSL, NSS and BoringSSL (curl, Firefox, Chrome) write their 
 
 ### Termination, re-encryption, passthrough
 
-```
-termination     client ══TLS══▶ load balancer ──plain──▶ backend      LB sees HTTP; backend sees the LB
-re-encryption   client ══TLS══▶ load balancer ══TLS══▶ backend        two separate TLS sessions
-passthrough     client ══════════════TLS═══════════════▶ backend      LB routes on SNI only
-```
+![Three ways a load balancer handles TLS. Termination: TLS from the client ends at the load balancer, which sends plain traffic to the backend, so the LB sees HTTP and the backend sees the LB. Re-encryption: TLS from the client to the load balancer and a second TLS session to the backend, two separate TLS sessions. Passthrough: one TLS session from the client to the backend, and the LB routes on SNI only.](./img/13/tls-termination.svg)
 
 Wherever TLS terminates, the client's certificate (mTLS), its TLS version and cipher, and its IP address stop at that hop unless forwarded explicitly (headers such as `X-Forwarded-For`, `X-Forwarded-Client-Cert`, or the PROXY protocol). The backend's own certificate, in re-encryption, is validated by the load balancer — with its own trust store and its own name rules.
 
@@ -385,16 +325,7 @@ The lab uses [`tlslab`](../labs/go/cmd/tlslab), written for this module on Go's 
 
 [`tls.json`](../labs/netlab/tls.json):
 
-```
-  client 198.18.90.10 ──── router 198.18.90.1 ──── server 198.18.91.10
-  /etc/hosts: shop.test     relays :4443 → :443     :443  HTTPS, 14 names by SNI (+ :80 cleartext login)
-  and 13 other names        :4444 → :8443           :8443 TLS 1.2 only
-  → 198.18.91.10            :4445 → :7443           :7443 key exchange group P-256 only
-                            (+25 ms each way)       :9443 mTLS (client certificates from the lab root)
-                            :8443 intercepting      :1443 TLS 1.0–1.1 only
-                            proxy (off until a check
-                            redirects port 443 to it)
-```
+![The TLS lab: client 198.18.90.10, router 198.18.90.1 and server 198.18.91.10. The client's /etc/hosts maps shop.test and 13 other names to 198.18.91.10. The router relays port 4443 to 443, 4444 to 8443 and 4445 to 7443 with 25 ms added each way, and runs an intercepting proxy on 8443 that is off until a check redirects port 443 to it. The server serves HTTPS with 14 names by SNI on 443 (plus a cleartext login on 80), TLS 1.2 only on 8443, key exchange group P-256 only on 7443, mTLS with client certificates from the lab root on 9443, and TLS 1.0–1.1 only on 1443.](./img/13/tls-lab.svg)
 
 ```bash
 cd labs/go

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" role="img" aria-labelledby="t d"><title id="t">Path MTU discovery with the DF bit set, and the black hole when ICMP is blocked</title><desc id="d">The sender sends a 4000-byte packet with DF=1. The router cannot fragment it, so it replies with ICMP type 3 code 4, Fragmentation Needed and DF Set, including the MTU of the next hop, for example 1400. The sender caches that path MTU and sends smaller packets; TCP resends the lost segment at the smaller size. If a firewall drops that ICMP, the sender never gets the too-big message, packets silently disappear, a TCP connection hangs after SYN and SYN-ACK succeed because small packets work, and large transfers stall: a PMTUD black hole, one of the hardest problems to diagnose.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="518" rx="16"/>
+<text class="l" x="24" y="30">WITH DF bit set (modern default — Path MTU Discovery)</text>
+<rect class="net" x="40" y="46" width="160" height="40" rx="10"/><text class="t" x="120" y="71" text-anchor="middle">Sender</text>
+<rect class="net" x="600" y="46" width="160" height="40" rx="10"/><text class="t" x="680" y="71" text-anchor="middle">Router</text>
+<path class="line" d="M120 86 V336"/><path class="line" d="M680 86 V336"/>
+<text class="m" x="400" y="120" text-anchor="middle">Original: 4000 bytes, DF=1</text>
+<path class="arrow" d="M120 130 H676"/>
+<rect class="warn" x="570" y="144" width="220" height="40" rx="10"/><text class="l" x="680" y="169" text-anchor="middle">Router cannot fragment!</text>
+<text class="l" x="400" y="210" text-anchor="middle">ICMP Type 3 Code 4: "Fragmentation Needed and DF Set"</text>
+<text class="s" x="400" y="228" text-anchor="middle">Message includes: MTU of the next hop (e.g., 1400)</text>
+<path class="arrow" d="M680 240 H124"/>
+<rect class="ok" x="40" y="254" width="440" height="48" rx="10"/><text class="s" x="60" y="274">Sender caches that path MTU and sends smaller packets</text><text class="s" x="60" y="292">(TCP resends the lost segment at the smaller size).</text>
+<text class="s" x="400" y="316" text-anchor="middle">smaller packets</text>
+<path class="arrow" d="M120 326 H676"/>
+<rect class="warn" x="20" y="356" width="760" height="146" rx="10"/>
+<text class="t" x="40" y="382">IF ICMP IS BLOCKED (firewall drops ICMP)</text>
+<text class="s" x="40" y="406">→ Sender never gets the "too big" message</text>
+<text class="s" x="40" y="425">→ Packets silently disappear</text>
+<text class="s" x="40" y="444">→ TCP connection hangs after SYN/SYN-ACK succeeds (small packets work)</text>
+<text class="s" x="40" y="463">→ Large data transfer stalls</text>
+<text class="l" x="40" y="486">→ This is a PMTUD BLACK HOLE — one of the hardest problems to diagnose</text>
+</svg>

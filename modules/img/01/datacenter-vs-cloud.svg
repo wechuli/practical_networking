@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 708" role="img" aria-labelledby="t d"><title id="t">Traditional data center versus cloud networking</title><desc id="d">Traditional data center: your application, your OS network stack, physical NIC, physical cable, physical switch, physical router, physical firewall, then the internet. You control everything above the internet boundary and you can inspect everything. Cloud (Azure VNet, AWS VPC, GCP VPC): your application, your OS network stack, a virtual NIC that appears physical to your OS, then the provider’s software-defined network (virtual routing, NSGs or security groups or firewall rules, NAT gateways, route tables, private DNS, all software) which you configure but cannot inspect, then the physical provider network, which is not visible to you, then the internet. You control network, subnet, filtering, route-table and NAT configuration. You can inspect flow logs (Layer 3/4 metadata), effective-rule and reachability tools, and captures on your own instances. You cannot inspect the physical network, the hypervisor’s packet path, or the root cause of provider-side latency.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="706" rx="16"/>
+<text class="zl" x="24" y="34">TRADITIONAL DATA CENTER</text>
+<rect class="l7" x="24" y="52" width="360" height="34" rx="10"/>
+<text class="l" x="204.0" y="73.0" text-anchor="middle">Your Application</text>
+<path class="line" d="M204.0 86 V104"/>
+<rect class="box" x="24" y="104" width="360" height="34" rx="10"/>
+<text class="l" x="204.0" y="125.0" text-anchor="middle">Your OS Network Stack</text>
+<path class="line" d="M204.0 138 V156"/>
+<rect class="net" x="24" y="156" width="360" height="34" rx="10"/>
+<text class="l" x="204.0" y="177.0" text-anchor="middle">Physical NIC — Physical Cable</text>
+<path class="line" d="M204.0 190 V208"/>
+<rect class="net" x="24" y="208" width="360" height="34" rx="10"/>
+<text class="l" x="204.0" y="229.0" text-anchor="middle">Physical Switch</text>
+<path class="line" d="M204.0 242 V260"/>
+<rect class="net" x="24" y="260" width="360" height="34" rx="10"/>
+<text class="l" x="204.0" y="281.0" text-anchor="middle">Physical Router</text>
+<path class="line" d="M204.0 294 V312"/>
+<rect class="net" x="24" y="312" width="360" height="34" rx="10"/>
+<text class="l" x="204.0" y="333.0" text-anchor="middle">Physical Firewall</text>
+<path class="line" d="M204.0 346 V364"/>
+<rect class="box" x="24" y="364" width="360" height="34" rx="10"/>
+<text class="l" x="204.0" y="385.0" text-anchor="middle">Internet</text>
+<text class="l" x="24" y="422">You control:</text>
+<text class="s" x="36" y="440">everything above the internet boundary</text>
+<text class="l" x="24" y="469">You can inspect:</text>
+<text class="s" x="36" y="487">everything</text>
+<text class="zl" x="416" y="34">CLOUD (Azure VNet / AWS VPC / GCP VPC)</text>
+<rect class="l7" x="416" y="52" width="360" height="34" rx="10"/>
+<text class="l" x="596.0" y="73.0" text-anchor="middle">Your Application</text>
+<path class="line" d="M596.0 86 V104"/>
+<rect class="box" x="416" y="104" width="360" height="34" rx="10"/>
+<text class="l" x="596.0" y="125.0" text-anchor="middle">Your OS Network Stack</text>
+<path class="line" d="M596.0 138 V156"/>
+<rect class="net" x="416" y="156" width="360" height="46" rx="10"/>
+<text class="l" x="596.0" y="174.5" text-anchor="middle">Virtual NIC</text>
+<text class="s" x="596.0" y="191.5" text-anchor="middle">appears physical to your OS</text>
+<path class="line" d="M596.0 202 V220"/>
+<rect class="zone" x="416" y="220" width="360" height="112" rx="10"/>
+<text class="l" x="596.0" y="246.0" text-anchor="middle">Provider’s software-defined network</text>
+<text class="s" x="596.0" y="263.0" text-anchor="middle">Virtual routing, NSGs / security groups /</text>
+<text class="s" x="596.0" y="280.0" text-anchor="middle">firewall rules, NAT gateways, route tables,</text>
+<text class="s" x="596.0" y="297.0" text-anchor="middle">private DNS — software</text>
+<text class="l" x="596.0" y="314.0" text-anchor="middle">You configure it, you cannot inspect it</text>
+<path class="line" d="M596.0 332 V350"/>
+<rect class="zone" x="416" y="350" width="360" height="46" rx="10"/>
+<text class="l" x="596.0" y="368.5" text-anchor="middle">Physical provider network</text>
+<text class="s" x="596.0" y="385.5" text-anchor="middle">not visible to you</text>
+<path class="line" d="M596.0 396 V414"/>
+<rect class="box" x="416" y="414" width="360" height="34" rx="10"/>
+<text class="l" x="596.0" y="435.0" text-anchor="middle">Internet</text>
+<text class="l" x="416" y="472">You control:</text>
+<text class="s" x="428" y="490">network, subnet, filtering, route-table, and</text>
+<text class="s" x="428" y="507">NAT configuration</text>
+<text class="l" x="416" y="536">You can inspect:</text>
+<text class="s" x="428" y="554">flow logs (Layer 3/4 metadata), effective-rule</text>
+<text class="s" x="428" y="571">and reachability tools, captures on your own</text>
+<text class="s" x="428" y="588">instances</text>
+<text class="l" x="416" y="617">You cannot inspect:</text>
+<text class="s" x="428" y="635">the physical network, the hypervisor’s packet</text>
+<text class="s" x="428" y="652">path, or the root cause of provider-side</text>
+<text class="s" x="428" y="669">latency</text>
+</svg>

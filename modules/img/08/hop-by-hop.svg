@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 704" role="img" aria-labelledby="t d"><title id="t">Packet forwarding, hop by hop</title><desc id="d">A packet from Host A (10.0.1.50) to Server (10.0.5.20). Host A's best match is its default route, so it sends to gateway 10.0.1.1, Router 1. Router 1's best match is 10.0.5.0/24 via 10.0.3.2, Router 2. Router 2 has 10.0.5.0/24 directly connected on eth1, so it ARPs for 10.0.5.20 on eth1 and delivers the packet. Each router only knows the next hop; the IP destination never changes; the destination MAC changes at every hop; with no route, Router 1 would drop the packet and send ICMP Destination Unreachable to Host A.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="702" rx="16"/>
+<text class="zl" x="24" y="28">Packet forwarding — hop by hop</text>
+<rect class="net" x="40" y="44" width="340" height="92" rx="10"/>
+<text class="t" x="56" y="68">Host A (10.0.1.50)</text>
+<text class="s" x="56" y="88">Routing table:</text>
+<text class="m" x="56" y="106">default via 10.0.1.1</text>
+<text class="m" x="56" y="124">10.0.1.0/24 dev eth0</text>
+<path class="arrow" d="M120 136 V206"/>
+<text class="m" x="132" y="164">dst=10.0.5.20</text>
+<text class="s" x="132" y="184">Best match: default → gw 10.0.1.1</text>
+<rect class="net" x="40" y="208" width="340" height="110" rx="10"/>
+<text class="t" x="56" y="232">Router 1 — 10.0.1.1 / 10.0.3.1</text>
+<text class="s" x="56" y="252">Routing table:</text>
+<text class="m" x="56" y="270">10.0.1.0/24 dev eth0</text>
+<text class="m" x="56" y="288">10.0.3.0/24 dev eth1</text>
+<text class="m" x="56" y="306">10.0.5.0/24 via 10.0.3.2</text>
+<path class="arrow" d="M120 318 V388"/>
+<text class="m" x="132" y="346">dst=10.0.5.20</text>
+<text class="s" x="132" y="366">Best match: 10.0.5.0/24 → gw 10.0.3.2</text>
+<rect class="net" x="40" y="390" width="340" height="92" rx="10"/>
+<text class="t" x="56" y="414">Router 2 — 10.0.3.2 / 10.0.5.1</text>
+<text class="s" x="56" y="434">Routing table:</text>
+<text class="m" x="56" y="452">10.0.3.0/24 dev eth0</text>
+<text class="m" x="56" y="470">10.0.5.0/24 dev eth1</text><text class="s" x="216" y="470">(directly connected)</text>
+<path class="arrow" d="M120 482 V568"/>
+<text class="m" x="132" y="506">dst=10.0.5.20</text>
+<text class="s" x="132" y="526">Best match: 10.0.5.0/24 dev eth1 (direct)</text>
+<text class="s" x="132" y="546">ARP for 10.0.5.20 on eth1</text>
+<rect class="ok" x="40" y="570" width="340" height="114" rx="10"/>
+<text class="t" x="56" y="594">Server (10.0.5.20)</text>
+<text class="s" x="56" y="614">Routing table:</text>
+<text class="m" x="56" y="632">default via 10.0.5.1</text>
+<text class="m" x="56" y="650">10.0.5.0/24 dev eth0</text>
+<text class="l" x="56" y="672">Packet delivered to Server.</text>
+<rect class="box" x="420" y="44" width="356" height="208" rx="10"/>
+<text class="zl" x="436" y="68">Key observations</text>
+<text class="s" x="436" y="92">• Each router only knows the NEXT hop,</text>
+<text class="s" x="448" y="110">not the full path.</text>
+<text class="s" x="436" y="128">• The IP destination (10.0.5.20) never</text>
+<text class="s" x="448" y="146">changes.</text>
+<text class="s" x="436" y="164">• The Ethernet destination MAC changes</text>
+<text class="s" x="448" y="182">at EVERY hop (ARP at each step).</text>
+<text class="s" x="436" y="200">• If Router 1 had no route to 10.0.5.0/24,</text>
+<text class="s" x="448" y="218">it would drop the packet and send ICMP</text>
+<text class="s" x="448" y="236">Destination Unreachable back to Host A.</text>
+</svg>

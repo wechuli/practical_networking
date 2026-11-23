@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 700" role="img" aria-labelledby="t d"><title id="t">SLAAC: how an IPv6 host configures itself</title><desc id="d">A sequence between other nodes on the link, the host and the router. 1: the interface comes up and the host builds a link-local address from fe80:: and a 64-bit interface identifier, then runs duplicate address detection on it. 2: the host sends a Router Solicitation to ff02::2. 3: the router answers with a Router Advertisement from its link-local address, carrying the prefix 2001:db8:1::/64 with the A flag, a router lifetime above 0, the M and O flags, and optionally MTU and DNS (RDNSS). 4: the host builds a global address from the prefix and an interface identifier that is often opaque rather than MAC-derived. 5: duplicate address detection sends a Neighbor Solicitation for its own address from :: to the solicited-node group; the address is tentative for about one second. If any Neighbor Advertisement answers, the address is marked dadfailed and never used; silence permits it but does not guarantee nobody claims it later. Result: a link-local address fe80::xxxx, a global address 2001:db8:1::xxxx and a default route via fe80::... proto ra.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="698" rx="16"/>
+<rect class="box" x="20" y="40" width="160" height="40" rx="10"/><text class="l" x="100" y="65" text-anchor="middle">Other nodes on link</text>
+<rect class="net" x="290" y="40" width="140" height="40" rx="10"/><text class="t" x="360" y="65" text-anchor="middle">Host</text>
+<rect class="net" x="620" y="40" width="160" height="40" rx="10"/><text class="t" x="700" y="65" text-anchor="middle">Router</text>
+<text class="zl" x="24" y="26">SLAAC — how IPv6 hosts configure themselves</text>
+<path class="line" d="M100 80 V500"/><path class="line" d="M360 80 V500"/><path class="line" d="M700 80 V500"/>
+<rect class="box" x="200" y="96" width="320" height="48" rx="10"/><text class="l" x="216" y="116">1. Interface up: link-local address</text><text class="s" x="216" y="134">fe80:: + 64-bit interface ID, then DAD</text>
+<text class="l" x="530" y="176" text-anchor="middle">2. Router Solicitation (RS) to ff02::2</text>
+<path class="arrow" d="M360 186 H696"/>
+<text class="l" x="530" y="210" text-anchor="middle">3. Router Advertisement (RA)</text>
+<text class="s" x="530" y="227" text-anchor="middle">from the router's link-local address</text>
+<text class="m" x="530" y="244" text-anchor="middle">2001:db8:1::/64, A flag</text>
+<text class="s" x="530" y="261" text-anchor="middle">router lifetime &gt; 0, M/O flags</text>
+<text class="s" x="530" y="278" text-anchor="middle">optional: MTU, DNS (RDNSS)</text>
+<path class="arrow" d="M700 290 H364"/>
+<rect class="box" x="190" y="306" width="340" height="48" rx="10"/><text class="l" x="206" y="326">4. Global address = prefix + interface ID</text><text class="s" x="206" y="344">the ID is often opaque, not MAC-derived</text>
+<text class="l" x="230" y="376" text-anchor="middle">5. DAD: NS for its own address</text>
+<text class="m" x="230" y="392" text-anchor="middle">from :: to ff02::1:ffXX:XXXX</text>
+<path class="arrow" d="M360 402 H104"/>
+<rect class="box" x="260" y="416" width="200" height="34" rx="10"/><text class="s" x="360" y="438" text-anchor="middle">tentative for about 1 s</text>
+<text class="s" x="230" y="476" text-anchor="middle">any NA answer</text>
+<path class="dash" d="M100 486 H356"/>
+<rect class="warn" x="20" y="516" width="370" height="54" rx="10"/><text class="l" x="40" y="539">NA received → "dadfailed", never used</text><text class="s" x="40" y="558">another node already has the address</text>
+<rect class="ok" x="410" y="516" width="370" height="54" rx="10"/><text class="l" x="430" y="539">Silence → the address is usable</text><text class="s" x="430" y="558">not a guarantee nobody claims it later</text>
+<rect class="ok" x="20" y="586" width="760" height="96" rx="10"/>
+<text class="t" x="40" y="610">Result</text>
+<text class="m" x="40" y="632">fe80::xxxx</text><text class="s" x="200" y="632">(link-local, for local communication)</text>
+<text class="m" x="40" y="651">2001:db8:1::xxxx</text><text class="s" x="200" y="651">(global, for internet communication)</text>
+<text class="m" x="40" y="670">plus a default route "via fe80::... proto ra"</text>
+</svg>

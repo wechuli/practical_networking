@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 380" role="img" aria-labelledby="t d"><title id="t">The netfilter packet path</title><desc id="d">An incoming packet passes PREROUTING (raw, mangle, nat for DNAT), then the routing decision. Packets for this host go to INPUT and then the local process. Other packets go to FORWARD (mangle, filter) and then POSTROUTING (mangle, nat for SNAT) and out. Packets from a local process go through OUTPUT (raw, mangle, nat, filter), then routing, then POSTROUTING and out.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="378" rx="16"/>
+<text class="l" x="20" y="80">in</text><path class="arrow" d="M40 75 H60"/>
+<rect class="l3" x="60" y="40" width="150" height="70" rx="10"/><text class="t" x="135" y="66" text-anchor="middle">PREROUTING</text><text class="s" x="135" y="86" text-anchor="middle">raw, mangle,</text><text class="s" x="135" y="102" text-anchor="middle">nat (DNAT)</text>
+<path class="arrow" d="M210 75 H240"/>
+<rect class="box" x="240" y="50" width="80" height="50" rx="10"/><text class="l" x="280" y="79" text-anchor="middle">routing</text>
+<text class="s" x="370" y="63" text-anchor="middle">for this host</text><path class="arrow" d="M320 75 H420"/>
+<rect class="l3" x="420" y="40" width="140" height="70" rx="10"/><text class="t" x="490" y="80" text-anchor="middle">INPUT</text>
+<path class="arrow" d="M560 75 H620"/>
+<rect class="l7" x="620" y="40" width="160" height="70" rx="10"/><text class="t" x="700" y="80" text-anchor="middle">local process</text>
+<path class="arrow" d="M280 100 V160"/>
+<rect class="l3" x="200" y="160" width="160" height="70" rx="10"/><text class="t" x="280" y="190" text-anchor="middle">FORWARD</text><text class="s" x="280" y="210" text-anchor="middle">mangle, filter</text>
+<path class="arrow" d="M700 110 V160"/>
+<rect class="l3" x="620" y="160" width="160" height="70" rx="10"/><text class="t" x="700" y="190" text-anchor="middle">OUTPUT</text><text class="s" x="700" y="210" text-anchor="middle">raw, mangle, nat, filter</text>
+<path class="arrow" d="M280 230 V280"/>
+<rect class="l3" x="200" y="280" width="160" height="70" rx="10"/><text class="t" x="280" y="310" text-anchor="middle">POSTROUTING</text><text class="s" x="280" y="330" text-anchor="middle">mangle, nat: SNAT</text>
+<path class="arrow" d="M700 230 V290"/>
+<rect class="box" x="640" y="290" width="120" height="50" rx="10"/><text class="l" x="700" y="319" text-anchor="middle">routing</text>
+<path class="arrow" d="M640 315 H360"/>
+<path class="arrow" d="M200 315 H66"/><text class="l" x="20" y="320">out</text>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d"><title id="t">Ping: Echo Request and Echo Reply</title><desc id="d">A sequence diagram between your host and a target host. Your host sends an ICMP Echo Request (Type 8, Code 0) from 10.0.1.50 to 8.8.8.8 with Identifier 1234, Sequence 1 and a payload of timestamp and padding. The target sends back an ICMP Echo Reply (Type 0, Code 0) from 8.8.8.8 to 10.0.1.50 with the same Identifier and Sequence and the payload echoed unchanged. RTT is the time the reply was received minus the time the request was sent: 12.3 ms.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="468" rx="16"/>
+<rect class="net" x="70" y="30" width="180" height="40" rx="10"/><text class="t" x="160" y="56" text-anchor="middle">Your host</text>
+<rect class="net" x="550" y="30" width="180" height="40" rx="10"/><text class="t" x="640" y="56" text-anchor="middle">Target host</text>
+<path class="line" d="M160 70 V322"/><path class="line" d="M640 70 V322"/>
+<text class="l" x="400" y="104" text-anchor="middle">ICMP Echo Request (Type 8, Code 0)</text>
+<text class="m" x="400" y="123" text-anchor="middle">IP src=10.0.1.50, dst=8.8.8.8</text>
+<text class="m" x="400" y="140" text-anchor="middle">Identifier=1234, Sequence=1</text>
+<text class="s" x="400" y="158" text-anchor="middle">Payload: timestamp + padding data</text>
+<path class="arrow" d="M160 172 H638"/>
+<text class="l" x="400" y="210" text-anchor="middle">ICMP Echo Reply (Type 0, Code 0)</text>
+<text class="m" x="400" y="229" text-anchor="middle">IP src=8.8.8.8, dst=10.0.1.50</text>
+<text class="m" x="400" y="246" text-anchor="middle">Identifier=1234, Sequence=1</text>
+<text class="s" x="400" y="264" text-anchor="middle">Payload: echoed back unchanged</text>
+<path class="arrow" d="M640 278 H162"/>
+<rect class="ok" x="150" y="334" width="500" height="44" rx="10"/><text class="l" x="400" y="361" text-anchor="middle">RTT = time(Reply received) − time(Request sent) = 12.3 ms</text>
+<text class="s" x="400" y="410" text-anchor="middle">The Identifier field links a reply to a specific ping process.</text>
+<text class="s" x="400" y="429" text-anchor="middle">The Sequence field links a reply to a specific request.</text>
+<text class="s" x="400" y="448" text-anchor="middle">Multiple ping processes on the same host use different Identifiers.</text>
+</svg>

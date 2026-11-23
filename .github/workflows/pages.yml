@@ -1,4 +1,4 @@
-name: Book (GitHub Pages)
+name: Site (GitHub Pages)
 
 on:
   push:
@@ -16,36 +16,30 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      configured: ${{ steps.configured.outputs.yes }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Skip until the book is configured
-        id: configured
-        run: |
-          if [ -f book.toml ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "book.toml not found; nothing to build yet"; fi
-      - name: Install mdBook (prebuilt binary)
-        if: steps.configured.outputs.yes == 'true'
-        uses: taiki-e/install-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          tool: mdbook
-      - name: Rewrite links to non-Markdown files (on a copy)
-        if: steps.configured.outputs.yes == 'true'
-        run: |
-          rm -rf "$RUNNER_TEMP/src" && mkdir -p "$RUNNER_TEMP/src"
-          git ls-files -z | xargs -0 cp --parents -t "$RUNNER_TEMP/src"
-          bash tools/book-links.sh "$RUNNER_TEMP/src" "https://github.com/${{ github.repository }}" "${{ github.sha }}"
-      - name: Build
-        if: steps.configured.outputs.yes == 'true'
-        run: mdbook build "$RUNNER_TEMP/src" --dest-dir "$GITHUB_WORKSPACE/book"
-      - uses: actions/upload-pages-artifact@v3
-        if: steps.configured.outputs.yes == 'true' && github.event_name != 'pull_request'
+          fetch-depth: 0 # full history for "last updated" dates
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          path: book
+          node-version: 24
+          cache: npm
+      - id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - run: npm ci
+      - name: Build (fails on dead links)
+        run: npm run docs:build
+        env:
+          SITE_BASE: ${{ steps.pages.outputs.base_path && format('{0}/', steps.pages.outputs.base_path) || '/practical_networking/' }}
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: github.event_name != 'pull_request'
+        with:
+          path: .vitepress/dist
 
   deploy:
     needs: build
-    if: needs.build.outputs.configured == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -55,4 +49,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

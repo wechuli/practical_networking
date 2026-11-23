@@ -37,118 +37,35 @@ Every device that participates in IP networking — hosts, routers, firewalls, c
 
 When the kernel needs to send a packet, it follows this process:
 
-```
-ROUTING DECISION — WHAT HAPPENS FOR EVERY PACKET
-
-  1. Application calls send() with data destined for IP address D
-
-  2. Kernel looks up D in the routing table
-
-  3. Kernel finds the best matching route using Longest Prefix Match:
-     - Compare D against every route's destination prefix
-     - Multiple routes may match (e.g., 0.0.0.0/0 matches everything)
-     - Select the route with the LONGEST (most specific) prefix
-     - If tied: use the route with the lowest metric
-     - A route can have several next hops (ECMP); a hash of the
-       packet's addresses (and, if configured, ports) picks one
-     - Before any of this, policy rules (8.6) choose WHICH table to
-       search; the local table (the host's own addresses) comes first
-
-  4. The matching route tells the kernel:
-     - Next hop gateway (or "direct" if on the same subnet)
-     - Output interface (eth0, wlan0, tun0, etc.)
-
-  5. If next hop is a gateway:
-     - ARP for the gateway's MAC address
-     - Encapsulate in an Ethernet frame addressed to the gateway's MAC
-     - Send out the interface
-
-  6. If destination is directly connected (on-link):
-     - ARP for the destination's MAC address directly
-     - Encapsulate in an Ethernet frame addressed to the destination's MAC
-     - Send out the interface
-
-  7. If NO route matches:
-     - Drop the packet
-     - Return error to application: "Network is unreachable"
-     A matching route of type blackhole, unreachable, or prohibit also
-     refuses the packet, each with its own error (8.3).
-```
+![A flowchart of the routing decision for every packet: the application sends to destination D, the kernel looks D up in the routing table and picks the route with the longest matching prefix (lowest metric on a tie, an ECMP hash among several next hops, after policy rules choose the table), then either ARPs for the gateway or for the on-link destination and sends the frame, or, with no matching route, drops the packet and returns "Network is unreachable".](./img/08/routing-decision.svg)
 
 ### The Routing Table Structure
 
-```
-ROUTING TABLE FIELDS
+**Routing table fields**
 
-  ┌──────────────┬────────────────┬──────────┬────────┬────────┬──────────┐
-  │ Destination  │ Gateway        │ Device   │ Scope  │ Metric │ Protocol │
-  ├──────────────┼────────────────┼──────────┼────────┼────────┼──────────┤
-  │ 0.0.0.0/0    │ 10.0.1.1       │ eth0     │ global │ 100    │ dhcp     │
-  │ 10.0.1.0/24  │ (none/direct)  │ eth0     │ link   │ 0      │ kernel   │
-  │ 172.17.0.0/16│ (none/direct)  │ docker0  │ link   │ 0      │ kernel   │
-  │ 10.0.5.0/24  │ 10.0.1.254     │ eth0     │ global │ 0      │ static   │
-  └──────────────┴────────────────┴──────────┴────────┴────────┴──────────┘
+| Destination | Gateway | Device | Scope | Metric | Protocol |
+| --- | --- | --- | --- | --- | --- |
+| 0.0.0.0/0 | 10.0.1.1 | eth0 | global | 100 | dhcp |
+| 10.0.1.0/24 | (none/direct) | eth0 | link | 0 | kernel |
+| 172.17.0.0/16 | (none/direct) | docker0 | link | 0 | kernel |
+| 10.0.5.0/24 | 10.0.1.254 | eth0 | global | 0 | static |
 
-  Destination:  The network this route applies to (CIDR notation)
-  Gateway:      The IP to forward packets to (next hop).
-                "none" or absent means the destination is directly connected.
-  Device:       The network interface to send packets out of.
-  Scope:        "link" = directly connected, "global" = reachable via gateway,
-                "host" = this machine's own addresses (the local table).
-  Metric:       Preference when multiple routes exist for the same dest.
-                Lower = preferred.
-  Protocol:     Who installed the route:
-                "kernel" = auto-created for directly connected networks
-                "dhcp"   = a DHCP client (Ubuntu's networkd, NetworkManager)
-                "static" = a network manager from its configuration
-                           (netplan/systemd-networkd routes: entries)
-                "boot"   = `ip route add` by hand or a script — the
-                           default, so ip hides it; `ip -d route` shows it
-                "ra"     = IPv6 Router Advertisement (Module 5)
-                "bgp" / "ospf" / "bird" = a routing daemon (FRR, BIRD)
-```
+- **Destination**: The network this route applies to (CIDR notation).
+- **Gateway**: The IP to forward packets to (next hop). "none" or absent means the destination is directly connected.
+- **Device**: The network interface to send packets out of.
+- **Scope**: "link" = directly connected, "global" = reachable via gateway, "host" = this machine's own addresses (the local table).
+- **Metric**: Preference when multiple routes exist for the same dest. Lower = preferred.
+- **Protocol**: Who installed the route:
+  - `kernel`: auto-created for directly connected networks
+  - `dhcp`: a DHCP client (Ubuntu's networkd, NetworkManager)
+  - `static`: a network manager from its configuration (netplan/systemd-networkd `routes:` entries)
+  - `boot`: `ip route add` by hand or a script — the default, so ip hides it; `ip -d route` shows it
+  - `ra`: IPv6 Router Advertisement (Module 5)
+  - `bgp` / `ospf` / `bird`: a routing daemon (FRR, BIRD)
 
 ### Diagram: Routing at Every Hop
 
-```
-PACKET FORWARDING — HOP BY HOP
-
-  Host A (10.0.1.50)                                 Server (10.0.5.20)
-  Routing table:                                     Routing table:
-    default via 10.0.1.1                               default via 10.0.5.1
-    10.0.1.0/24 dev eth0                               10.0.5.0/24 dev eth0
-
-       │                                                     ▲
-       │ dst=10.0.5.20                                       │
-       │ Best match: default → gw 10.0.1.1                   │
-       ▼                                                     │
-  [Router 1 — 10.0.1.1 / 10.0.3.1]                         │
-  Routing table:                                             │
-    10.0.1.0/24 dev eth0                                     │
-    10.0.3.0/24 dev eth1                                     │
-    10.0.5.0/24 via 10.0.3.2                                │
-       │                                                     │
-       │ dst=10.0.5.20                                       │
-       │ Best match: 10.0.5.0/24 → gw 10.0.3.2              │
-       ▼                                                     │
-  [Router 2 — 10.0.3.2 / 10.0.5.1]                         │
-  Routing table:                                             │
-    10.0.3.0/24 dev eth0                                     │
-    10.0.5.0/24 dev eth1          ── directly connected ────▶│
-       │
-       │ dst=10.0.5.20
-       │ Best match: 10.0.5.0/24 dev eth1 (direct)
-       │ ARP for 10.0.5.20 on eth1
-       ▼
-  Packet delivered to Server.
-
-  KEY OBSERVATIONS:
-  - Each router only knows the NEXT hop, not the full path.
-  - The IP destination (10.0.5.20) never changes.
-  - The Ethernet destination MAC changes at EVERY hop (ARP at each step).
-  - If Router 1 had no route to 10.0.5.0/24, it would drop the packet
-    and send ICMP Destination Unreachable back to Host A.
-```
+![A packet from Host A (10.0.1.50) to a server (10.0.5.20) crosses two routers: Host A's default route sends it to Router 1 (10.0.1.1), Router 1's route 10.0.5.0/24 via 10.0.3.2 sends it to Router 2, and Router 2, directly connected to 10.0.5.0/24 on eth1, ARPs for the server and delivers it; each router only knows the next hop, the IP destination never changes, and the destination MAC changes at every hop.](./img/08/hop-by-hop.svg)
 
 ---
 
@@ -186,31 +103,11 @@ ip route show
 default via 10.0.1.1 dev eth0 proto dhcp src 10.0.1.50 metric 100
 10.0.1.0/24 dev eth0 proto kernel scope link src 10.0.1.50 metric 100
 172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown
-
-FIELD BY FIELD:
-
-default via 10.0.1.1 dev eth0 proto dhcp src 10.0.1.50 metric 100
-│       │             │        │          │              │
-│       │             │        │          │              └─ Preference (lower=better)
-│       │             │        │          └─ Use this as source IP for packets
-│       │             │        └─ Route learned from DHCP
-│       │             └─ Send packets out this interface
-│       └─ Forward to this gateway (next hop)
-└─ 0.0.0.0/0 — matches ANY destination not matched by a more specific route
-
-10.0.1.0/24 dev eth0 proto kernel scope link src 10.0.1.50 metric 100
-│            │        │            │          │
-│            │        │            │          └─ Source IP for this network
-│            │        │            └─ "link" scope = directly connected
-│            │        └─ Auto-created when IP was assigned to eth0
-│            └─ Packets go directly out eth0 (no gateway — direct delivery)
-└─ Destination network: 10.0.1.0 through 10.0.1.255
-
-172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown
-                                                                  │
-                                                                  └─ Interface is DOWN
-                                                                     (no containers running)
 ```
+
+Field by field:
+
+![The three routes split into their fields: the default route's via, dev, proto dhcp, src and metric fields name the next hop, the interface, who installed it, the source IP and the preference; the connected route 10.0.1.0/24 has no gateway, proto kernel and scope link because it is directly connected; and linkdown on the docker0 route means the interface is down because no containers are running.](./img/08/ip-route-fields.svg)
 
 ### Longest Prefix Match (LPM)
 
@@ -218,44 +115,7 @@ Within a routing-table lookup, the longest matching prefix is selected. Policy
 rules determine which tables are consulted; compare rule priority before applying
 longest-prefix reasoning across entries in different tables.
 
-```
-LONGEST PREFIX MATCH — HOW THE KERNEL CHOOSES
-
-  Routing table:
-    0.0.0.0/0      via 10.0.1.1     (default route — matches everything)
-    10.0.0.0/8     via 10.0.1.254   (matches all 10.x.x.x)
-    10.0.5.0/24    via 10.0.1.100   (matches 10.0.5.0 – 10.0.5.255)
-    10.0.5.20/32   via 10.0.1.200   (matches ONLY 10.0.5.20)
-
-  Packet destined for 10.0.5.20:
-    ✓ Matches 0.0.0.0/0      prefix length = 0  bits
-    ✓ Matches 10.0.0.0/8     prefix length = 8  bits
-    ✓ Matches 10.0.5.0/24    prefix length = 24 bits
-    ✓ Matches 10.0.5.20/32   prefix length = 32 bits  ← WINNER (longest match)
-
-  Route selected: 10.0.5.20/32 via 10.0.1.200
-
-  Packet destined for 10.0.5.99:
-    ✓ Matches 0.0.0.0/0      prefix length = 0  bits
-    ✓ Matches 10.0.0.0/8     prefix length = 8  bits
-    ✓ Matches 10.0.5.0/24    prefix length = 24 bits  ← WINNER
-    ✗ Does NOT match 10.0.5.20/32
-
-  Route selected: 10.0.5.0/24 via 10.0.1.100
-
-  Packet destined for 10.0.99.1:
-    ✓ Matches 0.0.0.0/0      prefix length = 0  bits
-    ✓ Matches 10.0.0.0/8     prefix length = 8  bits  ← WINNER
-    ✗ Does NOT match 10.0.5.0/24
-    ✗ Does NOT match 10.0.5.20/32
-
-  Route selected: 10.0.0.0/8 via 10.0.1.254
-
-  Packet destined for 8.8.8.8:
-    ✓ Matches 0.0.0.0/0      prefix length = 0  bits  ← WINNER (only match)
-
-  Route selected: default via 10.0.1.1
-```
+![Longest prefix match against a table with 0.0.0.0/0, 10.0.0.0/8, 10.0.5.0/24 and 10.0.5.20/32: a packet to 10.0.5.20 matches all four and the /32 wins; 10.0.5.99 matches three and the /24 wins; 10.0.99.1 matches two and the /8 wins; 8.8.8.8 matches only the default route.](./img/08/longest-prefix-match.svg)
 
 ### Equal-Cost Multipath (ECMP)
 
@@ -386,20 +246,20 @@ Docker and Kubernetes enable IP forwarding automatically, so on many hosts `ip_f
 
 ### When Static Routing Is Appropriate
 
-```
-USE STATIC ROUTES WHEN:
-  ✓ Small network with few routes that rarely change
-  ✓ Specific overrides (e.g., "send traffic for this prefix via the VPN")
-  ✓ Cloud VPC route tables (AWS, GCP, Azure use static routes internally)
-  ✓ Default gateway configuration
-  ✓ Lab environments and testing
+**Use static routes when:**
 
-DO NOT USE STATIC ROUTES WHEN:
-  ✗ Many routes that change frequently
-  ✗ Redundant paths where automatic failover is needed
-  ✗ ISP-level or internet routing (use BGP — Module 9)
-  ✗ Large enterprise networks (use OSPF or IS-IS)
-```
+- ✓ Small network with few routes that rarely change
+- ✓ Specific overrides (e.g., "send traffic for this prefix via the VPN")
+- ✓ Cloud VPC route tables (AWS, GCP, Azure use static routes internally)
+- ✓ Default gateway configuration
+- ✓ Lab environments and testing
+
+**Do not use static routes when:**
+
+- ✗ Many routes that change frequently
+- ✗ Redundant paths where automatic failover is needed
+- ✗ ISP-level or internet routing (use BGP — Module 9)
+- ✗ Large enterprise networks (use OSPF or IS-IS)
 
 ---
 
@@ -413,102 +273,60 @@ This module covers the concepts. Module 9 covers BGP in detail.
 
 ### Two Families of Routing Protocols
 
-```
-DISTANCE VECTOR vs LINK-STATE
+**Distance vector vs link-state**
 
-  DISTANCE VECTOR                           LINK-STATE
-  ─────────────────────────────────         ─────────────────────────────────
-  Each router tells neighbors:              Each router tells ALL routers:
-  "I can reach network X in N hops"         "Here are my directly connected links"
+| | Distance vector | Link-state |
+| --- | --- | --- |
+| Each router tells | its neighbors: "I can reach network X in N hops" | ALL routers: "Here are my directly connected links" |
+| Router knows | Distance (hops) to each destination; direction (which neighbor to forward to) | Complete topology of the network; computes best path itself (Dijkstra) |
+| Convergence | Simple but slow to converge. Loops possible during convergence. | Complex but fast convergence. Transient forwarding loops also possible. |
+| Examples | **RIP** (Routing Info Protocol): max 15 hops, obsolete for most use. **EIGRP** (Enhanced Interior Gateway RP): Cisco-developed, "advanced distance vector"; published as RFC 7868 (2016). | **OSPF** (Open Shortest Path First): the standard for enterprise networks. **IS-IS** (Intermediate System to IS): common in ISP networks and large DCs. |
+| When to use | Small, simple networks (home routers). Rarely chosen for new deployments. | Enterprise, data center, ISP networks. The default choice for internal routing. |
 
-  Router knows:                             Router knows:
-  - Distance (hops) to each destination     - Complete topology of the network
-  - Direction (which neighbor to forward to) - Computes best path itself (Dijkstra)
+**BGP (Border Gateway Protocol)** is a path-vector protocol — a distinct category. It routes between autonomous systems (organizations) and is the protocol that runs the internet. Covered in detail in Module 9.
 
-  Simple but slow to converge.              Complex but fast convergence.
-  Loops possible during convergence.       Transient forwarding loops also possible.
+**Interior vs exterior routing**
 
-  Examples:                                 Examples:
-  - RIP  (Routing Info Protocol)            - OSPF (Open Shortest Path First)
-    Max 15 hops. Obsolete for most use.       The standard for enterprise networks.
-  - EIGRP (Enhanced Interior Gateway RP)    - IS-IS (Intermediate System to IS)
-    Cisco-developed, "advanced distance       Common in ISP networks and large DCs.
-    vector"; published as RFC 7868 (2016).
-
-  When to use:                              When to use:
-  Small, simple networks (home routers).    Enterprise, data center, ISP networks.
-  Rarely chosen for new deployments.        The default choice for internal routing.
-
-
-  BGP (Border Gateway Protocol):
-  A path-vector protocol — a distinct category.
-  Routes between autonomous systems (organizations).
-  The protocol that runs the internet.
-  Covered in detail in Module 9.
-
-
-INTERIOR vs EXTERIOR ROUTING
-
-  IGP (Interior Gateway Protocol)           EGP (Exterior Gateway Protocol)
-  ─────────────────────────────             ─────────────────────────────
-  Routing WITHIN an organization            Routing BETWEEN organizations
-  - OSPF                                    - BGP
-  - IS-IS
-  - EIGRP
-  - RIP
-
-  Inside your company / cloud VPC           Between your network and the internet
-```
+| | IGP (Interior Gateway Protocol) | EGP (Exterior Gateway Protocol) |
+| --- | --- | --- |
+| Routing | WITHIN an organization | BETWEEN organizations |
+| Protocols | OSPF, IS-IS, EIGRP, RIP | BGP |
+| Where | Inside your company / cloud VPC | Between your network and the internet |
 
 ### How OSPF Converges, in Numbers
 
 The lab runs OSPF (FRR) on four Linux routers and measures what this section describes:
 
-```
-  OSPF STEP                          WHAT HAPPENS                      LAB TIMING (hello 1 s, dead 4 s)
-  ─────────────────────────────────  ────────────────────────────────  ─────────────────────────────────
-  Neighbours discover each other      hellos on each link               adjacencies Full in ~2.4 s
-  Exchange link-state databases       every router learns every link
-  Run SPF (Dijkstra), install routes  equal costs → ECMP next hops     all routes in the kernel in ~10 s
-  A neighbour dies SILENTLY           nothing until hellos stop         3.2–3.4 s of lost traffic (≤ dead interval)
-  A link goes DOWN (carrier loss)     the router notices at once        0–1 lost probe at 20 per second
-```
+| OSPF step | What happens | Lab timing (hello 1 s, dead 4 s) |
+| --- | --- | --- |
+| Neighbours discover each other | hellos on each link | adjacencies Full in ~2.4 s |
+| Exchange link-state databases | every router learns every link | |
+| Run SPF (Dijkstra), install routes | equal costs → ECMP next hops | all routes in the kernel in ~10 s |
+| A neighbour dies SILENTLY | nothing until hellos stop | 3.2–3.4 s of lost traffic (≤ dead interval) |
+| A link goes DOWN (carrier loss) | the router notices at once | 0–1 lost probe at 20 per second |
 
 Two lessons carry over to every routing protocol, BGP included. **Failure detection dominates convergence**: recomputing paths takes milliseconds, noticing a failure takes as long as the timers say — and the defaults are far longer than the lab's (OSPF hello 10 s, dead 40 s; BGP hold time 90–180 s), which is why production networks add BFD (Bidirectional Forwarding Detection, sub-second). **A dead box is worse than a dead cable**: a link that drops carrier is noticed instantly, while a router that hangs, or a firewall that silently blocks the protocol, is noticed only by timeout.
 
 ### What You Need to Know as an Engineer (Not a Network Architect)
 
-```
-PRACTICAL KNOWLEDGE FOR SUPPORT/DEV/CLOUD ENGINEERS:
+**Practical knowledge for support/dev/cloud engineers:**
 
-  1. You will rarely configure OSPF or BGP directly.
-     But you need to recognize when a routing protocol failure is the cause
-     of a connectivity issue.
-
-  2. Signs of a dynamic routing failure:
-     - Routes suddenly disappear from the routing table
-     - Traceroute shows different paths for the same destination at different times
-     - Connectivity flaps (works, then fails, then works again)
-     - "Destination unreachable" for networks that were working minutes ago
-
-  3. What to check:
-     - Is the routing daemon running? (systemctl status bird / frr)
-     - Are neighbors established? (birdc show protocols / vtysh -c "show ip ospf neighbor")
-     - Did a specific route withdraw? (ip route show — is the route present?)
-
-  4. In cloud environments:
-     - AWS VPC route tables are static but managed automatically by services
-       like Transit Gateway, VPN connections, and peering.
-     - Route propagation can be enabled to let VPN/Direct Connect routes
-       automatically appear in VPC route tables.
-     - GCP uses custom routes + Cloud Router (which speaks BGP to your on-prem).
-     - Azure has system routes, user-defined routes (UDRs), and routes
-       learned by BGP from VPN/ExpressRoute gateways; "effective routes"
-       on a NIC shows the result.
-     - Kubernetes CNIs often run BGP themselves: Calico (BIRD) and
-       Cilium can advertise pod CIDRs to the network; a broken BGP
-       session there looks like "pods on one node are unreachable".
-```
+1. You will rarely configure OSPF or BGP directly. But you need to recognize when a routing protocol failure is the cause of a connectivity issue.
+2. Signs of a dynamic routing failure:
+   - Routes suddenly disappear from the routing table
+   - Traceroute shows different paths for the same destination at different times
+   - Connectivity flaps (works, then fails, then works again)
+   - "Destination unreachable" for networks that were working minutes ago
+3. What to check:
+   - Is the routing daemon running? (`systemctl status bird` / `frr`)
+   - Are neighbors established? (`birdc show protocols` / `vtysh -c "show ip ospf neighbor"`)
+   - Did a specific route withdraw? (`ip route show` — is the route present?)
+4. In cloud environments:
+   - AWS VPC route tables are static but managed automatically by services like Transit Gateway, VPN connections, and peering.
+   - Route propagation can be enabled to let VPN/Direct Connect routes automatically appear in VPC route tables.
+   - GCP uses custom routes + Cloud Router (which speaks BGP to your on-prem).
+   - Azure has system routes, user-defined routes (UDRs), and routes learned by BGP from VPN/ExpressRoute gateways; "effective routes" on a NIC shows the result.
+   - Kubernetes CNIs often run BGP themselves: Calico (BIRD) and Cilium can advertise pod CIDRs to the network; a broken BGP session there looks like "pods on one node are unreachable".
 
 ---
 
@@ -522,82 +340,21 @@ NAT operates on the routing device, not on the endpoints. The endpoints are unaw
 
 ### Types of NAT
 
-```
-THREE TYPES OF NAT
+There are three types of NAT.
 
-  SNAT (Source NAT)
-  ─────────────────
-  Changes the SOURCE IP address of outbound packets.
-  Return traffic has its DESTINATION IP translated back.
+**SNAT (Source NAT)** changes the SOURCE IP address of outbound packets. Return traffic has its DESTINATION IP translated back. Use case: allow private hosts (10.x.x.x) to reach the internet.
 
-  Use case: Allow private hosts (10.x.x.x) to reach the internet.
+**DNAT (Destination NAT)** changes the DESTINATION IP address of inbound packets. Return traffic has its SOURCE IP translated back. The backend sees the client's real source address (only the destination changed), so it must route replies back THROUGH the NAT device; if it replies directly, the client receives a reply from an address it never contacted and drops it. Use case: port forwarding. Route incoming traffic on a public IP to a private backend server.
 
-  Before SNAT:
-  [Host 10.0.1.50] ──src=10.0.1.50, dst=198.51.100.80──▶ [NAT Gateway]
-  After SNAT:
-  [NAT Gateway] ──src=203.0.113.5, dst=198.51.100.80──▶ [Internet]
-                    ↑
-              Public IP of the NAT gateway replaces private IP
+![SNAT and DNAT before and after: with SNAT, host 10.0.1.50 sends to 198.51.100.80 and the NAT gateway replaces the source with its public IP 203.0.113.5; with DNAT, a packet from 198.51.100.1 to 203.0.113.5:443 has its destination replaced with the backend's private address 10.0.1.50:8080, while the source stays the same.](./img/08/nat-types.svg)
 
+**MASQUERADE** is a variant of SNAT where the source IP is automatically set to the outgoing interface's current IP address. Used when the public IP is dynamic (DHCP on the WAN interface).
 
-  DNAT (Destination NAT)
-  ──────────────────────
-  Changes the DESTINATION IP address of inbound packets.
-  Return traffic has its SOURCE IP translated back.
-  The backend sees the client's real source address (only the
-  destination changed), so it must route replies back THROUGH the NAT
-  device; if it replies directly, the client receives a reply from an
-  address it never contacted and drops it.
-
-  Use case: Port forwarding. Route incoming traffic on a public IP
-  to a private backend server.
-
-  Before DNAT:
-  [Internet] ──src=198.51.100.1, dst=203.0.113.5:443──▶ [NAT Gateway]
-  After DNAT:
-  [NAT Gateway] ──src=198.51.100.1, dst=10.0.1.50:8080──▶ [Backend]
-                                          ↑
-                    Private IP of the backend replaces public IP
-
-
-  MASQUERADE
-  ──────────
-  A variant of SNAT where the source IP is automatically set to the
-  outgoing interface's current IP address. Used when the public IP is
-  dynamic (DHCP on the WAN interface).
-
-  Linux stateful NAT selects a mapping on the first packet and reuses it.
-  MASQUERADE derives the source from the egress interface when creating
-  the mapping and handles address changes; it is not a fresh lookup per packet.
-```
+Linux stateful NAT selects a mapping on the first packet and reuses it. MASQUERADE derives the source from the egress interface when creating the mapping and handles address changes; it is not a fresh lookup per packet.
 
 ### Diagram: NAT in a Typical Cloud Architecture
 
-```
-NAT IN A CLOUD VPC
-
-  Private Subnet (10.0.1.0/24)          Public Internet
-  ┌────────────────────────────┐
-  │ App Server  10.0.1.50      │
-  │ App Server  10.0.1.51      │─────▶ NAT Gateway ─────▶ [Internet]
-  │ App Server  10.0.1.52      │       (SNAT)
-  └────────────────────────────┘       Public IP: 52.1.2.3
-
-  Outbound packet from 10.0.1.50 to 198.51.100.80:
-  ┌─────────────────────────────────────────────────────────┐
-  │ Before NAT: src=10.0.1.50:54321  dst=198.51.100.80:443 │
-  │ After NAT:  src=52.1.2.3:40001   dst=198.51.100.80:443 │
-  └─────────────────────────────────────────────────────────┘
-
-  Return packet from 198.51.100.80:
-  ┌─────────────────────────────────────────────────────────┐
-  │ Arrives:    src=198.51.100.80:443 dst=52.1.2.3:40001   │
-  │ After NAT:  src=198.51.100.80:443 dst=10.0.1.50:54321  │
-  └─────────────────────────────────────────────────────────┘
-
-  The internet sees 52.1.2.3. It never sees 10.0.1.50.
-  The app server sees 198.51.100.80. It never knows NAT happened.
-```
+![App servers 10.0.1.50 to 10.0.1.52 in a private subnet reach the internet through a NAT gateway with public IP 52.1.2.3: an outbound packet from 10.0.1.50:54321 to 198.51.100.80:443 leaves with source 52.1.2.3:40001, and the reply to 52.1.2.3:40001 is translated back to 10.0.1.50:54321, so the internet never sees 10.0.1.50 and the app server never knows NAT happened.](./img/08/nat-cloud-vpc.svg)
 
 ### Connection Tracking (conntrack)
 
@@ -605,55 +362,43 @@ The Linux stateful NAT used here requires conntrack to associate original and re
 tuples. Not every possible address-translation design is stateful; stateless
 algorithmic translation is a different mechanism.
 
-```
-CONNECTION TRACKING TABLE (conntrack)
+The kernel's conntrack table stores the state of every connection it tracks — NAT'd or not, as soon as any rule uses NAT or connection state:
 
-  The kernel's conntrack table stores the state of every connection it
-  tracks — NAT'd or not, as soon as any rule uses NAT or connection state:
+| Proto | Original (internal) | Reply (translated) |
+| --- | --- | --- |
+| tcp | 10.0.1.50:54321 → 198.51.100.80:443 | 198.51.100.80:443 → 52.1.2.3:40001 |
+| tcp | 10.0.1.51:55000 → 198.51.100.80:443 | 198.51.100.80:443 → 52.1.2.3:40002 |
 
-  ┌──────────┬──────────────────────────────┬──────────────────────────────┐
-  │  Proto   │  Original (internal)         │  Reply (translated)          │
-  ├──────────┼──────────────────────────────┼──────────────────────────────┤
-  │  tcp     │  10.0.1.50:54321 →           │  198.51.100.80:443 →         │
-  │          │  198.51.100.80:443            │  52.1.2.3:40001              │
-  ├──────────┼──────────────────────────────┼──────────────────────────────┤
-  │  tcp     │  10.0.1.51:55000 →           │  198.51.100.80:443 →         │
-  │          │  198.51.100.80:443            │  52.1.2.3:40002              │
-  └──────────┴──────────────────────────────┴──────────────────────────────┘
+View the conntrack table on Linux:
 
-  View the conntrack table on Linux:
-  sudo conntrack -L
-  sudo conntrack -C          # Count entries
-  cat /proc/sys/net/netfilter/nf_conntrack_max   # Read the actual configured limit
+```bash
+sudo conntrack -L
+sudo conntrack -C          # Count entries
+cat /proc/sys/net/netfilter/nf_conntrack_max   # Read the actual configured limit
 ```
 
 ### Conntrack Table Exhaustion
 
+Conntrack exhaustion is a common production failure.
+
+**Problem:** Every NAT'd connection uses one conntrack entry. The table has a maximum size (`nf_conntrack_max`). When the table is full, NEW connections are DROPPED.
+
+**Symptoms:**
+
+- Intermittent connection failures under high load
+- "nf_conntrack: table full, dropping packet" in dmesg/syslog
+- Connections that were already established continue working
+- Only NEW connections fail (SYN packets are dropped)
+
+**Diagnosis:**
+
+```bash
+sudo dmesg | grep conntrack            # Check for "table full" messages
+sudo conntrack -C                       # Current entry count
+cat /proc/sys/net/netfilter/nf_conntrack_max  # Maximum entries
 ```
-CONNTRACK EXHAUSTION — A COMMON PRODUCTION FAILURE
 
-  Problem: Every NAT'd connection uses one conntrack entry.
-  The table has a maximum size (nf_conntrack_max).
-  When the table is full, NEW connections are DROPPED.
-
-  Symptoms:
-  - Intermittent connection failures under high load
-  - "nf_conntrack: table full, dropping packet" in dmesg/syslog
-  - Connections that were already established continue working
-  - Only NEW connections fail (SYN packets are dropped)
-
-  Diagnosis:
-  sudo dmesg | grep conntrack            # Check for "table full" messages
-  sudo conntrack -C                       # Current entry count
-  cat /proc/sys/net/netfilter/nf_conntrack_max  # Maximum entries
-
-  Mitigation decisions:
-  Correlate count/limit, drop-counter deltas, logs, and failing flows.
-  Pooling and correcting leaks may reduce pressure. Increasing limits costs
-  memory; reducing conntrack lifetimes can break valid idle flows. Preserve
-  original values and a rollback plan before any production change.
-  Conntrack TIME_WAIT lifetime is separate from endpoint TCP TIME_WAIT.
-```
+**Mitigation decisions:** Correlate count/limit, drop-counter deltas, logs, and failing flows. Pooling and correcting leaks may reduce pressure. Increasing limits costs memory; reducing conntrack lifetimes can break valid idle flows. Preserve original values and a rollback plan before any production change. Conntrack TIME_WAIT lifetime is separate from endpoint TCP TIME_WAIT.
 
 ### NAT with iptables
 
@@ -674,47 +419,35 @@ sudo iptables -t nat -L -n -v
 
 ### NAT in Cloud
 
-```
-CLOUD NAT SERVICES
+**AWS NAT Gateway**
 
-  AWS NAT Gateway
-  ────────────────
-  Managed SNAT service. Placed in a public subnet.
-  Private subnets route 0.0.0.0/0 to the NAT Gateway.
-  Up to 55,000 simultaneous connections to each unique destination
-  (IP, port, protocol) per assigned IP address; more IPs raise it.
-  Idle TCP connections are dropped after 350 s — long-lived idle
-  connections need keepalives shorter than that.
-  Costs: per-hour + per-GB processed (often a surprise on the bill).
+- Managed SNAT service. Placed in a public subnet.
+- Private subnets route 0.0.0.0/0 to the NAT Gateway.
+- Up to 55,000 simultaneous connections to each unique destination (IP, port, protocol) per assigned IP address; more IPs raise it.
+- Idle TCP connections are dropped after 350 s — long-lived idle connections need keepalives shorter than that.
+- Costs: per-hour + per-GB processed (often a surprise on the bill).
 
-  GCP Cloud NAT
-  ─────────────
-  Managed SNAT service at the VPC level.
-  Does not require a separate instance — operates on the network tier.
-  Automatic NAT IP allocation or manual assignment.
-  Ports are allocated per VM: by default a minimum of 64 per VM,
-  so one busy VM talking to one destination runs out early; dynamic
-  port allocation raises the ceiling.
+**GCP Cloud NAT**
 
-  Azure NAT Gateway
-  ─────────────────
-  Managed SNAT for outbound connectivity.
-  Associates with subnets. Uses public IP or prefix.
-  64,512 SNAT ports per public IP; idle timeout 4 minutes by default
-  (configurable up to 120).
+- Managed SNAT service at the VPC level.
+- Does not require a separate instance — operates on the network tier.
+- Automatic NAT IP allocation or manual assignment.
+- Ports are allocated per VM: by default a minimum of 64 per VM, so one busy VM talking to one destination runs out early; dynamic port allocation raises the ceiling.
 
-  Common to all:
-  - You cannot SSH into a NAT gateway instance (it's managed)
-  - SNAT port exhaustion is the #1 failure mode
-  - Monitor: CloudWatch ErrorPortAllocation (AWS), Cloud Monitoring
-    dropped-ports metrics (GCP), Azure Monitor SNAT metrics
-  - Ports are per destination: thousands of connections to one API
-    endpoint exhaust ports; the same number spread across many
-    destinations does not
-  - The fix is usually fewer, reused connections (HTTP keep-alive,
-    connection pools) before more IPs
-  - When SNAT ports are exhausted: new connections fail, existing survive
-```
+**Azure NAT Gateway**
+
+- Managed SNAT for outbound connectivity.
+- Associates with subnets. Uses public IP or prefix.
+- 64,512 SNAT ports per public IP; idle timeout 4 minutes by default (configurable up to 120).
+
+**Common to all:**
+
+- You cannot SSH into a NAT gateway instance (it's managed)
+- SNAT port exhaustion is the #1 failure mode
+- Monitor: CloudWatch ErrorPortAllocation (AWS), Cloud Monitoring dropped-ports metrics (GCP), Azure Monitor SNAT metrics
+- Ports are per destination: thousands of connections to one API endpoint exhaust ports; the same number spread across many destinations does not
+- The fix is usually fewer, reused connections (HTTP keep-alive, connection pools) before more IPs
+- When SNAT ports are exhausted: new connections fail, existing survive
 
 ---
 
@@ -738,27 +471,7 @@ on additional policy such as source identity, not inherently for every split tun
 
 ### How It Works
 
-```
-POLICY ROUTING — TWO-STEP LOOKUP
-
-  Step 1: ip rule — which routing table to use?
-  ┌──────────────────────────────────────────────────────────┐
-  │  Priority 0:     from all lookup local                   │
-  │  Priority 100:   from 10.0.1.0/24 lookup custom_table    │
-  │  Priority 32766: from all lookup main                    │
-  │  Priority 32767: from all lookup default                 │
-  └──────────────────────────────────────────────────────────┘
-
-  Rules are evaluated in priority order (lowest number = first).
-  "from 10.0.1.0/24" means: if the SOURCE IP is in this range.
-  "lookup custom_table" means: use this routing table.
-
-  Step 2: ip route show table <name> — the selected routing table
-  Each table is a normal routing table with its own routes.
-
-  Example: traffic from 10.0.1.0/24 uses custom_table, which has a
-  different default gateway than the main table.
-```
+![Policy routing as a two-step lookup: step 1, the ip rule list (priority 0 lookup local, priority 100 from 10.0.1.0/24 lookup custom_table, 32766 lookup main, 32767 lookup default), is evaluated lowest number first and picks a table; step 2 searches that table, so traffic from 10.0.1.0/24 uses custom_table and its different default gateway.](./img/08/policy-routing-lookup.svg)
 
 ### Commands
 
@@ -800,45 +513,7 @@ a fault. Compare source-qualified lookups and captures before changing policy.
 
 ### Diagram: Policy Routing for Multi-Homed Server
 
-```
-MULTI-HOMED SERVER WITH POLICY ROUTING
-
-  ISP A (198.51.100.0/24)                ISP B (203.0.113.0/24)
-       │                                      │
-       │ eth0: 198.51.100.10                   │ eth1: 203.0.113.10
-       └──────────┐                 ┌──────────┘
-                  │                 │
-               ┌──┴─────────────────┴──┐
-               │       Server          │
-               │                       │
-               │  ip rule:             │
-               │  from 198.51.100.10   │
-               │    → lookup table_a   │
-               │  from 203.0.113.10    │
-               │    → lookup table_b   │
-               │                       │
-               │  table_a:             │
-               │    default via        │
-               │    198.51.100.1       │
-               │                       │
-               │  table_b:             │
-               │    default via        │
-               │    203.0.113.1        │
-               └───────────────────────┘
-
-  Without policy routing:
-  All outbound traffic uses one default gateway.
-  Traffic arriving on eth1 might reply via eth0.
-  ISP A sees return traffic for connections it didn't initiate.
-  ISP A drops it (anti-spoofing: that source address is ISP B's), or a
-  stateful firewall on that path drops it because it never saw the
-  connection start — the lab reproduces exactly this.
-
-  With policy routing:
-  Traffic from eth0's IP → table_a → ISP A gateway
-  Traffic from eth1's IP → table_b → ISP B gateway
-  Return traffic always goes back the way it came.
-```
+![A server connected to ISP A on eth0 (198.51.100.10) and ISP B on eth1 (203.0.113.10) uses ip rules to send traffic from each address to its own table, table_a with default via 198.51.100.1 and table_b with default via 203.0.113.1; without these rules, replies to traffic that arrived on eth1 can leave via eth0 and be dropped by ISP A's anti-spoofing or a stateful firewall, while with them return traffic always goes back the way it came.](./img/08/multihomed-policy-routing.svg)
 
 ---
 
@@ -903,18 +578,7 @@ tcpdump -ni any 'host <client-ip> and tcp[tcpflags] & (tcp-syn) != 0'   # SYNs i
 
 [`routing.json`](../labs/netlab/routing.json) builds this network:
 
-```
-                       LAN 198.18.10.0/24 (bridge)
-     client .10 (+ .20) ──────┬───────────── r9 .2 ──── 198.18.14.0/24 ──── server eth1 .10
-                              │
-                            r1 .1  (iptables: drop INVALID conntrack state)
-                ┌─────────────┼───────────────┐
-         198.18.11.0/24  198.18.12.0/24  198.18.13.0/24
-                │             │               │
-         server eth0 .10     r2 .2          r3 .2
-         (default via r1)     └──── 198.19.12.0/24 (bridge) ──── far .10
-                                     r2 .2   r3 .3
-```
+![The routing lab network: the client (.10 and .20), r1 (.1) and r9 (.2) share the bridged LAN 198.18.10.0/24; r1 drops INVALID conntrack state and reaches the server's eth0 over 198.18.11.0/24, r2 over 198.18.12.0/24 and r3 over 198.18.13.0/24; r9 reaches the server's eth1 over 198.18.14.0/24; r2 (.2) and r3 (.3) share the bridge 198.19.12.0/24 with far (.10).](./img/08/routing-lab-topology.svg)
 
 r1 reaches `far` over two equal paths (r2 and r3) and hashes flows by port. The server has two interfaces but only one default route, via r1. The server runs labserver on 8080 (fast) and 8090 (replies after 60 s).
 
@@ -1041,12 +705,7 @@ This is NAT gateway port exhaustion in miniature: four ports, four long-lived co
 
 [`ospf.json`](../labs/netlab/ospf.json) builds two equal-cost paths between two hosts and runs FRR's `zebra` and `ospfd` on each router (each in its own namespace, configured from `/etc/frr/<router>/ospfd.conf`, inspected with `vtysh -N <router>`):
 
-```
-                 ┌── r2 ──┐
-  ha ── r1 ──────┤        ├────── r4 ── hb
-  .21.10         └── r3 ──┘           .26.10
-          all router links: OSPF point-to-point, hello 1 s, dead 4 s
-```
+![The OSPF lab network: host ha (.21.10) connects to r1, which has two equal paths to r4, through r2 and through r3, and r4 connects to host hb (.26.10); all router links run OSPF point-to-point with hello 1 s and dead 4 s.](./img/08/ospf-lab-topology.svg)
 
 ```bash
 sudo ./bin/netlab run ../netlab/ospf.json        # about 45 s; 11 checks

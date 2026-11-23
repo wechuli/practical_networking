@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 552" role="img" aria-labelledby="t d"><title id="t">A multi-homed server with policy routing</title><desc id="d">A server connects to ISP A (198.51.100.0/24) on eth0 with 198.51.100.10 and to ISP B (203.0.113.0/24) on eth1 with 203.0.113.10. Its ip rules send traffic from 198.51.100.10 to table_a, whose default route is via 198.51.100.1, and traffic from 203.0.113.10 to table_b, whose default route is via 203.0.113.1. Without policy routing, all traffic uses one default gateway, replies to connections that arrived on eth1 may leave via eth0, and ISP A or a stateful firewall drops them. With policy routing, each address uses its own ISP's gateway and return traffic goes back the way it came.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="550" rx="16"/>
+<text class="zl" x="24" y="28">Multi-homed server with policy routing</text>
+<rect class="net" x="60" y="44" width="240" height="50" rx="10"/><text class="t" x="180" y="66" text-anchor="middle">ISP A</text><text class="m" x="180" y="84" text-anchor="middle">198.51.100.0/24</text>
+<rect class="net" x="500" y="44" width="240" height="50" rx="10"/><text class="t" x="620" y="66" text-anchor="middle">ISP B</text><text class="m" x="620" y="84" text-anchor="middle">203.0.113.0/24</text>
+<path class="line" d="M180 94 V168"/><text class="m" x="190" y="136">eth0: 198.51.100.10</text>
+<path class="line" d="M620 94 V168"/><text class="m" x="610" y="136" text-anchor="end">eth1: 203.0.113.10</text>
+<rect class="net" x="140" y="168" width="520" height="132" rx="10"/>
+<text class="t" x="400" y="192" text-anchor="middle">Server</text>
+<text class="zl" x="160" y="220">ip rule</text>
+<text class="m" x="160" y="240">from 198.51.100.10 → lookup table_a</text>
+<text class="m" x="160" y="258">from 203.0.113.10  → lookup table_b</text>
+<text class="zl" x="450" y="220">table_a</text>
+<text class="m" x="450" y="240">default via 198.51.100.1</text>
+<text class="zl" x="450" y="264">table_b</text>
+<text class="m" x="450" y="284">default via 203.0.113.1</text>
+<rect class="warn" x="16" y="324" width="376" height="212" rx="10"/>
+<text class="t" x="30" y="348">Without policy routing</text>
+<text class="s" x="30" y="372">All outbound traffic uses one default gateway.</text>
+<text class="s" x="30" y="390">Traffic arriving on eth1 might reply via eth0.</text>
+<text class="s" x="30" y="408">ISP A sees return traffic for connections</text>
+<text class="s" x="30" y="426">it didn't initiate.</text>
+<text class="s" x="30" y="444">ISP A drops it (anti-spoofing: that source</text>
+<text class="s" x="30" y="462">address is ISP B's), or a stateful firewall</text>
+<text class="s" x="30" y="480">on that path drops it because it never saw</text>
+<text class="s" x="30" y="498">the connection start — the lab reproduces</text>
+<text class="s" x="30" y="516">exactly this.</text>
+<rect class="ok" x="408" y="324" width="376" height="212" rx="10"/>
+<text class="t" x="422" y="348">With policy routing</text>
+<text class="s" x="422" y="372">Traffic from eth0's IP → table_a</text>
+<text class="s" x="434" y="390">→ ISP A gateway</text>
+<text class="s" x="422" y="414">Traffic from eth1's IP → table_b</text>
+<text class="s" x="434" y="432">→ ISP B gateway</text>
+<text class="s" x="422" y="456">Return traffic always goes back the way</text>
+<text class="s" x="422" y="474">it came.</text>
+</svg>

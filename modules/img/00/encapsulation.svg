@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 630" role="img" aria-labelledby="t d"><title id="t">Encapsulation and decapsulation of an HTTP request</title><desc id="d">Data gets wrapped at each layer. Going down: the application data is an HTTP request (GET / HTTP/1.1); TCP wraps it with a TCP header; IP wraps that with an IP header; Ethernet wraps that with an Ethernet header and an FCS trailer, and the frame is sent on the wire. Going up on the receiver: Ethernet checks the FCS and strips its header, IP strips its header, TCP strips its header, and the application gets the HTTP request back.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="628" rx="16"/>
+<text class="zl" x="24" y="34">ENCAPSULATION — data gets wrapped at each layer</text>
+<text class="l" x="24" y="74">Application data</text>
+<rect class="l7" x="150" y="52" width="260" height="34" rx="6"/>
+<text class="l" x="280.0" y="73.0" text-anchor="middle">HTTP Request: GET / HTTP/1.1</text>
+<path class="arrow" d="M170 86 V114"/>
+<text class="s" x="182" y="105">TCP wraps it</text>
+<text class="l" x="24" y="138">Transport</text>
+<rect class="l4" x="150" y="116" width="110" height="34" rx="6"/>
+<text class="l" x="205.0" y="137.0" text-anchor="middle">TCP Header</text>
+<rect class="l7" x="260" y="116" width="180" height="34" rx="6"/>
+<text class="l" x="350.0" y="137.0" text-anchor="middle">HTTP Request</text>
+<path class="arrow" d="M170 150 V178"/>
+<text class="s" x="182" y="169">IP wraps it</text>
+<text class="l" x="24" y="202">Network</text>
+<rect class="l3" x="150" y="180" width="100" height="34" rx="6"/>
+<text class="l" x="200.0" y="201.0" text-anchor="middle">IP Header</text>
+<rect class="l4" x="250" y="180" width="110" height="34" rx="6"/>
+<text class="l" x="305.0" y="201.0" text-anchor="middle">TCP Header</text>
+<rect class="l7" x="360" y="180" width="180" height="34" rx="6"/>
+<text class="l" x="450.0" y="201.0" text-anchor="middle">HTTP Request</text>
+<path class="arrow" d="M170 214 V242"/>
+<text class="s" x="182" y="233">Ethernet wraps it</text>
+<text class="l" x="24" y="266">Link</text>
+<rect class="l2" x="150" y="244" width="110" height="34" rx="6"/>
+<text class="l" x="205.0" y="265.0" text-anchor="middle">Eth Header</text>
+<rect class="l3" x="260" y="244" width="100" height="34" rx="6"/>
+<text class="l" x="310.0" y="265.0" text-anchor="middle">IP Header</text>
+<rect class="l4" x="360" y="244" width="110" height="34" rx="6"/>
+<text class="l" x="415.0" y="265.0" text-anchor="middle">TCP Header</text>
+<rect class="l7" x="470" y="244" width="180" height="34" rx="6"/>
+<text class="l" x="560.0" y="265.0" text-anchor="middle">HTTP Request</text>
+<rect class="l2" x="650" y="244" width="60" height="34" rx="6"/>
+<text class="l" x="680.0" y="265.0" text-anchor="middle">FCS</text>
+<path class="arrow" d="M170 278 V312"/>
+<rect class="net" x="150" y="314" width="200" height="34" rx="10"/>
+<text class="l" x="250.0" y="335.0" text-anchor="middle">Sent on the wire</text>
+<path class="arrow" d="M170 348 V376"/>
+<text class="l" x="24" y="402">Received</text>
+<rect class="l2" x="150" y="380" width="110" height="34" rx="6"/>
+<text class="l" x="205.0" y="401.0" text-anchor="middle">Eth Header</text>
+<rect class="l3" x="260" y="380" width="100" height="34" rx="6"/>
+<text class="l" x="310.0" y="401.0" text-anchor="middle">IP Header</text>
+<rect class="l4" x="360" y="380" width="110" height="34" rx="6"/>
+<text class="l" x="415.0" y="401.0" text-anchor="middle">TCP Header</text>
+<rect class="l7" x="470" y="380" width="180" height="34" rx="6"/>
+<text class="l" x="560.0" y="401.0" text-anchor="middle">HTTP Request</text>
+<rect class="l2" x="650" y="380" width="60" height="34" rx="6"/>
+<text class="l" x="680.0" y="401.0" text-anchor="middle">FCS</text>
+<path class="arrow" d="M170 414 V442"/>
+<text class="s" x="182" y="433">Ethernet checks the FCS, strips its header</text>
+<text class="l" x="24" y="466">Network</text>
+<rect class="l3" x="150" y="444" width="100" height="34" rx="6"/>
+<text class="l" x="200.0" y="465.0" text-anchor="middle">IP Header</text>
+<rect class="l4" x="250" y="444" width="110" height="34" rx="6"/>
+<text class="l" x="305.0" y="465.0" text-anchor="middle">TCP Header</text>
+<rect class="l7" x="360" y="444" width="180" height="34" rx="6"/>
+<text class="l" x="450.0" y="465.0" text-anchor="middle">HTTP Request</text>
+<path class="arrow" d="M170 478 V506"/>
+<text class="s" x="182" y="497">IP strips its header</text>
+<text class="l" x="24" y="530">Transport</text>
+<rect class="l4" x="150" y="508" width="110" height="34" rx="6"/>
+<text class="l" x="205.0" y="529.0" text-anchor="middle">TCP Header</text>
+<rect class="l7" x="260" y="508" width="180" height="34" rx="6"/>
+<text class="l" x="350.0" y="529.0" text-anchor="middle">HTTP Request</text>
+<path class="arrow" d="M170 542 V570"/>
+<text class="s" x="182" y="561">TCP strips its header</text>
+<text class="l" x="24" y="594">Application</text>
+<rect class="l7" x="150" y="572" width="260" height="34" rx="6"/>
+<text class="l" x="280.0" y="593.0" text-anchor="middle">HTTP Request: GET / HTTP/1.1</text>
+</svg>

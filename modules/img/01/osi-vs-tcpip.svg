@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 456" role="img" aria-labelledby="t d"><title id="t">The OSI model compared with the TCP/IP model</title><desc id="d">OSI layers 7 Application, 6 Presentation and 5 Session map to the TCP/IP Application layer, where HTTP, DNS, SSH, SMTP and gRPC run, with TLS sitting between TCP and the app. OSI layer 4 Transport maps to TCP/IP Transport: TCP, UDP, and QUIC on UDP. OSI layer 3 Network maps to the TCP/IP Internet layer: IP and ICMP. OSI layers 2 Data Link and 1 Physical map to the TCP/IP Link layer: Ethernet, Wi-Fi and ARP.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="454" rx="16"/>
+<text class="zl" x="24" y="34">OSI MODEL (7 layers)</text>
+<text class="zl" x="300" y="34">TCP/IP MODEL (4 layers)</text>
+<text class="zl" x="540" y="34">WHAT RUNS HERE</text>
+<rect class="l7" x="24" y="52" width="220" height="44" rx="8"/>
+<text class="t" x="40" y="79">7</text>
+<text class="t" x="64" y="79">Application</text>
+<rect class="l7" x="24" y="108" width="220" height="44" rx="8"/>
+<text class="t" x="40" y="135">6</text>
+<text class="t" x="64" y="135">Presentation</text>
+<rect class="l7" x="24" y="164" width="220" height="44" rx="8"/>
+<text class="t" x="40" y="191">5</text>
+<text class="t" x="64" y="191">Session</text>
+<rect class="l4" x="24" y="220" width="220" height="44" rx="8"/>
+<text class="t" x="40" y="247">4</text>
+<text class="t" x="64" y="247">Transport</text>
+<rect class="l3" x="24" y="276" width="220" height="44" rx="8"/>
+<text class="t" x="40" y="303">3</text>
+<text class="t" x="64" y="303">Network</text>
+<rect class="l2" x="24" y="332" width="220" height="44" rx="8"/>
+<text class="t" x="40" y="359">2</text>
+<text class="t" x="64" y="359">Data Link</text>
+<rect class="l2" x="24" y="388" width="220" height="44" rx="8"/>
+<text class="t" x="40" y="415">1</text>
+<text class="t" x="64" y="415">Physical</text>
+<rect class="l7" x="300" y="52" width="190" height="156" rx="8"/>
+<text class="t" x="395.0" y="135.0" text-anchor="middle">Application</text>
+<path class="line" d="M244 74 H300"/>
+<path class="line" d="M244 130 H300"/>
+<path class="line" d="M244 186 H300"/>
+<path class="line" d="M490 130.0 H530"/>
+<text class="l" x="540" y="108.5">HTTP, DNS, SSH,</text>
+<text class="l" x="540" y="125.5">SMTP, gRPC</text>
+<text class="s" x="540" y="142.5">(TLS sits between</text>
+<text class="s" x="540" y="159.5">TCP and the app)</text>
+<rect class="l4" x="300" y="220" width="190" height="44" rx="8"/>
+<text class="t" x="395.0" y="247.0" text-anchor="middle">Transport</text>
+<path class="line" d="M244 242 H300"/>
+<path class="line" d="M490 242.0 H530"/>
+<text class="l" x="540" y="246.0">TCP, UDP, QUIC (on UDP)</text>
+<rect class="l3" x="300" y="276" width="190" height="44" rx="8"/>
+<text class="t" x="395.0" y="303.0" text-anchor="middle">Internet</text>
+<path class="line" d="M244 298 H300"/>
+<path class="line" d="M490 298.0 H530"/>
+<text class="l" x="540" y="302.0">IP, ICMP</text>
+<rect class="l2" x="300" y="332" width="190" height="100" rx="8"/>
+<text class="t" x="395.0" y="387.0" text-anchor="middle">Link</text>
+<path class="line" d="M244 354 H300"/>
+<path class="line" d="M244 410 H300"/>
+<path class="line" d="M490 382.0 H530"/>
+<text class="l" x="540" y="386.0">Ethernet, Wi-Fi, ARP</text>
+</svg>

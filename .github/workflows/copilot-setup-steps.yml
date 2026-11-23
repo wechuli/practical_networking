@@ -21,12 +21,13 @@ jobs:
           cache-dependency-path: labs/go/go.mod
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - name: Install mdBook (prebuilt binary)
-        uses: taiki-e/install-action@v2
-        with:
-          tool: mdbook
+          node-version: 24
+          cache: npm
+      - name: Install site dependencies
+        run: npm ci
       - name: Show versions
-        run: go version && node --version && mdbook --version
+        run: go version && node --version
       - name: Course check
         run: node tools/check-course.mjs
+      - name: Site build
+        run: npm run docs:build

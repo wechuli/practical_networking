@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1660" role="img" aria-labelledby="t d"><title id="t">A fresh HTTPS request in five steps</title><desc id="d">What happens when you run curl -v https://example.com. Step 1, DNS resolution (Module 12): your machine asks a recursive resolver, which asks the root, TLD and authoritative servers, and the answer comes back as A or AAAA records such as 203.0.113.10. Step 2, TCP connection (Module 11): SYN, SYN-ACK, ACK; connected after 1 round trip. Step 3, TLS 1.3 handshake, simplified (Module 13): ClientHello with versions, ciphers, key share, SNI and ALPN; the server answers with ServerHello and key share, then the already encrypted EncryptedExtensions, Certificate, CertificateVerify and Finished; the client verifies the certificate chain and hostname and sends its Finished; encrypted after 1 more round trip. Step 4, HTTP request and response (Module 15): GET / with Host example.com, answered by 200 with the body; HTTP/2 if both sides chose h2 via ALPN, else HTTP/1.1. Step 5, TCP teardown (Module 11): FIN, FIN and ACK, ACK; closed. Keep-alive and HTTP/2 hold the connection open for reuse; some applications abort with RST instead of closing with FIN.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="1658" rx="16"/>
+<rect class="l7" x="200" y="20" width="400" height="36" rx="10"/>
+<text class="s" x="220" y="43">You type:</text>
+<text class="m" x="290" y="43">curl -v https://example.com</text>
+<path class="arrow" d="M400 56 V78"/>
+<rect class="box" x="20" y="82" width="760" height="190" rx="12"/>
+<rect class="l7" x="36" y="96" width="330" height="30" rx="8"/>
+<text class="t" x="50" y="116">Step 1 · DNS resolution</text>
+<text class="s" x="764" y="116" text-anchor="end">Module 12</text>
+<text class="s" x="36" y="152">“What is the IP address of example.com?”</text>
+<rect class="net" x="40" y="166" width="160" height="56" rx="10"/>
+<text class="t" x="120.0" y="199.0" text-anchor="middle">Your machine</text>
+<rect class="net" x="300" y="166" width="200" height="56" rx="10"/>
+<text class="t" x="400.0" y="199.0" text-anchor="middle">Recursive resolver</text>
+<rect class="net" x="600" y="166" width="170" height="56" rx="10"/>
+<text class="t" x="685.0" y="189.5" text-anchor="middle">root, TLD,</text>
+<text class="t" x="685.0" y="208.5" text-anchor="middle">authoritative</text>
+<path class="arrow" d="M200 188 H298"/>
+<text class="l" x="250.0" y="181" text-anchor="middle">ask</text>
+<path class="arrow" d="M300 214 H202"/>
+<text class="l" x="250.0" y="207" text-anchor="middle">answer</text>
+<path class="arrow" d="M500 188 H598"/>
+<text class="l" x="550.0" y="181" text-anchor="middle">ask</text>
+<path class="arrow" d="M600 214 H502"/>
+<text class="l" x="550.0" y="207" text-anchor="middle">answer</text>
+<text class="s" x="36" y="252">Result: one or more A/AAAA records, e.g. <tspan class="m">203.0.113.10</tspan></text>
+<path class="arrow" d="M400 272 V294"/>
+<rect class="box" x="20" y="298" width="760" height="252" rx="12"/>
+<rect class="l4" x="36" y="312" width="330" height="30" rx="8"/>
+<text class="t" x="50" y="332">Step 2 · TCP connection</text>
+<text class="s" x="764" y="332" text-anchor="end">Module 11</text>
+<rect class="net" x="70" y="356" width="160" height="34" rx="10"/>
+<text class="l" x="150.0" y="377.0" text-anchor="middle">Your machine</text>
+<rect class="net" x="435" y="356" width="170" height="34" rx="10"/>
+<text class="l" x="520.0" y="377.0" text-anchor="middle">example.com server</text>
+<path class="line" d="M150 390 V502"/>
+<path class="line" d="M520 390 V502"/>
+<path class="arrow" d="M150 428 H518"/>
+<text class="l" x="335.0" y="421" text-anchor="middle">SYN</text>
+<text class="s" x="545" y="432">“I want to connect”</text>
+<path class="arrow" d="M520 460 H152"/>
+<text class="l" x="335.0" y="453" text-anchor="middle">SYN-ACK</text>
+<text class="s" x="545" y="464">“Okay, I’m ready”</text>
+<path class="arrow" d="M150 492 H518"/>
+<text class="l" x="335.0" y="485" text-anchor="middle">ACK</text>
+<text class="s" x="545" y="496">“Great, let’s go”</text>
+<rect class="ok" x="36" y="512" width="248" height="28" rx="8"/>
+<text class="l" x="160.0" y="531" text-anchor="middle">CONNECTED after 1 round trip</text>
+<path class="arrow" d="M400 550 V572"/>
+<rect class="box" x="20" y="576" width="760" height="462" rx="12"/>
+<rect class="l7" x="36" y="590" width="330" height="30" rx="8"/>
+<text class="t" x="50" y="610">Step 3 · TLS 1.3 handshake (simplified)</text>
+<text class="s" x="764" y="610" text-anchor="end">Module 13</text>
+<rect class="net" x="70" y="634" width="160" height="34" rx="10"/>
+<text class="l" x="150.0" y="655.0" text-anchor="middle">Your machine</text>
+<rect class="net" x="435" y="634" width="170" height="34" rx="10"/>
+<text class="l" x="520.0" y="655.0" text-anchor="middle">example.com server</text>
+<path class="line" d="M150 668 V988"/>
+<path class="line" d="M520 668 V988"/>
+<path class="arrow" d="M150 698 H518"/>
+<text class="l" x="335.0" y="691" text-anchor="middle">ClientHello</text>
+<text class="s" x="162" y="718">versions, ciphers, key share,</text>
+<text class="s" x="162" y="735">SNI “example.com”, ALPN h2/http1.1</text>
+<path class="arrow" d="M520 774 H152"/>
+<text class="l" x="335.0" y="767" text-anchor="middle">ServerHello (+ key share)</text>
+<path class="arrow" d="M520 806 H152"/>
+<text class="l" x="335.0" y="799" text-anchor="middle">{EncryptedExtensions}</text>
+<path class="arrow" d="M520 838 H152"/>
+<text class="l" x="335.0" y="831" text-anchor="middle">{Certificate}</text>
+<path class="arrow" d="M520 870 H152"/>
+<text class="l" x="335.0" y="863" text-anchor="middle">{CertificateVerify}</text>
+<path class="arrow" d="M520 902 H152"/>
+<text class="l" x="335.0" y="895" text-anchor="middle">{Finished}</text>
+<path class="line" d="M534 794 H540 V906 H534"/>
+<text class="s" x="549" y="838.0">everything in {braces}</text>
+<text class="s" x="549" y="855.0">is already encrypted</text>
+<text class="s" x="162" y="942">client verifies the certificate chain and hostname</text>
+<path class="arrow" d="M150 976 H518"/>
+<text class="l" x="335.0" y="969" text-anchor="middle">{Finished}</text>
+<rect class="ok" x="36" y="998" width="288" height="28" rx="8"/>
+<text class="l" x="180.0" y="1017" text-anchor="middle">ENCRYPTED after 1 more round trip</text>
+<path class="arrow" d="M400 1038 V1060"/>
+<rect class="box" x="20" y="1064" width="760" height="250" rx="12"/>
+<rect class="l7" x="36" y="1078" width="330" height="30" rx="8"/>
+<text class="t" x="50" y="1098">Step 4 · HTTP request + response</text>
+<text class="s" x="764" y="1098" text-anchor="end">Module 15</text>
+<rect class="net" x="70" y="1122" width="160" height="34" rx="10"/>
+<text class="l" x="150.0" y="1143.0" text-anchor="middle">Your machine</text>
+<rect class="net" x="435" y="1122" width="170" height="34" rx="10"/>
+<text class="l" x="520.0" y="1143.0" text-anchor="middle">example.com server</text>
+<path class="line" d="M150 1156 V1296"/>
+<path class="line" d="M520 1156 V1296"/>
+<path class="arrow" d="M150 1186 H518"/>
+<text class="l" x="335.0" y="1179" text-anchor="middle">GET /</text>
+<text class="m" x="162" y="1206">Host: example.com</text>
+<text class="s" x="545" y="1190">HTTP/2 if both sides chose</text>
+<text class="s" x="545" y="1207">“h2” via ALPN, else HTTP/1.1</text>
+<path class="arrow" d="M520 1252 H152"/>
+<text class="l" x="335.0" y="1245" text-anchor="middle">200</text>
+<text class="m" x="162" y="1272">content-type: html</text>
+<text class="m" x="162" y="1289">[body...]</text>
+<path class="arrow" d="M400 1314 V1336"/>
+<rect class="box" x="20" y="1340" width="760" height="300" rx="12"/>
+<rect class="l4" x="36" y="1354" width="330" height="30" rx="8"/>
+<text class="t" x="50" y="1374">Step 5 · TCP teardown</text>
+<text class="s" x="764" y="1374" text-anchor="end">Module 11</text>
+<rect class="net" x="70" y="1398" width="160" height="34" rx="10"/>
+<text class="l" x="150.0" y="1419.0" text-anchor="middle">Your machine</text>
+<rect class="net" x="435" y="1398" width="170" height="34" rx="10"/>
+<text class="l" x="520.0" y="1419.0" text-anchor="middle">example.com server</text>
+<path class="line" d="M150 1432 V1544"/>
+<path class="line" d="M520 1432 V1544"/>
+<path class="arrow" d="M150 1470 H518"/>
+<text class="l" x="335.0" y="1463" text-anchor="middle">FIN</text>
+<path class="arrow" d="M520 1502 H152"/>
+<text class="l" x="335.0" y="1495" text-anchor="middle">FIN, ACK</text>
+<path class="arrow" d="M150 1534 H518"/>
+<text class="l" x="335.0" y="1527" text-anchor="middle">ACK</text>
+<text class="s" x="545" y="1474">either side may close first;</text>
+<text class="s" x="545" y="1491">the reply ACK and FIN are</text>
+<text class="s" x="545" y="1508">often combined (3 segments)</text>
+<rect class="box" x="36" y="1554" width="72" height="28" rx="8"/>
+<text class="l" x="72.0" y="1573" text-anchor="middle">CLOSED</text>
+<text class="s" x="36" y="1606">Keep-alive and HTTP/2 hold the connection open for reuse;</text>
+<text class="s" x="36" y="1624">some applications abort with RST instead of closing with FIN.</text>
+</svg>

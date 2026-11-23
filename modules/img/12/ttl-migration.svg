@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 510" role="img" aria-labelledby="t d"><title id="t">Changing a DNS record with caches in mind</title><desc id="d">A timeline for migrating a record. Before the change, by at least the old TTL plus a margin, lower the record's TTL, for example from 3600 to 60. At time T, change the record and keep the old endpoint serving. At T plus the new TTL most clients have moved: verify from several resolvers and watch the old endpoint drain. Later, raise the TTL again. Mistake to avoid: changing the address and lowering the TTL at the same time. Also remember that resolvers may clamp TTLs or serve stale data, a JVM caches independently, and low TTLs cost queries without guaranteeing speed.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="508" rx="16"/>
+<text class="zl" x="24" y="34">Migration with caches in mind</text>
+<path class="line" d="M210 64 V300"/>
+<circle class="net" cx="210" cy="70" r="7"/><text class="l" x="192" y="75" text-anchor="end">T − (old TTL + margin)</text>
+<text class="s" x="232" y="75">Lower the record's TTL (say 3600 → 60). Caches holding the old record</text>
+<text class="s" x="232" y="93">keep the OLD TTL until it expires, so wait at least the old TTL before</text>
+<text class="s" x="232" y="111">relying on the new one.</text>
+<circle class="net" cx="210" cy="150" r="7"/><text class="l" x="192" y="155" text-anchor="end">T</text>
+<text class="s" x="232" y="155">Change the record. Keep the old endpoint serving: some caches, long-lived</text>
+<text class="s" x="232" y="173">connections and misbehaving clients will still use it.</text>
+<circle class="net" cx="210" cy="212" r="7"/><text class="l" x="192" y="217" text-anchor="end">T + new TTL</text>
+<text class="s" x="232" y="217">Most clients have moved. Verify from several resolvers and networks</text>
+<text class="s" x="232" y="235">(<tspan class="m">dnslab watch</tspan>, <tspan class="m">dig @…</tspan>), and watch the old endpoint's traffic drain.</text>
+<circle class="ok" cx="210" cy="280" r="7"/><text class="l" x="192" y="285" text-anchor="end">Later</text>
+<text class="s" x="232" y="285">Raise the TTL again.</text>
+<rect class="warn" x="24" y="318" width="752" height="68" rx="10"/>
+<text class="l" x="40" y="342">Mistake to avoid</text>
+<text class="s" x="40" y="362">Changing the address and lowering the TTL at the same time: caches already holding the record</text>
+<text class="s" x="40" y="378">ignore the new TTL until theirs expires.</text>
+<rect class="box" x="24" y="398" width="752" height="94" rx="10"/>
+<text class="l" x="40" y="422">Also remember</text>
+<text class="s" x="40" y="442">Resolvers may clamp TTLs (cache-min-ttl, cache-max-ttl), serve stale data when the authority is</text>
+<text class="s" x="40" y="458">unreachable (RFC 8767), and a JVM caches independently.</text>
+<text class="s" x="40" y="474">Low TTLs cost queries; they do not guarantee speed.</text>
+</svg>

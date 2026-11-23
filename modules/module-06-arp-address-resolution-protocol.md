@@ -41,39 +41,7 @@ The sending host needs a translation mechanism: given an IP address on the local
 
 ARP is used only for local delivery — when the destination IP is on the same subnet (same broadcast domain) as the sender. If the destination is on a different subnet, the packet goes to the default gateway, and the ARP lookup is for the gateway's MAC address, not the final destination's.
 
-```
-WHEN IS ARP NEEDED?
-
-  Case 1: Destination is on the same subnet
-  ─────────────────────────────────────────
-  Host A (10.0.1.10) wants to send to Host B (10.0.1.20)
-  Both are on 10.0.1.0/24 — same subnet
-
-  Host A needs Host B's MAC → ARP for 10.0.1.20
-
-  [Host A] ──ARP: Who has 10.0.1.20?──▶ [Switch] ──▶ [Host B]
-  [Host A] ◀──ARP: 10.0.1.20 is at aa:bb:cc:dd:ee:ff── [Host B]
-  [Host A] ──Ethernet frame dst=aa:bb:cc:dd:ee:ff──▶ [Host B]
-
-
-  Case 2: Destination is on a different subnet
-  ─────────────────────────────────────────────
-  Host A (10.0.1.10) wants to send to Server (10.0.5.20)
-  Different subnets — routing table says next hop is gateway 10.0.1.1
-
-  Host A needs the GATEWAY's MAC → ARP for 10.0.1.1 (not 10.0.5.20)
-
-  [Host A] ──ARP: Who has 10.0.1.1?──▶ [Gateway/Router]
-  [Host A] ◀──ARP: 10.0.1.1 is at 11:22:33:44:55:66── [Gateway]
-  [Host A] ──Frame dst=11:22:33:44:55:66, IP dst=10.0.5.20──▶ [Gateway]
-                                                                    │
-           Note: the Ethernet destination is the gateway's MAC,     │
-           but the IP destination is the final server. The gateway   │
-           strips the Ethernet header, looks at the IP destination, │
-           and re-encapsulates in a new frame for the next hop.     │
-                                                                    ▼
-                                                          [Server 10.0.5.20]
-```
+![Case 1: Host A (10.0.1.10) ARPs for Host B (10.0.1.20) on the same 10.0.1.0/24 subnet and sends its frame to Host B's MAC. Case 2: to reach a server at 10.0.5.20 on another subnet, Host A ARPs for gateway 10.0.1.1 instead, sends a frame addressed to the gateway's MAC with IP destination 10.0.5.20, and the gateway re-encapsulates it in a new frame for the next hop.](./img/06/when-arp-needed.svg)
 
 ### Key Insight
 
@@ -81,34 +49,7 @@ WHEN IS ARP NEEDED?
 
 ### Diagram: Where ARP Fits in the Stack
 
-```
-  APPLICATION DATA
-       │
-       ▼
-  ┌──────────────────────────────────────────────┐
-  │ TCP Header │ Application Data                │  Layer 4
-  └────────────┴─────────────────────────────────┘
-       │
-       ▼
-  ┌──────────┬──────────────────────────────────────┐
-  │ IP Header │ TCP Header │ Application Data       │  Layer 3
-  │ Src IP    │                                     │
-  │ Dst IP    │  ← IP destination known             │
-  └──────────┴──────────────────────────────────────┘
-       │
-       ▼  ARP resolves the destination MAC here
-  ┌──────────┬──────────┬──────────────────────────────┬─────┐
-  │ Eth Hdr  │ IP Header│ TCP + Data                   │ FCS │  Layer 2
-  │ Dst MAC  │          │                               │     │
-  │ Src MAC  │          │                               │     │
-  │   ↑      │          │                               │     │
-  │   │      │          │                               │     │
-  │   └── Found by ARP                                  │     │
-  └──────────┴──────────┴──────────────────────────────┴─────┘
-       │
-       ▼
-  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   Bits on wire   Layer 1
-```
+![Application data is wrapped by a TCP header and then an IP header whose destination IP is already known; ARP then resolves the destination MAC that goes into the Ethernet header before the frame is sent as bits.](./img/06/arp-in-stack.svg)
 
 ---
 
@@ -122,99 +63,42 @@ IPv6 does not use ARP. Neighbor Discovery (Module 5.5) does the same job with IC
 
 ### The ARP Process — Step by Step
 
-```
-ARP REQUEST-REPLY SEQUENCE
+![Host A checks its ARP cache and misses, broadcasts an ARP request asking who has 10.0.1.20, Host B caches Host A's mapping and answers with a unicast reply saying 10.0.1.20 is at bb:bb:bb:bb:bb:bb, other hosts stay silent, and Host A caches the answer as REACHABLE and sends its packet.](./img/06/arp-exchange.svg)
 
-  Step 1: Host A checks its ARP cache
-  ──────────────────────────────────
-  Does Host A already know the MAC for 10.0.1.20?
-  → Check: ip neigh show | grep 10.0.1.20
-  → If found and REACHABLE: use the cached MAC. Done. No ARP needed.
-  → If STALE: send with the cached MAC immediately, and confirm it a few
-    seconds later (DELAY, then PROBE — see the state table below).
-  → If absent: queue the packet and proceed to Step 2.
+**Step 1 — Host A checks its ARP cache.** Does Host A already know the MAC for 10.0.1.20? Check: `ip neigh show | grep 10.0.1.20`.
 
+- If found and REACHABLE: use the cached MAC. Done. No ARP needed.
+- If STALE: send with the cached MAC immediately, and confirm it a few seconds later (DELAY, then PROBE — see the state table below).
+- If absent: queue the packet and proceed to Step 2.
 
-  Step 2: Host A sends an ARP Request (broadcast)
-  ────────────────────────────────────────────────
-  Source MAC:  Host A's MAC (aa:aa:aa:aa:aa:aa)
-  Dest MAC:    ff:ff:ff:ff:ff:ff (Ethernet broadcast — every host on segment)
-  EtherType:   0x0806 (ARP)
-  Operation:   1 (ARP Request)
-  Sender IP:   10.0.1.10
-  Sender MAC:  aa:aa:aa:aa:aa:aa
-  Target IP:   10.0.1.20
-  Target MAC:  00:00:00:00:00:00 (unknown — this is what we're asking)
+**Step 2 — Host A sends an ARP Request (broadcast). Step 3 — Host B sends an ARP Reply (unicast).**
 
-  "Who has 10.0.1.20? Tell 10.0.1.10"
+| Field | Step 2: ARP Request | Step 3: ARP Reply |
+| --- | --- | --- |
+| Source MAC | Host A's MAC (`aa:aa:aa:aa:aa:aa`) | Host B's MAC (`bb:bb:bb:bb:bb:bb`) |
+| Dest MAC | `ff:ff:ff:ff:ff:ff` (Ethernet broadcast — every host on segment) | `aa:aa:aa:aa:aa:aa` (directed back to Host A) |
+| EtherType | `0x0806` (ARP) | `0x0806` (ARP) |
+| Operation | 1 (ARP Request) | 2 (ARP Reply) |
+| Sender IP | 10.0.1.10 | 10.0.1.20 |
+| Sender MAC | `aa:aa:aa:aa:aa:aa` | `bb:bb:bb:bb:bb:bb` |
+| Target IP | 10.0.1.20 | 10.0.1.10 |
+| Target MAC | `00:00:00:00:00:00` (unknown — this is what we're asking) | `aa:aa:aa:aa:aa:aa` |
+| Meaning | "Who has 10.0.1.20? Tell 10.0.1.10" | "10.0.1.20 is at bb:bb:bb:bb:bb:bb" |
 
-  This broadcast reaches EVERY host on the local segment.
-  Every host receives it. Only 10.0.1.20 responds.
+The request broadcast reaches EVERY host on the local segment. Every host receives it. Only 10.0.1.20 responds. The reply is unicast — sent directly to Host A, not broadcast. Host B also caches Host A's mapping from the request itself, so the conversation needs no second ARP exchange in the other direction.
 
+**Step 4 — Host A caches the result.** Host A stores `10.0.1.20 → bb:bb:bb:bb:bb:bb` (REACHABLE). Now Host A can construct the Ethernet frame and send the IP packet.
 
-  Step 3: Host B sends an ARP Reply (unicast)
-  ────────────────────────────────────────────
-  Source MAC:  Host B's MAC (bb:bb:bb:bb:bb:bb)
-  Dest MAC:    aa:aa:aa:aa:aa:aa (directed back to Host A)
-  EtherType:   0x0806 (ARP)
-  Operation:   2 (ARP Reply)
-  Sender IP:   10.0.1.20
-  Sender MAC:  bb:bb:bb:bb:bb:bb
-  Target IP:   10.0.1.10
-  Target MAC:  aa:aa:aa:aa:aa:aa
-
-  "10.0.1.20 is at bb:bb:bb:bb:bb:bb"
-
-  This is unicast — sent directly to Host A, not broadcast.
-
-  Host B also caches Host A's mapping from the request itself, so the
-  conversation needs no second ARP exchange in the other direction.
-
-
-  Step 4: Host A caches the result
-  ─────────────────────────────────
-  Host A stores: 10.0.1.20 → bb:bb:bb:bb:bb:bb (REACHABLE)
-  Now Host A can construct the Ethernet frame and send the IP packet.
-
-  Reachability has an aging timer, not a simple DNS-style cache TTL.
-  STALE can transmit immediately; DELAY then PROBE can confirm reachability.
-  TCP traffic confirms reachability as a side effect (an ACK proves the
-  neighbor is alive), so busy TCP peers rarely need probes; ICMP and UDP
-  do not, so their entries are probed every so often.
-```
+Reachability has an aging timer, not a simple DNS-style cache TTL. STALE can transmit immediately; DELAY then PROBE can confirm reachability. TCP traffic confirms reachability as a side effect (an ACK proves the neighbor is alive), so busy TCP peers rarely need probes; ICMP and UDP do not, so their entries are probed every so often.
 
 ### The ARP Packet Format
 
-```
-ARP PACKET STRUCTURE (28 bytes for IPv4 over Ethernet)
+![The 28-byte ARP packet for IPv4 over Ethernet: hardware type 0x0001 (Ethernet, 2 bytes), protocol type 0x0800 (IPv4, 2 bytes), hardware address length 6 (1 byte), protocol address length 4 (1 byte), operation 1 for request or 2 for reply (2 bytes), then the sender's MAC (6 bytes) and IP (4 bytes) and the target's MAC (6 bytes, all zeros in requests) and IP (4 bytes).](./img/06/arp-packet.svg)
 
-  ┌────────────────────────────────────────────────────────────┐
-  │ Hardware Type (2 bytes)     = 0x0001 (Ethernet)            │
-  │ Protocol Type (2 bytes)     = 0x0800 (IPv4)                │
-  │ Hardware Addr Len (1 byte)  = 6 (MAC = 6 bytes)            │
-  │ Protocol Addr Len (1 byte)  = 4 (IPv4 = 4 bytes)           │
-  │ Operation (2 bytes)         = 1 (Request) or 2 (Reply)     │
-  ├────────────────────────────────────────────────────────────┤
-  │ Sender Hardware Address (6 bytes)  = Sender's MAC          │
-  │ Sender Protocol Address (4 bytes)  = Sender's IP           │
-  │ Target Hardware Address (6 bytes)  = Target's MAC           │
-  │                                      (00:00:00:00:00:00    │
-  │                                       in requests)         │
-  │ Target Protocol Address (4 bytes)  = Target's IP            │
-  └────────────────────────────────────────────────────────────┘
+Total: 28 bytes of ARP payload inside an Ethernet frame — 42 bytes with the 14-byte Ethernet header, padded to the 60-byte minimum on a real wire (tcpdump on the sender shows "length 42", before padding).
 
-  Total: 28 bytes of ARP payload inside an Ethernet frame — 42 bytes with
-  the 14-byte Ethernet header, padded to the 60-byte minimum on a real wire
-  (tcpdump on the sender shows "length 42", before padding).
-
-  In an ARP Request:
-    Target Hardware Address = all zeros (unknown)
-    Ethernet destination = ff:ff:ff:ff:ff:ff (broadcast)
-
-  In an ARP Reply:
-    Target Hardware Address = requester's MAC (now known)
-    Ethernet destination = requester's MAC (unicast)
-```
+- **In an ARP Request:** Target Hardware Address = all zeros (unknown); Ethernet destination = `ff:ff:ff:ff:ff:ff` (broadcast).
+- **In an ARP Reply:** Target Hardware Address = requester's MAC (now known); Ethernet destination = requester's MAC (unicast).
 
 ### The ARP Cache
 
@@ -232,44 +116,16 @@ arp -n
 
 **ARP cache states in Linux (managed by the kernel's neighbor subsystem):**
 
-```
-STATE         MEANING                                  ACTION TAKEN
-───────────   ────────────────────────────────────     ──────────────────────
-REACHABLE     Recently confirmed valid. The host       Use the cached MAC
-              responded to an ARP request or sent      directly. No ARP needed.
-              traffic recently.
-
-STALE         Not recently confirmed. The entry is     Still usable. The next
-              old — the reachability timer has          packet is sent with it
-              expired. It might still be valid.         at once and the entry
-                                                        moves to DELAY.
-
-DELAY         A packet was sent using a STALE entry.   Kernel waits
-              The kernel is waiting briefly to see if   delay_first_probe_time
-              confirmation arrives (e.g., a TCP ACK     (5 s) for that before
-              from the neighbor).                       probing.
-
-PROBE         Confirmation did not arrive during        Kernel is actively
-              DELAY. The kernel is now actively         sending unicast ARP
-              sending unicast ARP probes to the         requests to the
-              neighbor.                                 cached MAC.
-
-FAILED        ARP resolution failed entirely. The      Queued packets are
-              neighbor did not respond to any ARP       dropped; the sender
-              requests (broadcast or unicast).          gets EHOSTUNREACH. The
-                                                        next packet starts a
-                                                        new resolution.
-
-INCOMPLETE    An ARP request was sent but no reply      Waiting for reply.
-              has been received yet. Resolution is      Packets are queued
-              in progress.                              (unres_qlen_bytes).
-
-PERMANENT     Manually configured static entry.         Never expires. Never
-              Will not be overwritten by ARP.           probed.
-
-NOARP         Interface does not use ARP (e.g.,         No ARP activity for
-              loopback, point-to-point tunnels).        this neighbor.
-```
+| State | Meaning | Action taken |
+| --- | --- | --- |
+| REACHABLE | Recently confirmed valid. The host responded to an ARP request or sent traffic recently. | Use the cached MAC directly. No ARP needed. |
+| STALE | Not recently confirmed. The entry is old — the reachability timer has expired. It might still be valid. | Still usable. The next packet is sent with it at once and the entry moves to DELAY. |
+| DELAY | A packet was sent using a STALE entry. The kernel is waiting briefly to see if confirmation arrives (e.g., a TCP ACK from the neighbor). | Kernel waits `delay_first_probe_time` (5 s) for that before probing. |
+| PROBE | Confirmation did not arrive during DELAY. The kernel is now actively sending unicast ARP probes to the neighbor. | Kernel is actively sending unicast ARP requests to the cached MAC. |
+| FAILED | ARP resolution failed entirely. The neighbor did not respond to any ARP requests (broadcast or unicast). | Queued packets are dropped; the sender gets EHOSTUNREACH. The next packet starts a new resolution. |
+| INCOMPLETE | An ARP request was sent but no reply has been received yet. Resolution is in progress. | Waiting for reply. Packets are queued (`unres_qlen_bytes`). |
+| PERMANENT | Manually configured static entry. Will not be overwritten by ARP. | Never expires. Never probed. |
+| NOARP | Interface does not use ARP (e.g., loopback, point-to-point tunnels). | No ARP activity for this neighbor. |
 
 **The timers that produce those states** (Linux defaults, per interface under `net.ipv4.neigh.<if>.`):
 
@@ -351,57 +207,11 @@ They serve related but different purposes; silence is not proof of permanent uni
 
 ### Diagram: Gratuitous ARP During Failover
 
-```
-VIRTUAL IP FAILOVER WITH GRATUITOUS ARP
+![Before failover, the client's ARP cache maps the VIP 10.0.1.200 to the primary server's MAC aa:aa:aa..., so it sends to the primary. After the primary dies, the standby (10.0.1.101) takes over the VIP and broadcasts a gratuitous ARP saying 10.0.1.200 is at bb:bb:bb..., and the client's cache is updated so it sends to the standby's MAC.](./img/06/gratuitous-arp-failover.svg)
 
-  Before failover:
-  ┌──────────────────┐              ┌──────────────────┐
-  │  Primary Server  │              │  Standby Server  │
-  │  IP: 10.0.1.100  │              │  IP: 10.0.1.101  │
-  │  VIP: 10.0.1.200 │              │  (no VIP yet)    │
-  │  MAC: aa:aa:aa... │              │  MAC: bb:bb:bb... │
-  └────────┬─────────┘              └────────┬─────────┘
-           │                                 │
-  ═════════╪═════════════════════════════════╪═══════ Switch
-           │                                 │
-  ┌────────┴─────────┐
-  │  Client          │
-  │  ARP cache:      │
-  │  10.0.1.200 →    │
-  │    aa:aa:aa...   │   ← Client sends to primary's MAC
-  └──────────────────┘
+**Without gratuitous ARP:** the client keeps sending to aa:aa:aa (dead server) until its entry ages out of REACHABLE, sits in DELAY, and fails three unicast probes — up to ~53 s with Linux defaults. Other operating systems and routers use different timers (some routers keep ARP entries for hours). Service is DOWN for that client the whole time.
 
-
-  Primary fails. Standby takes over VIP:
-  ┌──────────────────┐              ┌──────────────────┐
-  │  Primary Server  │              │  Standby Server  │
-  │  ██ DEAD ██      │              │  IP: 10.0.1.101  │
-  │                  │              │  VIP: 10.0.1.200 │ ← VIP moved here
-  │                  │              │  MAC: bb:bb:bb... │
-  └──────────────────┘              └────────┬─────────┘
-                                             │
-  ═══════════════════════════════════════════╪═══════ Switch
-                                             │
-  Standby sends GRATUITOUS ARP:              │
-  "10.0.1.200 is at bb:bb:bb..."             │
-  (broadcast to ff:ff:ff:ff:ff:ff)           │
-                                             │
-  ┌──────────────────┐                       │
-  │  Client          │◀──────────────────────┘
-  │  ARP cache:      │
-  │  10.0.1.200 →    │
-  │    bb:bb:bb...   │   ← Cache updated! Client now sends to standby's MAC
-  └──────────────────┘
-
-  Without gratuitous ARP: client keeps sending to aa:aa:aa (dead server)
-  until its entry ages out of REACHABLE, sits in DELAY, and fails three
-  unicast probes — up to ~53 s with Linux defaults. Other operating
-  systems and routers use different timers (some routers keep ARP
-  entries for hours). Service is DOWN for that client the whole time.
-
-  With accepted announcements: mappings can converge sooner. Measure failover;
-  address ownership, switch FDB state, timers, and loss also matter.
-```
+**With accepted announcements:** mappings can converge sooner. Measure failover; address ownership, switch FDB state, timers, and loss also matter.
 
 ### Gratuitous ARP on the Wire
 
@@ -450,45 +260,7 @@ ARP has no authentication. There is no way for a host to verify that an ARP repl
 
 ### How ARP Spoofing Works
 
-```
-ARP SPOOFING — MAN-IN-THE-MIDDLE ATTACK
-
-  Normal state:
-  [Client 10.0.1.10] ──traffic for gateway──▶ [Gateway 10.0.1.1]
-  Client ARP cache: 10.0.1.1 → GW_MAC
-
-
-  Attacker sends forged ARP reply to client:
-  "10.0.1.1 is at ATTACKER_MAC"   ← LIE
-
-  [Attacker 10.0.1.99]
-     │
-     │  Forged ARP Reply (unsolicited):
-     │  Sender IP:  10.0.1.1        ← Claims to be the gateway
-     │  Sender MAC: ATTACKER_MAC    ← But gives its own MAC
-     │
-     ▼
-  [Client 10.0.1.10]
-  ARP cache: 10.0.1.1 → ATTACKER_MAC   ← POISONED
-
-
-  Now all traffic from client to gateway goes to attacker:
-  [Client] ──traffic for 10.0.1.1──▶ [Attacker] ──forwards──▶ [Gateway]
-                                          │
-                                          └── Attacker can:
-                                              • Read all unencrypted traffic
-                                              • Modify packets in transit
-                                              • Drop packets selectively
-                                              • Capture credentials (HTTP, FTP, etc.)
-
-
-  Attacker also poisons the gateway:
-  "10.0.1.10 is at ATTACKER_MAC"
-
-  Now the attacker sits in the middle of BOTH directions:
-  [Client] ◀──▶ [Attacker] ◀──▶ [Gateway]
-       Full man-in-the-middle position
-```
+![An attacker at 10.0.1.99 sends the client an unsolicited forged ARP reply claiming that the gateway 10.0.1.1 is at ATTACKER_MAC, poisoning the client's cache so its traffic for the gateway goes through the attacker, who forwards it and can read, modify, drop or harvest credentials from it; by also poisoning the gateway, the attacker sits in the middle of both directions.](./img/06/arp-spoofing.svg)
 
 ### Why ARP Spoofing Works
 
@@ -499,39 +271,22 @@ ARP SPOOFING — MAN-IN-THE-MIDDLE ATTACK
 
 ### Detection and Prevention
 
-```
-DETECTION:
-  arpwatch         Monitors ARP traffic. Alerts on IP/MAC changes.
-                   Detects: "flip flop" = MAC for an IP keeps changing.
+**Detection:**
 
-  tcpdump          Manual detection:
-                   sudo tcpdump -i eth0 -nn arp
-                   Watch for: multiple different MACs claiming the same IP.
+| Tool | What it does |
+| --- | --- |
+| `arpwatch` | Monitors ARP traffic. Alerts on IP/MAC changes. Detects: "flip flop" = MAC for an IP keeps changing. |
+| `tcpdump` | Manual detection: `sudo tcpdump -i eth0 -nn arp`. Watch for: multiple different MACs claiming the same IP. |
+| Wireshark | Expert Info → Duplicate IP address detected. Filter: `arp.duplicate-address-detected` |
 
-  Wireshark        Expert Info → Duplicate IP address detected.
-                   Filter: arp.duplicate-address-detected
+**Prevention:**
 
-
-PREVENTION:
-  Dynamic ARP Inspection (DAI)
-                   Switch-level feature. The switch validates ARP packets
-                   against a DHCP snooping binding table. ARP replies that
-                   don't match the known IP-to-MAC binding are dropped.
-
-  Static ARP entries
-                   Manually configure critical mappings (e.g., the gateway):
-                   sudo ip neigh replace 10.0.1.1 lladdr aa:bb:cc:dd:ee:ff dev eth0 nud permanent
-                   Permanent entries are not overwritten by ARP replies.
-
-  802.1X           Port-based access control. Only authenticated devices
-                   can send traffic, including ARP.
-
-  Use TLS/HTTPS    Even if traffic is redirected via ARP spoofing, an
-                   attacker cannot read or modify correctly authenticated
-                   TLS traffic. They can still drop it (denial of service),
-                   see who talks to whom, and attack anything unencrypted
-                   or any client that skips certificate verification.
-```
+| Measure | What it does |
+| --- | --- |
+| Dynamic ARP Inspection (DAI) | Switch-level feature. The switch validates ARP packets against a DHCP snooping binding table. ARP replies that don't match the known IP-to-MAC binding are dropped. |
+| Static ARP entries | Manually configure critical mappings (e.g., the gateway): `sudo ip neigh replace 10.0.1.1 lladdr aa:bb:cc:dd:ee:ff dev eth0 nud permanent`. Permanent entries are not overwritten by ARP replies. |
+| 802.1X | Port-based access control. Only authenticated devices can send traffic, including ARP. |
+| Use TLS/HTTPS | Even if traffic is redirected via ARP spoofing, an attacker cannot read or modify correctly authenticated TLS traffic. They can still drop it (denial of service), see who talks to whom, and attack anything unencrypted or any client that skips certificate verification. |
 
 ### Production Relevance
 
@@ -550,27 +305,7 @@ ARP spoofing is less relevant in cloud environments (where ARP is controlled by 
 
 Proxy ARP is when a device (typically a router) answers ARP requests on behalf of another host that is on a different network. The router responds with its own MAC address, so the sender sends the frame to the router, which then forwards the packet to the actual destination.
 
-```
-PROXY ARP
-
-  Host A (10.0.1.10) wants to reach Host C (10.0.2.50)
-  Host A was configured with 10.0.1.10/8 instead of /24, so it thinks
-  10.0.2.50 is on the local network and ARPs for it directly.
-
-  Without Proxy ARP:
-  Host A sends ARP broadcast: "Who has 10.0.2.50?"
-  No one on the local /24 segment has that IP. ARP fails. Packets dropped.
-
-  With Proxy ARP (router has it enabled):
-  Host A sends ARP broadcast: "Who has 10.0.2.50?"
-  Router (10.0.1.1) has a route to 10.0.2.0/24 and replies:
-  "10.0.2.50 is at ROUTER_MAC"
-  Host A sends packets to ROUTER_MAC. Router forwards to 10.0.2.50.
-
-  Proxy ARP masks misconfiguration. It makes things work when they
-  should not. This can hide real problems. Most networks disable it
-  on routers facing ordinary LANs.
-```
+![Host A, misconfigured as 10.0.1.10/8, ARPs directly for 10.0.2.50. Without proxy ARP nobody on the local /24 answers, so ARP fails and packets are dropped. With proxy ARP, the router 10.0.1.1, which has a route to 10.0.2.0/24, replies that 10.0.2.50 is at ROUTER_MAC and forwards the packets, masking the misconfiguration.](./img/06/proxy-arp.svg)
 
 A Linux interface with `proxy_arp=1` answers a request only if the kernel has a route to the target **through a different interface**; with no matching route (not even a default), it stays silent.
 
@@ -604,61 +339,22 @@ What a guest actually sees differs by provider:
 
 **Consequence for failover:** a gratuitous ARP from a VM moves nothing, because the provider, not the guest, decides which NIC an IP belongs to. keepalived-style VIP failover in a VPC needs an API call on takeover (reassign a secondary private IP, move an Elastic/public IP, or update a route table entry), usually with VRRP in unicast mode because multicast is not delivered. A design that works on-premises and "fails silently" after migrating to the cloud is often this.
 
-```
-ARP IN A PHYSICAL NETWORK vs CLOUD VPC
+![On a physical network, Host A's ARP broadcast is flooded across the shared segment and Host B replies. In a cloud VPC, VM A's ARP request goes to the hypervisor's virtual switch, which answers from its own table, so no broadcast reaches other VMs.](./img/06/arp-physical-vs-cloud.svg)
 
-  Physical Network:
-  ┌────────┐  ARP broadcast  ┌────────┐
-  │ Host A │ ──────────────▶ │ Host B │
-  │        │ ◀────────────── │        │
-  └────────┘  ARP reply      └────────┘
-  Both hosts are on a real shared Ethernet segment.
-  The switch floods the ARP broadcast to all ports in the VLAN.
+This means:
 
+- ✓ Spoofing another VM's address does not work: the provider answers ARP and checks source addresses (unless you disable that check, e.g. AWS "source/destination check" for NAT instances).
+- ✓ Broadcast storms from ARP cannot happen.
+- ✗ Gratuitous-ARP failover does not work (see above).
+- ✗ Debugging ARP in cloud is harder — `tcpdump arp` shows only your side.
 
-  Cloud VPC (e.g., AWS):
-  ┌────────┐  ARP request    ┌──────────────┐
-  │  VM A  │ ──────────────▶ │  Hypervisor  │
-  │        │ ◀────────────── │  (virtual     │
-  └────────┘  ARP reply      │   switch)     │
-                              └──────────────┘
-  The hypervisor knows every VM's IP and MAC.
-  It answers ARP requests instantly from its own table.
-  No broadcast reaches other VMs — ARP is contained.
-
-  This means:
-  ✓ Spoofing another VM's address does not work: the provider answers
-    ARP and checks source addresses (unless you disable that check,
-    e.g. AWS "source/destination check" for NAT instances)
-  ✓ Broadcast storms from ARP cannot happen
-  ✗ Gratuitous-ARP failover does not work (see above)
-  ✗ Debugging ARP in cloud is harder — tcpdump arp shows only your side
-  Guest-created bridges and overlays (Docker, a CNI) are real L2
-  segments again, with all of this module's behavior.
-```
+Guest-created bridges and overlays (Docker, a CNI) are real L2 segments again, with all of this module's behavior.
 
 ### Overlay Networks and ARP Suppression
 
 In overlay networks (VXLAN, used by Docker overlay and many Kubernetes CNIs), ARP is often suppressed or proxied at the VTEP (VXLAN Tunnel Endpoint). Flannel's VXLAN backend, for example, writes static neighbor and FDB entries for each remote node instead of letting ARP flood (`ip neigh show dev flannel.1` and `bridge fdb show dev flannel.1` on a node list them); Module 16 covers CNIs. Instead of broadcasting ARP across the entire overlay, the VTEP has a distributed IP-to-MAC table and answers ARP locally. This prevents ARP broadcasts from being tunneled across the underlay network, which would negate much of the benefit of overlays.
 
-```
-ARP IN VXLAN OVERLAY NETWORKS
-
-  Without ARP suppression:
-  ARP broadcast from Container A must be encapsulated in VXLAN,
-  sent to every VTEP in the overlay, decapsulated, and broadcast
-  on every local segment. This is expensive and does not scale.
-
-  With ARP suppression:
-  ┌──────────┐   ARP request    ┌──────────┐
-  │Container │ ────────────────▶│   VTEP   │
-  │    A     │ ◀────────────────│ (knows   │
-  └──────────┘   ARP reply      │  the MAC │
-                 (from VTEP)    │  table)  │
-                                └──────────┘
-  VTEP answers from its learned table. No broadcast across the overlay.
-  The ARP request never leaves the local host.
-```
+![Without ARP suppression, an ARP broadcast from a container is encapsulated in VXLAN, sent to every VTEP and broadcast on every local segment, which does not scale. With ARP suppression, the local VTEP answers the ARP request from its learned MAC table, so the request never leaves the local host.](./img/06/vxlan-arp-suppression.svg)
 
 ---
 
@@ -685,13 +381,7 @@ ARP IN VXLAN OVERLAY NETWORKS
 
 [`arp.json`](../labs/netlab/arp.json) builds one switched segment and a Kubernetes-style node:
 
-```
-                         switch (Linux bridge br0)
-        ┌──────────┬──────────┬──────────┬──────────┐
-     client      web1       web2     intruder     node ── cali1 ── pod
-   198.18.6.1  .10 (+VIP   .11        .66        .20               198.18.7.5/32
-   …06:01      .100) …06:0a …06:0b    …06:66                       gateway 169.254.1.1
-```
+![The ARP lab: a Linux bridge br0 connects client 198.18.6.1, web1 at .10 with the VIP .100, web2 at .11, an intruder at .66 and a node at .20; the node connects over cali1 to a pod at 198.18.7.5/32 whose gateway is 169.254.1.1.](./img/06/arp-lab-topology.svg)
 
 Every MAC is set to `02:00:00:00:06:xx` (locally administered, Module 3) so the transcripts are readable: the last byte matches the host. The client's `base_reachable_time_ms` is cut from 30 s to 12 s so the states change within the lab's runtime.
 

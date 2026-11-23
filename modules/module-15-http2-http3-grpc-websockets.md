@@ -59,21 +59,10 @@ Bundling still helps compression, but is no longer needed for parallelism.
 
 HTTP/2 (RFC 9113, which obsoletes RFC 7540) keeps HTTP's semantics but replaces the text format with **binary frames**. Every frame starts with a 9-byte header:
 
-```
-+-----------------------------------------------+
-| Length (24 bits)                              |
-+---------------+---------------+---------------+
-| Type (8)      | Flags (8)     |
-+-+-------------+---------------+-------------------------------+
-|R| Stream Identifier (31 bits)                                 |
-+=+=============================================================+
-| Frame Payload (Length bytes)                                  |
-+---------------------------------------------------------------+
+![The 9-byte HTTP/2 frame header is a 24-bit Length, an 8-bit Type, 8 bits of Flags, one reserved bit R and a 31-bit Stream Identifier, followed by a Frame Payload of Length bytes.](./img/15/http2-frame-header.svg)
 
-Types:   DATA 0x0, HEADERS 0x1, PRIORITY 0x2 (deprecated), RST_STREAM 0x3, SETTINGS 0x4,
-         PUSH_PROMISE 0x5, PING 0x6, GOAWAY 0x7, WINDOW_UPDATE 0x8, CONTINUATION 0x9
-Flags:   END_STREAM 0x1, END_HEADERS 0x4, PADDED 0x8, PRIORITY 0x20
-```
+- **Types:** DATA 0x0, HEADERS 0x1, PRIORITY 0x2 (deprecated), RST_STREAM 0x3, SETTINGS 0x4, PUSH_PROMISE 0x5, PING 0x6, GOAWAY 0x7, WINDOW_UPDATE 0x8, CONTINUATION 0x9
+- **Flags:** END_STREAM 0x1, END_HEADERS 0x4, PADDED 0x8, PRIORITY 0x20
 
 How the pieces fit together:
 
@@ -143,19 +132,7 @@ HTTP/3 (RFC 9114) maps HTTP onto **QUIC** (RFC 9000):
 - It integrates TLS 1.3 (RFC 9001), so nearly everything after the first packets is encrypted, including most of the transport headers.
 - Header compression is **QPACK** (RFC 9204), HPACK redesigned for streams that can arrive out of order.
 
-```
-  HTTP/1.1, HTTP/2           HTTP/3
-  ┌──────────────┐           ┌──────────────┐
-  │ HTTP         │           │ HTTP/3       │  frames, QPACK
-  ├──────────────┤           ├──────────────┤
-  │ TLS          │           │ QUIC         │  streams, loss recovery, congestion control,
-  ├──────────────┤           │  + TLS 1.3   │  connection IDs; TLS carried in CRYPTO frames
-  │ TCP (kernel) │           ├──────────────┤
-  ├──────────────┤           │ UDP          │  QUIC itself runs in user space (the application or a library)
-  │ IP           │           ├──────────────┤
-  └──────────────┘           │ IP           │
-                             └──────────────┘
-```
+![HTTP/1.1 and HTTP/2 run over TLS, over TCP in the kernel, over IP; HTTP/3 (frames, QPACK) runs over QUIC with TLS 1.3 (streams, loss recovery, congestion control, connection IDs, TLS carried in CRYPTO frames), over UDP, over IP, and QUIC itself runs in user space in the application or a library.](./img/15/http-stacks.svg)
 
 ### Handshakes, measured
 
@@ -385,13 +362,7 @@ The tools:
 
 [`web.json`](../labs/netlab/web.json):
 
-```
-  client 198.18.110.10 ── router (pathlab: 25 ms each way) ── server 198.18.111.10 (web.test)
-                                                               weblab :443 (h2, http/1.1) :80 (http/1.1, h2c)
-                                                               h3lab udp/443 (HTTP/3)
-                                                               proxy-h1 :8080 · proxy-h2c :8083 · proxy-buffer :8082
-                                                               relay :8081 (5 s idle timeout)
-```
+![The client at 198.18.110.10 connects through a router running pathlab (25 ms each way) to the server at 198.18.111.10 (web.test), which runs weblab on :443 (h2, http/1.1) and :80 (http/1.1, h2c), h3lab on udp/443 (HTTP/3), proxy-h1 on :8080, proxy-h2c on :8083, proxy-buffer on :8082 and relay on :8081 with a 5 s idle timeout.](./img/15/web-lab-topology.svg)
 
 ```bash
 cd labs/go
@@ -476,11 +447,11 @@ The real answer is in the message. The status that came back was an HTTP status,
 
 **Step 2 — Check the hop.**
 
-```
-Target group:   protocol HTTP (or HTTPS), protocol version HTTP1     ← gRPC needs "gRPC" here
-Listener:       HTTPS (required for gRPC and HTTP/2 to targets)
-Health check:   HTTP GET /healthz                                     ← must become a gRPC health method
-```
+| Setting | Value | Note |
+|---------|-------|------|
+| Target group | protocol HTTP (or HTTPS), protocol version HTTP1 | ← gRPC needs "gRPC" here |
+| Listener | HTTPS (required for gRPC and HTTP/2 to targets) | |
+| Health check | HTTP GET /healthz | ← must become a gRPC health method |
 
 **The fix.**
 

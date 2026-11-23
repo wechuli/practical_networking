@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 340" role="img" aria-labelledby="t d"><title id="t">MAC address structure</title><desc id="d">A MAC address such as 00:1a:2b:3c:4d:5e splits into the OUI, 00:1a:2b, which identifies the manufacturer, and the device ID, 3c:4d:5e, which is unique per device. Prefixes you will meet: 00:0c:29 and 00:50:56 for VMware and 00:15:5d for Microsoft Hyper-V, all IEEE OUIs; 52:54:00, the QEMU/KVM default, and 02:42, common on older Docker, both locally administered with bit 1 set; and ff:ff:ff:ff:ff:ff, the broadcast address with bit 0 set.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="338" rx="16"/>
+<text class="zl" x="24" y="30">MAC address structure</text>
+<rect class="l2" x="220" y="46" width="160" height="44" rx="10"/><text class="m" x="300" y="73" text-anchor="middle">00:1a:2b</text>
+<text class="t" x="400" y="74" text-anchor="middle">:</text>
+<rect class="l2" x="420" y="46" width="160" height="44" rx="10"/><text class="m" x="500" y="73" text-anchor="middle">3c:4d:5e</text>
+<text class="t" x="300" y="116" text-anchor="middle">OUI</text><text class="s" x="300" y="134" text-anchor="middle">(Manufacturer)</text>
+<text class="t" x="500" y="116" text-anchor="middle">Device ID</text><text class="s" x="500" y="134" text-anchor="middle">(Unique per device)</text>
+<rect class="box" x="40" y="156" width="720" height="166" rx="10"/>
+<text class="l" x="60" y="180">Prefixes you will meet:</text>
+<text class="m" x="60" y="206">00:0c:29, 00:50:56</text><text class="s" x="250" y="206">VMware (IEEE OUIs)</text>
+<text class="m" x="60" y="230">00:15:5d</text><text class="s" x="250" y="230">Microsoft Hyper-V (IEEE OUI)</text>
+<text class="m" x="60" y="254">52:54:00</text><text class="s" x="250" y="254">QEMU/KVM default — locally administered (bit 1 set)</text>
+<text class="m" x="60" y="278">02:42:…</text><text class="s" x="250" y="278">common on older Docker — locally administered</text>
+<text class="m" x="60" y="302">ff:ff:ff:ff:ff:ff</text><text class="s" x="250" y="302">broadcast (bit 0 set)</text>
+</svg>

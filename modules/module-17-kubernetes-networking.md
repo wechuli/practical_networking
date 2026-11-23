@@ -381,15 +381,7 @@ Part 4 runs the real components on a disposable cluster.
 
 [`k8s.json`](../labs/netlab/k8s.json):
 
-```
-                       lan 192.168.50.0/24 (the underlay)
-    ┌──────────────────────────────┬──────────────────────────────┬──────────────────┐
-  node1 192.168.50.11            node2 192.168.50.12            external 192.168.50.100
-  cni0 10.244.1.1 · flannel.1    cni0 10.244.2.1 · flannel.1    (upstream DNS, a web server,
-   ├ web1   10.244.1.2 :8080      ├ web2    10.244.2.2 :8080     and the nodes' default gateway)
-   └ client 10.244.1.3            └ coredns 10.244.2.3 :53
-  Services (kproxy on both nodes): web 10.96.0.20:80 → :8080, NodePort 30080 · kube-dns 10.96.0.10:53
-```
+![Three machines share the underlay LAN 192.168.50.0/24: node1 (192.168.50.11, cni0 10.244.1.1, flannel.1) runs web1 at 10.244.1.2:8080 and client at 10.244.1.3; node2 (192.168.50.12, cni0 10.244.2.1, flannel.1) runs web2 at 10.244.2.2:8080 and coredns at 10.244.2.3:53; external (192.168.50.100) is the upstream DNS, a web server and the nodes' default gateway; kproxy on both nodes implements the Services web 10.96.0.20:80 → :8080 with NodePort 30080 and kube-dns 10.96.0.10:53.](./img/17/k8s-lab-topology.svg)
 
 ```bash
 cd labs/go

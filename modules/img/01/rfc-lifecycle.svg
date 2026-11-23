@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 284" role="img" aria-labelledby="t d"><title id="t">How a protocol becomes an RFC, and how it changes</title><desc id="d">An Internet-Draft (work in progress, expires, not citable) becomes an RFC as a Proposed Standard, which can advance to Internet Standard with an STD number. Later RFCs may update an RFC, in which case both stay valid, or obsolete it, in which case you read the new one.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="282" rx="16"/>
+<text class="zl" x="24" y="34">HOW A PROTOCOL BECOMES AN RFC, AND HOW IT CHANGES</text>
+<rect class="box" x="24" y="54" width="180" height="44" rx="10"/>
+<text class="t" x="114.0" y="81.0" text-anchor="middle">Internet-Draft</text>
+<text class="s" x="114" y="120" text-anchor="middle">(work in progress,</text>
+<text class="s" x="114" y="137" text-anchor="middle">expires, not citable)</text>
+<path class="arrow" d="M204 76 H254"/>
+<rect class="l3" x="256" y="54" width="220" height="44" rx="10"/>
+<text class="t" x="366.0" y="81.0" text-anchor="middle">RFC: Proposed Standard</text>
+<path class="arrow" d="M476 76 H526"/>
+<rect class="ok" x="528" y="54" width="248" height="44" rx="10"/>
+<text class="t" x="652.0" y="81.0" text-anchor="middle">RFC: Internet Standard</text>
+<text class="s" x="652" y="116" text-anchor="middle">(+ STD number)</text>
+<rect class="zone" x="244" y="44" width="544" height="90" rx="12"/>
+<path class="arrow" d="M516 134 V186"/>
+<text class="s" x="526" y="164">later RFCs may...</text>
+<path class="line" d="M330 186 H700"/>
+<path class="arrow" d="M330 186 V206"/>
+<path class="arrow" d="M700 186 V206"/>
+<rect class="box" x="220" y="208" width="220" height="52" rx="10"/>
+<text class="t" x="330.0" y="230.5" text-anchor="middle">UPDATE it</text>
+<text class="s" x="330.0" y="247.5" text-anchor="middle">both stay valid</text>
+<rect class="warn" x="580" y="208" width="200" height="52" rx="10"/>
+<text class="t" x="680.0" y="230.5" text-anchor="middle">OBSOLETE it</text>
+<text class="s" x="680.0" y="247.5" text-anchor="middle">read the new one</text>
+</svg>

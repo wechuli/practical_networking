@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" role="img" aria-labelledby="t d"><title id="t">TCP teardown when the client closes first</title><desc id="d">Both sides start ESTABLISHED. The client sends FIN seq=3001 and enters FIN_WAIT_1; the server enters CLOSE_WAIT and its application is told EOF. The server's ACK ack=3002 moves the client to FIN_WAIT_2. The server's application calls close(), the server sends FIN seq=1 and enters LAST_ACK; the client enters TIME_WAIT and sends ACK ack=2, and the server is CLOSED. The client stays in TIME_WAIT for 60 s on Linux, then is CLOSED.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="458" rx="16"/>
+<text class="zl" x="24" y="28">Teardown (the client closes first)</text>
+<rect class="net" x="110" y="40" width="140" height="40" rx="10"/><text class="t" x="180" y="65" text-anchor="middle">client</text>
+<rect class="net" x="450" y="40" width="140" height="40" rx="10"/><text class="t" x="520" y="65" text-anchor="middle">server</text>
+<path class="line" d="M180 80 V440"/><path class="line" d="M520 80 V440"/>
+<text class="l" x="168" y="108" text-anchor="end">ESTABLISHED</text><text class="l" x="532" y="108">ESTABLISHED</text>
+<text class="m" x="350" y="134" text-anchor="middle">FIN  seq=3001</text>
+<path class="arrow" d="M180 146 H518"/>
+<text class="l" x="532" y="142">CLOSE_WAIT</text><text class="s" x="532" y="160">application told: EOF</text>
+<text class="l" x="168" y="180" text-anchor="end">FIN_WAIT_1</text>
+<text class="m" x="350" y="208" text-anchor="middle">ACK  ack=3002</text>
+<path class="arrow" d="M520 220 H182"/>
+<text class="l" x="168" y="254" text-anchor="end">FIN_WAIT_2</text><text class="s" x="532" y="254">application calls close()</text>
+<text class="m" x="350" y="282" text-anchor="middle">FIN  seq=1</text>
+<path class="arrow" d="M520 294 H182"/>
+<text class="l" x="532" y="298">LAST_ACK</text>
+<text class="l" x="168" y="328" text-anchor="end">TIME_WAIT</text>
+<text class="m" x="350" y="356" text-anchor="middle">ACK  ack=2</text>
+<path class="arrow" d="M180 368 H518"/>
+<text class="l" x="532" y="372">CLOSED</text>
+<text class="s" x="168" y="402" text-anchor="end">(60 s on Linux)</text>
+<text class="l" x="168" y="426" text-anchor="end">CLOSED</text>
+</svg>

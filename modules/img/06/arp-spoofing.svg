@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 744" role="img" aria-labelledby="t d"><title id="t">ARP spoofing: a man-in-the-middle attack</title><desc id="d">Normal state: the client (10.0.1.10) sends traffic for the gateway (10.0.1.1) to the gateway; its ARP cache maps 10.0.1.1 to GW_MAC. The attacker (10.0.1.99) sends the client an unsolicited forged ARP reply, "10.0.1.1 is at ATTACKER_MAC", a lie: the sender IP 10.0.1.1 claims to be the gateway but the sender MAC is the attacker's own. The client's cache entry for 10.0.1.1 is poisoned to ATTACKER_MAC. Now all traffic from the client for 10.0.1.1 goes to the attacker, which forwards it to the gateway and can read all unencrypted traffic, modify packets in transit, drop packets selectively and capture credentials (HTTP, FTP and so on). The attacker also poisons the gateway with "10.0.1.10 is at ATTACKER_MAC", so it sits in the middle of both directions: a full man-in-the-middle position.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="742" rx="16"/>
+<text class="zl" x="24" y="34">Normal state</text>
+<rect class="net" x="40" y="48" width="200" height="48" rx="10"/><text class="t" x="140" y="68" text-anchor="middle">Client</text><text class="m" x="140" y="86" text-anchor="middle">10.0.1.10</text>
+<rect class="net" x="560" y="48" width="200" height="48" rx="10"/><text class="t" x="660" y="68" text-anchor="middle">Gateway</text><text class="m" x="660" y="86" text-anchor="middle">10.0.1.1</text>
+<text class="l" x="400" y="64" text-anchor="middle">traffic for gateway</text><path class="arrow" d="M242 74 H556"/>
+<text class="m" x="40" y="120">Client ARP cache: 10.0.1.1 → GW_MAC</text>
+<path class="line" d="M24 138 H776" stroke-dasharray="4 4"/>
+<text class="zl" x="24" y="164">Attacker sends forged ARP reply to client</text>
+<rect class="warn" x="40" y="178" width="200" height="48" rx="10"/><text class="t" x="140" y="198" text-anchor="middle">Attacker</text><text class="m" x="140" y="216" text-anchor="middle">10.0.1.99</text>
+<path class="dash" d="M140 228 V298"/>
+<rect class="warn" x="270" y="180" width="490" height="104" rx="10"/>
+<text class="l" x="290" y="202">Forged ARP Reply (unsolicited):</text>
+<text xml:space="preserve" class="m" x="290" y="222">"10.0.1.1 is at ATTACKER_MAC"   ← LIE</text>
+<text xml:space="preserve" class="m" x="290" y="242">Sender IP:  10.0.1.1       ← Claims to be the gateway</text>
+<text xml:space="preserve" class="m" x="290" y="262">Sender MAC: ATTACKER_MAC   ← But gives its own MAC</text>
+<rect class="net" x="40" y="302" width="200" height="48" rx="10"/><text class="t" x="140" y="322" text-anchor="middle">Client</text><text class="m" x="140" y="340" text-anchor="middle">10.0.1.10</text>
+<text class="m" x="270" y="331">ARP cache: 10.0.1.1 → ATTACKER_MAC</text>
+<rect class="warn" x="540" y="310" width="110" height="30" rx="10"/><text class="l" x="595" y="330" text-anchor="middle">POISONED</text>
+<path class="line" d="M24 372 H776" stroke-dasharray="4 4"/>
+<text class="zl" x="24" y="398">Now all traffic from client to gateway goes to attacker</text>
+<rect class="net" x="40" y="412" width="130" height="48" rx="10"/><text class="t" x="105" y="441" text-anchor="middle">Client</text>
+<rect class="warn" x="335" y="412" width="130" height="48" rx="10"/><text class="t" x="400" y="441" text-anchor="middle">Attacker</text>
+<rect class="net" x="630" y="412" width="130" height="48" rx="10"/><text class="t" x="695" y="441" text-anchor="middle">Gateway</text>
+<text class="l" x="252" y="432" text-anchor="middle">traffic for 10.0.1.1</text><path class="arrow" d="M172 444 H331"/>
+<text class="l" x="547" y="432" text-anchor="middle">forwards</text><path class="arrow" d="M467 444 H626"/>
+<path class="line" d="M400 460 V480"/>
+<rect class="warn" x="250" y="480" width="300" height="106" rx="10"/>
+<text class="l" x="270" y="501">Attacker can:</text>
+<text class="s" x="270" y="520">• Read all unencrypted traffic</text>
+<text class="s" x="270" y="538">• Modify packets in transit</text>
+<text class="s" x="270" y="556">• Drop packets selectively</text>
+<text class="s" x="270" y="574">• Capture credentials (HTTP, FTP, etc.)</text>
+<path class="line" d="M24 604 H776" stroke-dasharray="4 4"/>
+<text class="zl" x="24" y="630">Attacker also poisons the gateway: "10.0.1.10 is at ATTACKER_MAC"</text>
+<rect class="net" x="40" y="644" width="130" height="48" rx="10"/><text class="t" x="105" y="673" text-anchor="middle">Client</text>
+<rect class="warn" x="335" y="644" width="130" height="48" rx="10"/><text class="t" x="400" y="673" text-anchor="middle">Attacker</text>
+<rect class="net" x="630" y="644" width="130" height="48" rx="10"/><text class="t" x="695" y="673" text-anchor="middle">Gateway</text>
+<path class="arrow" marker-start="url(#a)" d="M174 668 H331"/><path class="arrow" marker-start="url(#a)" d="M469 668 H626"/>
+<text class="l" x="400" y="722" text-anchor="middle">The attacker sits in the middle of BOTH directions: full man-in-the-middle position</text>
+</svg>

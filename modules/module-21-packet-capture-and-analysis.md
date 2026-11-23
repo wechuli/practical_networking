@@ -151,12 +151,12 @@ For long-running captures use a **ring buffer**. `-C 1 -W 3` kept three files of
 
 The lab's router dropped TCP to port 7021. A client tried to connect, with captures running at four points:
 
-```
-SYNs seen at client:      3
-SYNs seen at router-in:   3
-SYNs seen at router-out:  0
-SYNs seen at server:      0
-```
+| Capture point | SYNs seen |
+|---------------|-----------|
+| client | 3 |
+| router-in | 3 |
+| router-out | 0 |
+| server | 0 |
 
 The SYNs left the client and reached the router, and nothing left it, so the router dropped them. That holds in every run, and it's the most useful thing a capture can do in a "who is dropping it?" argument: each capture point either sees the packet or doesn't.
 
@@ -345,11 +345,7 @@ A key log is as sensitive as the traffic it decrypts. Keep it next to the captur
 
 ### Lab Part 1: Run the Lab
 
-```
-client 198.18.210.10 ── router (pathlab: delay/loss on demand) ── server 198.18.211.10
- resolver → server                                                 dnsmasq :53 · HTTP :8080 · HTTPS :8443
-                                                                   iperf3 :5201 · noread :7020 · discard :7021
-```
+![The client at 198.18.210.10, whose resolver is the server, connects through a router running pathlab (delay and loss on demand) to the server at 198.18.211.10, which runs dnsmasq on :53, HTTP on :8080, HTTPS on :8443, iperf3 on :5201, noread on :7020 and discard on :7021.](./img/21/capture-lab-topology.svg)
 
 ```bash
 cd labs/go

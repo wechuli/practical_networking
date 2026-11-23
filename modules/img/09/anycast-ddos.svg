@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d"><title id="t">Anycast spreads a DDoS attack across sites</title><desc id="d">Without anycast, 100 Gbps of attack traffic hits a single origin server, which is overwhelmed and goes down. With anycast the attack is split by location: 30 Gbps to London (400 Gbps capacity), 25 Gbps to Frankfurt (300), 20 Gbps to NYC (500), 15 Gbps to Tokyo (200) and 10 Gbps to São Paulo (150). Each node handles its share easily and the service stays available.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="468" rx="16"/>
+<text class="zl" x="24" y="32">Without anycast</text>
+<rect class="warn" x="20" y="46" width="220" height="52" rx="10"/>
+<text class="t" x="130.0" y="68.5" text-anchor="middle">Attack traffic</text>
+<text class="s" x="130.0" y="86.5" text-anchor="middle">100 Gbps</text>
+<path class="arrow" d="M240 72 H316"/>
+<rect class="warn" x="320" y="46" width="240" height="52" rx="10"/>
+<text class="t" x="440.0" y="77.0" text-anchor="middle">Single Origin Server</text>
+<text class="l" x="576" y="76">overwhelmed, down</text>
+<text class="zl" x="24" y="136">With anycast: attack traffic is distributed across all anycast locations</text>
+<rect class="warn" x="20" y="236" width="160" height="72" rx="10"/>
+<text class="t" x="100.0" y="268.5" text-anchor="middle">Attack traffic</text>
+<text class="s" x="100.0" y="286.5" text-anchor="middle">100 Gbps total</text>
+<rect class="ok" x="360" y="152" width="280" height="40" rx="10"/>
+<text class="l" x="500.0" y="176.5" text-anchor="middle">London node, 400 Gbps capacity</text>
+<path class="arrow" d="M230 172 H356"/>
+<text class="l" x="296" y="166" text-anchor="middle">30 Gbps</text>
+<text class="s" x="652" y="177">handles it easily</text>
+<rect class="ok" x="360" y="202" width="280" height="40" rx="10"/>
+<text class="l" x="500.0" y="226.5" text-anchor="middle">Frankfurt node, 300 Gbps capacity</text>
+<path class="arrow" d="M230 222 H356"/>
+<text class="l" x="296" y="216" text-anchor="middle">25 Gbps</text>
+<text class="s" x="652" y="227">handles it easily</text>
+<rect class="ok" x="360" y="252" width="280" height="40" rx="10"/>
+<text class="l" x="500.0" y="276.5" text-anchor="middle">NYC node, 500 Gbps capacity</text>
+<path class="arrow" d="M230 272 H356"/>
+<text class="l" x="296" y="266" text-anchor="middle">20 Gbps</text>
+<text class="s" x="652" y="277">handles it easily</text>
+<rect class="ok" x="360" y="302" width="280" height="40" rx="10"/>
+<text class="l" x="500.0" y="326.5" text-anchor="middle">Tokyo node, 200 Gbps capacity</text>
+<path class="arrow" d="M230 322 H356"/>
+<text class="l" x="296" y="316" text-anchor="middle">15 Gbps</text>
+<text class="s" x="652" y="327">handles it easily</text>
+<rect class="ok" x="360" y="352" width="280" height="40" rx="10"/>
+<text class="l" x="500.0" y="376.5" text-anchor="middle">São Paulo node, 150 Gbps capacity</text>
+<path class="arrow" d="M230 372 H356"/>
+<text class="l" x="296" y="366" text-anchor="middle">10 Gbps</text>
+<text class="s" x="652" y="377">handles it easily</text>
+<path class="line" d="M180 272 H230"/>
+<path class="line" d="M230 172 V372"/>
+<text class="s" x="400" y="422" text-anchor="middle">Each node absorbs only its local share of the attack.</text>
+<text class="s" x="400" y="440" text-anchor="middle">Total capacity across all nodes &gt;&gt; attack volume. Service remains available.</text>
+</svg>

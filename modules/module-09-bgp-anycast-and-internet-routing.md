@@ -36,283 +36,128 @@ BGP — Border Gateway Protocol (RFC 4271, currently version 4) — is the routi
 
 An Autonomous System (AS) is a network or collection of networks under a single administrative authority that presents a common routing policy to the internet. Every AS is identified by a unique AS Number (ASN).
 
-```
-AUTONOMOUS SYSTEMS — THE BUILDING BLOCKS OF THE INTERNET
+**Autonomous systems — the building blocks of the internet.** The internet is not one network. In July 2026 about 79,000 autonomous systems appeared in the global IPv4 routing table, announcing about 1.06 million prefixes (APNIC's weekly routing table report).
 
-  The internet is not one network. In July 2026 about 79,000 autonomous
-  systems appeared in the global IPv4 routing table, announcing about
-  1.06 million prefixes (APNIC's weekly routing table report).
+Examples of well-known ASNs:
 
-  Examples of well-known ASNs:
-  ASN        Organization
-  ─────────  ──────────────────────
-  AS15169    Google
-  AS16509    Amazon (AWS)
-  AS8075     Microsoft (Azure)
-  AS13335    Cloudflare
-  AS32934    Facebook (Meta)
-  AS7018     AT&T
-  AS3356     Lumen (Level 3)
-  AS174      Cogent Communications
+| ASN     | Organization          |
+| ------- | --------------------- |
+| AS15169 | Google                |
+| AS16509 | Amazon (AWS)          |
+| AS8075  | Microsoft (Azure)     |
+| AS13335 | Cloudflare            |
+| AS32934 | Facebook (Meta)       |
+| AS7018  | AT&T                  |
+| AS3356  | Lumen (Level 3)       |
+| AS174   | Cogent Communications |
 
-  ASNs are assigned by Regional Internet Registries (RIRs):
-  ARIN (North America), RIPE NCC (Europe/Middle East),
-  APNIC (Asia-Pacific), LACNIC (Latin America), AFRINIC (Africa).
+ASNs are assigned by Regional Internet Registries (RIRs): ARIN (North America), RIPE NCC (Europe/Middle East), APNIC (Asia-Pacific), LACNIC (Latin America), AFRINIC (Africa).
 
-  Types:
-  - 16-bit ASNs: 1 – 65534 (original space, effectively exhausted)
-  - 32-bit ASNs: 65536 – 4294967294 (RFC 6793; what new networks get)
-  - Private ASNs: 64512–65534 (16-bit) and 4200000000–4294967294 (32-bit)
-    Used internally (Kubernetes CNIs, cloud VPN gateways), never on the
-    public internet. AWS's default Amazon-side ASN is 64512.
-  - Documentation ASNs: 64496–64511 and 65536–65551 (RFC 5398) — the
-    examples in this module use them.
-  - AS 23456 (AS_TRANS) appears where an old 16-bit-only router stands
-    in for a 32-bit ASN.
-```
+Types:
+
+- 16-bit ASNs: 1 – 65534 (original space, effectively exhausted)
+- 32-bit ASNs: 65536 – 4294967294 (RFC 6793; what new networks get)
+- Private ASNs: 64512–65534 (16-bit) and 4200000000–4294967294 (32-bit). Used internally (Kubernetes CNIs, cloud VPN gateways), never on the public internet. AWS's default Amazon-side ASN is 64512.
+- Documentation ASNs: 64496–64511 and 65536–65551 (RFC 5398) — the examples in this module use them.
+- AS 23456 (AS_TRANS) appears where an old 16-bit-only router stands in for a 32-bit ASN.
 
 ### iBGP vs eBGP
 
-```
-iBGP vs eBGP
+|                | eBGP (External BGP)                                         | iBGP (Internal BGP)                                                                                       |
+| -------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Peers          | Between DIFFERENT ASes                                      | Within the SAME AS                                                                                        |
+| Organizations  | Peers are in different organizations                        | Peers are in the same organization                                                                        |
+| TTL            | TTL = 1 by default (neighbors must be directly connected)   | TTL = 255 (can peer across the internal network — multihop)                                               |
+| AS-PATH        | AS-PATH is modified (prepend own ASN)                       | AS-PATH is NOT modified                                                                                   |
+| Learned routes | Learned routes are advertised to other eBGP and iBGP peers  | Learned routes are NOT re-advertised to other iBGP peers (split horizon) — requires route reflectors or full mesh |
 
-  eBGP (External BGP)                    iBGP (Internal BGP)
-  ────────────────────                   ────────────────────
-  Between DIFFERENT ASes                 Within the SAME AS
-  Peers are in different organizations   Peers are in the same organization
-  TTL = 1 by default (neighbors must     TTL = 255 (can peer across the
-    be directly connected)                  internal network — multihop)
-  AS-PATH is modified (prepend own ASN)  AS-PATH is NOT modified
-  Learned routes are advertised to       Learned routes are NOT re-advertised
-    other eBGP and iBGP peers             to other iBGP peers (split horizon)
-                                          — requires route reflectors or full mesh
-
-  ┌────────────────────────────────────────────────────────────┐
-  │                                                            │
-  │  AS 64501                          AS 64502                │
-  │  ┌────────────┐   eBGP session    ┌────────────┐         │
-  │  │ Router A   │◄─────────────────▶│ Router C   │         │
-  │  └─────┬──────┘                    └────────────┘         │
-  │        │ iBGP                                             │
-  │  ┌─────┴──────┐                                           │
-  │  │ Router B   │                                           │
-  │  └────────────┘                                           │
-  │                                                            │
-  │  Router A and Router B: iBGP (same AS)                    │
-  │  Router A and Router C: eBGP (different ASes)             │
-  └────────────────────────────────────────────────────────────┘
-```
+![Router A and Router B sit inside AS 64501 and peer over iBGP; Router A also peers over an eBGP session with Router C in AS 64502.](./img/09/ibgp-ebgp.svg)
 
 ### How BGP Advertises Routes
 
 BGP routers exchange **route announcements** (also called route advertisements or UPDATE messages). A route announcement says: "I can reach IP prefix X, and the path to get there through me is [list of ASNs]."
 
-```
-BGP ROUTE ADVERTISEMENT
-
-  AS 64501 owns IP prefix 203.0.113.0/24.
-  It advertises this prefix to its neighbor AS 64502:
-
-  UPDATE message:
-    NLRI (prefix):   203.0.113.0/24
-    AS-PATH:         [64501]
-    NEXT-HOP:        198.51.100.1 (Router A's interface toward Router C)
-
-  AS 64502 receives this and now knows:
-  "To reach 203.0.113.0/24, send traffic to 198.51.100.1.
-   The path traverses AS 64501."
-
-  If AS 64502 re-advertises this to AS 64503:
-    NLRI:            203.0.113.0/24
-    AS-PATH:         [64502, 64501]        ← AS 64502 prepends its own ASN
-    NEXT-HOP:        (Router C's interface toward AS 64503)
-
-  AS 64503 now knows:
-  "To reach 203.0.113.0/24, the path goes through AS 64502
-   then AS 64501. Two hops."
-```
+![AS 64501 owns 203.0.113.0/24 and sends AS 64502 an UPDATE with AS-PATH [64501] and NEXT-HOP 198.51.100.1, Router A's interface toward Router C; when AS 64502 re-advertises the route to AS 64503 it prepends its own ASN, so AS 64503 sees AS-PATH [64502, 64501], a two-hop path.](./img/09/bgp-update-propagation.svg)
 
 ### BGP Best-Path Selection
 
 When a BGP router receives multiple routes to the same prefix from different peers, it must choose the best one. BGP uses a well-defined decision process:
 
-```
-BGP BEST-PATH SELECTION ALGORITHM (simplified)
+**BGP best-path selection algorithm (simplified).** Given multiple routes to the same prefix, evaluate in order:
 
-  Given multiple routes to the same prefix, evaluate in order:
+| Step | Attribute                    | Prefer                               | Controlled by                                                                                                                                                                  |
+| ---- | ---------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | LOCAL-PREF                   | Highest value                        | Local network admin (iBGP only, not sent via eBGP). Use: prefer one ISP over another                                                                                           |
+| 2    | AS-PATH length               | Shortest path (fewest ASes)          | Originating AS. Use: natural distance metric. Can be manipulated by AS-PATH prepending: advertising [64501 64501 64501] makes your route look 3 hops long                        |
+| 3    | ORIGIN type                  | IGP > EGP > ?                        | Originating router (rarely a deciding factor)                                                                                                                                  |
+| 4    | MED (Multi-Exit Disc)        | Lowest value                         | Neighboring AS. Use: tell a neighbor "prefer this peering link over that one". Only compared between routes from the same neighbor AS                                           |
+| 5    | eBGP over iBGP               | eBGP preferred                       | Topology (prefer externally learned routes)                                                                                                                                    |
+| 6    | IGP metric to NEXT-HOP       | Lowest metric to reach the BGP next-hop | Internal routing (OSPF/IS-IS). Use: closest exit (hot-potato routing)                                                                                                       |
+| 7    | Oldest eBGP path             | Most stable                          | Avoids flapping between equal paths (FRR, Cisco)                                                                                                                               |
+| 8    | Router ID (or peer IP)       | Lowest                               | Tiebreaker                                                                                                                                                                     |
 
-  Step  Attribute          Prefer              Controlled By
-  ────  ─────────────────  ──────────────────  ──────────────────────
-   1    LOCAL-PREF         Highest value       Local network admin
-                                                (iBGP only, not sent via eBGP)
-                                                Use: prefer one ISP over another
+Before step 1, many implementations check reachability of the NEXT-HOP, a vendor "weight" (Cisco, local only), and prefer locally originated routes. In practice, most path decisions are made at steps 1-2: LOCAL-PREF (admin preference) and AS-PATH length (shortest path).
 
-   2    AS-PATH length     Shortest path       Originating AS
-                           (fewest ASes)        Use: natural distance metric
-                                                Can be manipulated by AS-PATH prepending:
-                                                advertising [64501 64501 64501] makes
-                                                your route look 3 hops long
-
-   3    ORIGIN type        IGP > EGP > ?       Originating router
-                                                (Rarely a deciding factor)
-
-   4    MED                Lowest value        Neighboring AS
-        (Multi-Exit Disc)                       Use: tell a neighbor "prefer this
-                                                peering link over that one"
-                                                Only compared between routes from
-                                                the same neighbor AS
-
-   5    eBGP over iBGP     eBGP preferred      Topology
-                                                (prefer externally learned routes)
-
-   6    IGP metric         Lowest metric to    Internal routing (OSPF/IS-IS)
-        to NEXT-HOP        reach the BGP       Use: closest exit (hot-potato routing)
-                           next-hop
-
-   7    Oldest eBGP path   Most stable         Avoids flapping between
-                                                equal paths (FRR, Cisco)
-
-   8    Router ID          Lowest              Tiebreaker
-        (or peer IP)
-
-  Before step 1, many implementations check reachability of the NEXT-HOP,
-  a vendor "weight" (Cisco, local only), and prefer locally originated
-  routes. In practice, most path decisions are made at steps 1-2:
-  LOCAL-PREF (admin preference) and AS-PATH length (shortest path).
-
-  BGP chooses among routes for the SAME prefix. A more specific prefix is
-  a different route, and the forwarding table's longest prefix match
-  prefers it before any of these attributes are compared — the reason a
-  hijacked /25 beats a legitimate /24 (the lab demonstrates it). FRR
-  prints the deciding step next to the winner: "best (AS Path)",
-  "best (Local Pref)", "best (Older Path)".
-```
+BGP chooses among routes for the SAME prefix. A more specific prefix is a different route, and the forwarding table's longest prefix match prefers it before any of these attributes are compared — the reason a hijacked /25 beats a legitimate /24 (the lab demonstrates it). FRR prints the deciding step next to the winner: "best (AS Path)", "best (Local Pref)", "best (Older Path)".
 
 ### Diagram: BGP Path Selection
 
-```
-EXAMPLE: CHOOSING BETWEEN TWO PATHS
+![Example of choosing between two paths: your router in AS 64500 learns 8.8.8.0/24 from AS 3356 (Lumen) with AS-PATH [3356, 15169], two AS hops, and from AS 174 (Cogent) with AS-PATH [174, 1299, 15169], three AS hops; the shorter Lumen path wins.](./img/09/bgp-path-choice.svg)
 
-  Your AS (64500) peers with two transit providers:
+Both routes reach 8.8.8.0/24 (Google DNS). Assuming LOCAL-PREF is the same for both, the winner is the AS 3356 path — shorter AS-PATH (2 hops vs 3 hops). Traffic to 8.8.8.8 goes via Lumen, not Cogent.
 
-                    AS 3356 (Lumen)
-                   ┌──────────────────┐
-  [Your Router] ──▶│ Route to 8.8.8.0/24:  │
-  AS 64500         │ AS-PATH: [3356, 15169] │  ← 2 AS hops
-                   └──────────────────┘
-
-                    AS 174 (Cogent)
-                   ┌──────────────────────┐
-  [Your Router] ──▶│ Route to 8.8.8.0/24:  │
-                   │ AS-PATH: [174, 1299,  │  ← 3 AS hops
-                   │           15169]       │
-                   └──────────────────────┘
-
-  Both routes reach 8.8.8.0/24 (Google DNS).
-  Assuming LOCAL-PREF is the same for both:
-
-  Winner: AS 3356 path — shorter AS-PATH (2 hops vs 3 hops).
-  Traffic to 8.8.8.8 goes via Lumen, not Cogent.
-
-  If you WANT to prefer Cogent, set LOCAL-PREF higher for routes
-  from Cogent: LOCAL-PREF 200 (Cogent) vs 100 (Lumen).
-  Now Cogent wins at Step 1 regardless of AS-PATH length.
-```
+If you WANT to prefer Cogent, set LOCAL-PREF higher for routes from Cogent: LOCAL-PREF 200 (Cogent) vs 100 (Lumen). Now Cogent wins at Step 1 regardless of AS-PATH length.
 
 ### BGP Convergence
 
 When a BGP route is withdrawn (a link fails, a network goes down), all BGP routers that used that route must find an alternative. This process — convergence — is slow compared to IGPs like OSPF. BGP timers are conservative:
 
-```
-BGP TIMERS AND CONVERGENCE
+**BGP timers and convergence.** Common defaults: hold 180 s / keepalive 60 s (Cisco IOS, FRR's traditional profile), hold 90 s / keepalive 30 s (Junos, and the RFC's suggestion). The session uses the LOWER of the two peers' hold times. Inspect the negotiated values on the actual peer.
 
-  Common defaults: hold 180 s / keepalive 60 s (Cisco IOS, FRR's
-  traditional profile), hold 90 s / keepalive 30 s (Junos, and the RFC's
-  suggestion). The session uses the LOWER of the two peers' hold times.
-  Inspect the negotiated values on the actual peer.
+If no KEEPALIVE is received within the Hold Timer, the BGP session is declared dead and all routes from that peer are withdrawn.
 
-  If no KEEPALIVE is received within the Hold Timer, the BGP session
-  is declared dead and all routes from that peer are withdrawn.
+Convergence time:
 
-  Convergence time:
-  - Detection of failure: up to the hold time (the lab: hold 3 s → 2–2.7 s
-    of lost traffic; a clean withdrawal → one lost probe at 20/s)
-  - Propagation of withdrawal: minutes to tens of minutes
-    (every AS must process the withdrawal and recalculate)
-  - No universal Internet convergence interval; policy, topology and failure
-    detection determine what each observer sees.
+- Detection of failure: up to the hold time (the lab: hold 3 s → 2–2.7 s of lost traffic; a clean withdrawal → one lost probe at 20/s)
+- Propagation of withdrawal: minutes to tens of minutes (every AS must process the withdrawal and recalculate)
+- No universal Internet convergence interval; policy, topology and failure detection determine what each observer sees.
 
-  Faster detection:
-  - BFD (Bidirectional Forwarding Detection): sub-second failure detection
-  - Reduced KEEPALIVE/Hold timers: 3s/10s (common in cloud peering)
-  - Graceful Restart: allows a router to restart BGP without
-    withdrawing routes during the restart
+Faster detection:
 
-  Why convergence matters to you:
-  During convergence, traffic to affected prefixes may be:
-  - Black-holed (no alternative route yet)
-  - Routed sub-optimally (using a longer path)
-  - Flapping (alternating between paths)
-```
+- BFD (Bidirectional Forwarding Detection): sub-second failure detection
+- Reduced KEEPALIVE/Hold timers: 3s/10s (common in cloud peering)
+- Graceful Restart: allows a router to restart BGP without withdrawing routes during the restart
+
+Why convergence matters to you: during convergence, traffic to affected prefixes may be:
+
+- Black-holed (no alternative route yet)
+- Routed sub-optimally (using a longer path)
+- Flapping (alternating between paths)
 
 ### Route Leaks and Hijacks
 
-```
-BGP ROUTE LEAK
+**BGP route leak.** A route leak occurs when a network advertises routes it received from one peer to another peer in violation of the intended routing policy.
 
-  A route leak occurs when a network advertises routes it received from
-  one peer to another peer in violation of the intended routing policy.
+![Normal operation: customer AS 64501 receives full internet routes from transit provider AS 3356 and advertises only its own prefixes to AS 174. Route leak: AS 64501 re-advertises all routes from AS 3356 to AS 174, and internet traffic floods back into AS 64501.](./img/09/route-leak.svg)
 
-  Normal operation:
-  AS 64501 (customer) receives full internet routes from AS 3356 (transit provider).
-  AS 64501 should only advertise its OWN prefixes to its other peers.
+- Normal operation: AS 64501 (customer) receives full internet routes from AS 3356 (transit provider). AS 64501 should only advertise its OWN prefixes to its other peers.
+- Route leak: AS 64501 accidentally re-advertises ALL routes from AS 3356 to AS 174. Now AS 174 thinks AS 64501 is a path to the entire internet. AS 174 typically prefers it — not because of AS-PATH length, but because providers give routes learned from CUSTOMERS a higher LOCAL_PREF than routes from peers (customers pay; peers don't). Internet traffic floods through AS 64501's small network. Their routers overload. Traffic is dropped. Outage affects everyone routing through AS 174. Leaks that carry more-specific prefixes (for example from a route optimizer that splits prefixes) are worse: they win by longest prefix match everywhere they are accepted.
 
-  Route leak:
-  AS 64501 accidentally re-advertises ALL routes from AS 3356 to AS 174.
-  Now AS 174 thinks AS 64501 is a path to the entire internet.
-  AS 174 typically prefers it — not because of AS-PATH length, but
-  because providers give routes learned from CUSTOMERS a higher
-  LOCAL_PREF than routes from peers (customers pay; peers don't).
-  Internet traffic floods through AS 64501's small network. Their
-  routers overload. Traffic is dropped. Outage affects everyone routing
-  through AS 174. Leaks that carry more-specific prefixes (for example
-  from a route optimizer that splits prefixes) are worse: they win by
-  longest prefix match everywhere they are accepted.
+Historical case studies must use the operator's dated postmortem and distinguish leaks from withdrawals. The October 2021 Facebook outage included route withdrawals; do not label every BGP outage a route leak. The route diagrams here are synthetic, not evidence of an operator's policy.
 
-  Historical case studies must use the operator's dated postmortem and
-  distinguish leaks from withdrawals. The October 2021 Facebook outage
-  included route withdrawals; do not label every BGP outage a route leak.
-  The route diagrams here are synthetic, not evidence of an operator's policy.
+**BGP route hijack.** A route hijack occurs when a network advertises IP prefixes it does not own. BGP has no built-in way to verify prefix ownership.
 
+Example:
 
-BGP ROUTE HIJACK
+- AS 12345 (legitimate owner) advertises 203.0.113.0/24.
+- AS 99999 (attacker or misconfigured) also advertises 203.0.113.0/24. A /25 is more specific where accepted; many Internet networks filter IPv4 prefixes longer than /24, so it does not win everywhere.
+- Result: traffic intended for AS 12345 goes to AS 99999.
 
-  A route hijack occurs when a network advertises IP prefixes it does
-  not own. BGP has no built-in way to verify prefix ownership.
+Defenses:
 
-  Example:
-  AS 12345 (legitimate owner) advertises 203.0.113.0/24.
-  AS 99999 (attacker or misconfigured) also advertises 203.0.113.0/24
-    - A /25 is more specific where accepted; many Internet networks filter
-      IPv4 prefixes longer than /24, so it does not win everywhere.
-
-  Result: traffic intended for AS 12345 goes to AS 99999.
-
-  Defenses:
-  - RPKI (Resource Public Key Infrastructure): prefix holders publish
-    signed ROAs saying which AS may originate a prefix, and up to what
-    prefix length. Routers doing Route Origin Validation (ROV) drop
-    "invalid" announcements. A ROA with maxLength /24 makes any /25
-    announcement invalid, whoever originates it. What ROV cannot catch is
-    a forged-origin hijack: announcing the same /24 with the real origin
-    AS placed at the end of the path. Deployment is widespread among large networks but
-    not universal; check a prefix's status on bgp.tools or RIPEstat.
-    ASPA (an IETF draft) extends validation to the path.
-  - IRR (Internet Routing Registry): prefix-to-AS mapping database.
-    Used to build prefix filters. Less secure than RPKI (no crypto).
-  - Prefix filtering: ASes configure maximum prefix limits and filters
-    based on IRR or RPKI data.
-```
+- RPKI (Resource Public Key Infrastructure): prefix holders publish signed ROAs saying which AS may originate a prefix, and up to what prefix length. Routers doing Route Origin Validation (ROV) drop "invalid" announcements. A ROA with maxLength /24 makes any /25 announcement invalid, whoever originates it. What ROV cannot catch is a forged-origin hijack: announcing the same /24 with the real origin AS placed at the end of the path. Deployment is widespread among large networks but not universal; check a prefix's status on bgp.tools or RIPEstat. ASPA (an IETF draft) extends validation to the path.
+- IRR (Internet Routing Registry): prefix-to-AS mapping database. Used to build prefix filters. Less secure than RPKI (no crypto).
+- Prefix filtering: ASes configure maximum prefix limits and filters based on IRR or RPKI data.
 
 ---
 
@@ -327,76 +172,42 @@ the same destination address despite potentially different serving instances.
 
 ### How Anycast Works
 
-```
-ANYCAST — ONE IP, MANY LOCATIONS
+![Anycast in an illustrative deployment: Cloudflare data centers in London, Tokyo and São Paulo each announce 1.1.1.0/24 via AS 13335 over BGP, and each serves the same address, 1.1.1.1.](./img/09/anycast-sites.svg)
 
-  Illustrative deployment: one resolver address advertised from several locations.
+A user in Paris queries 1.1.1.1:
 
-  London DC:               Tokyo DC:                São Paulo DC:
-  BGP: "1.1.1.0/24         BGP: "1.1.1.0/24         BGP: "1.1.1.0/24
-   via AS 13335"            via AS 13335"             via AS 13335"
-       │                        │                         │
-       ▼                        ▼                         ▼
-  ┌──────────┐            ┌──────────┐            ┌──────────┐
-  │ CF London│            │ CF Tokyo │            │CF São Paulo│
-  │ 1.1.1.1  │            │ 1.1.1.1  │            │ 1.1.1.1   │
-  └──────────┘            └──────────┘            └──────────┘
+- Every site announces the same prefix from the same AS, so the AS-PATHs are usually the same length
+- The user's ISP picks by its own policy and tie-breakers: which peering link it learned the route on, LOCAL_PREF, the nearest exit in its own network (hot potato), even which session is older
+- The query might land in Paris — or in London, or Frankfurt (the lab's two-site anycast was decided by "best (Older Path)")
 
-  A user in Paris queries 1.1.1.1:
-  → Every site announces the same prefix from the same AS, so the
-    AS-PATHs are usually the same length
-  → The user's ISP picks by its own policy and tie-breakers: which
-    peering link it learned the route on, LOCAL_PREF, the nearest exit
-    in its own network (hot potato), even which session is older
-  → The query might land in Paris — or in London, or Frankfurt
-    (the lab's two-site anycast was decided by "best (Older Path)")
+A user in Osaka queries 1.1.1.1:
 
-  A user in Osaka queries 1.1.1.1:
-  → BGP routes to Tokyo DC
-  → Response: sub-3ms latency
+- BGP routes to Tokyo DC
+- Response: sub-3ms latency
 
-  If the London DC goes offline:
-  → Cloudflare withdraws the BGP advertisement from London
-  → BGP converges: Paris users now route to the next closest DC
-    (maybe Frankfurt or Amsterdam)
-  → No client configuration change needed — BGP handles failover
-```
+If the London DC goes offline:
+
+- Cloudflare withdraws the BGP advertisement from London
+- BGP converges: Paris users now route to the next closest DC (maybe Frankfurt or Amsterdam)
+- No client configuration change needed — BGP handles failover
 
 ### Anycast vs Other Addressing Types
 
-```
-ADDRESSING TYPES
+| Type      | Mapping                                     | Details                                                                                                                                                              |
+| --------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unicast   | One IP → One host                           | Standard addressing. 10.0.1.50 identifies exactly one machine. Most traffic on the internet is unicast.                                                              |
+| Broadcast | One IP → Every host on the network          | 255.255.255.255 or subnet broadcast (e.g., 10.0.1.255). Layer 2 only. Not routed. IPv6 has no broadcast.                                                             |
+| Multicast | One IP → A group of interested hosts        | 224.0.0.0/4 (IPv4) or ff00::/8 (IPv6). Subscribers join the group. Used for IPTV, OSPF, PIM. Rarely crosses the public internet.                                     |
+| Anycast   | One IP → The closest (by routing) of many hosts | Same IP advertised from multiple locations via BGP. Used for DNS resolvers (1.1.1.1, 8.8.8.8), CDNs, DDoS mitigation, and globally distributed services.         |
 
-  Unicast:    One IP → One host.
-              Standard addressing. 10.0.1.50 identifies exactly one machine.
-              Most traffic on the internet is unicast.
+Key properties of anycast:
 
-  Broadcast:  One IP → Every host on the network.
-              255.255.255.255 or subnet broadcast (e.g., 10.0.1.255).
-              Layer 2 only. Not routed. IPv6 has no broadcast.
-
-  Multicast:  One IP → A group of interested hosts.
-              224.0.0.0/4 (IPv4) or ff00::/8 (IPv6).
-              Subscribers join the group. Used for IPTV, OSPF, PIM.
-              Rarely crosses the public internet.
-
-  Anycast:    One IP → The closest (by routing) of many hosts.
-              Same IP advertised from multiple locations via BGP.
-              Used for DNS resolvers (1.1.1.1, 8.8.8.8), CDNs,
-              DDoS mitigation, and globally distributed services.
-
-KEY PROPERTIES OF ANYCAST:
-  Routing-policy distribution, not guaranteed geographic or equal load balance
-  Failover requires a health-to-route withdrawal mechanism and convergence
-  Distributed capacity can help, but a particular site/path can still overload
-  ✓ Works well for stateless protocols (DNS over UDP)
-  ~ TCP works in practice — large CDNs serve HTTPS over anycast —
-    because routes are stable for far longer than most connections. A
-    routing change mid-connection sends the flow to a site that has no
-    state for it, which answers RST; operators mitigate with stable
-    routing and short connections
-  ✗ No guarantee of session stickiness across routing changes
-```
+- Routing-policy distribution, not guaranteed geographic or equal load balance
+- Failover requires a health-to-route withdrawal mechanism and convergence
+- Distributed capacity can help, but a particular site/path can still overload
+- ✓ Works well for stateless protocols (DNS over UDP)
+- ~ TCP works in practice — large CDNs serve HTTPS over anycast — because routes are stable for far longer than most connections. A routing change mid-connection sends the flow to a site that has no state for it, which answers RST; operators mitigate with stable routing and short connections
+- ✗ No guarantee of session stickiness across routing changes
 
 ### Anycast and DNS
 
@@ -411,25 +222,7 @@ RPKI validates route origin authorization, not the entire AS path or actual rout
 
 ### Anycast for CDNs and DDoS Mitigation
 
-```
-ANYCAST FOR DDoS ABSORPTION
-
-  Without anycast:
-  Attack traffic (100 Gbps) → [Single Origin Server] → overwhelmed, down
-
-  With anycast:
-  Attack traffic distributed across all anycast locations:
-
-  30 Gbps → [London node, 400 Gbps capacity]    ← handles it easily
-  25 Gbps → [Frankfurt node, 300 Gbps capacity] ← handles it easily
-  20 Gbps → [NYC node, 500 Gbps capacity]       ← handles it easily
-  15 Gbps → [Tokyo node, 200 Gbps capacity]     ← handles it easily
-  10 Gbps → [São Paulo node, 150 Gbps capacity] ← handles it easily
-
-  Each node absorbs only its local share of the attack.
-  Total capacity across all nodes >> attack volume.
-  Service remains available.
-```
+![Anycast for DDoS absorption: without anycast, 100 Gbps of attack traffic overwhelms a single origin server; with anycast the attack splits across sites — 30 Gbps to London (400 Gbps capacity), 25 to Frankfurt (300), 20 to NYC (500), 15 to Tokyo (200) and 10 to São Paulo (150) — and each node handles its share easily, so the service remains available.](./img/09/anycast-ddos.svg)
 
 ---
 
@@ -441,69 +234,26 @@ An Internet Exchange Point (IXP) is a physical location — typically a data cen
 
 ### Why IXPs Matter
 
-```
-WITHOUT IXP — TRANSIT PATH
+![Without an IXP, your ISP (AS 100) and a content provider (AS 200) each pay a transit provider, AS 3356 and AS 174, and packets take a long path; with an IXP both connect to the IXP's Layer 2 switch fabric and packets cross one switch.](./img/09/ixp-transit-vs-peering.svg)
 
-  [Your ISP AS 100]                              [Content Provider AS 200]
-        │                                               │
-        │ $$ pays transit $$                             │ $$ pays transit $$
-        ▼                                               ▼
-  [Transit Provider AS 3356]      long path      [Transit Provider AS 174]
-        │─────────────────────────────────────────────│
+Without an IXP, packets cross multiple networks. Each transit hop adds latency and cost. Transit providers charge per-Mbps or per-Gbps.
 
-  Packets cross multiple networks. Each transit hop adds latency
-  and cost. Transit providers charge per-Mbps or per-Gbps.
+With an IXP (direct peering), packets cross ONE switch. Sub-millisecond latency. Cost: IXP membership fee (flat, typically much less than transit). Each network has a port on the IXP's Ethernet switch fabric. They establish BGP sessions directly across the IXP.
 
-
-WITH IXP — DIRECT PEERING
-
-  [Your ISP AS 100]                              [Content Provider AS 200]
-        │                                               │
-        └─────────────▶ [IXP Switch] ◀─────────────────┘
-                        (Layer 2 fabric)
-
-  Packets cross ONE switch. Sub-millisecond latency.
-  Cost: IXP membership fee (flat, typically much less than transit).
-  Each network has a port on the IXP's Ethernet switch fabric.
-  They establish BGP sessions directly across the IXP.
-
-
-MAJOR IXPs (examples; each publishes live traffic and member counts):
-  DE-CIX Frankfurt, AMS-IX Amsterdam, LINX London, IX.br São Paulo,
-  Equinix IX (many cities), JPNAP Tokyo; in East Africa, KIXP in
-  Nairobi and Mombasa. The largest carry peaks in the tens of Tbps and
-  connect around a thousand or more networks. PeeringDB
-  (peeringdb.com) lists which networks are present at which IXP —
-  the first place to check whether your ISP and a provider can peer
-  directly.
-```
+Major IXPs (examples; each publishes live traffic and member counts): DE-CIX Frankfurt, AMS-IX Amsterdam, LINX London, IX.br São Paulo, Equinix IX (many cities), JPNAP Tokyo; in East Africa, KIXP in Nairobi and Mombasa. The largest carry peaks in the tens of Tbps and connect around a thousand or more networks. PeeringDB (peeringdb.com) lists which networks are present at which IXP — the first place to check whether your ISP and a provider can peer directly.
 
 ### How Peering Works at an IXP
 
-```
-PEERING SESSION AT AN IXP
+Both networks connect a router to the IXP's switching fabric. Each gets an IP from the IXP's peering LAN (e.g., 80.249.208.0/21 for AMS-IX). They establish a BGP session between each other:
 
-  Both networks connect a router to the IXP's switching fabric.
-  Each gets an IP from the IXP's peering LAN (e.g., 80.249.208.0/21 for AMS-IX).
+![On the IXP peering LAN, the AS 100 router at 80.249.208.10 and the AS 200 router at 80.249.208.20 both attach to the IXP's Ethernet switch fabric and run a BGP session directly between them.](./img/09/ixp-peering-session.svg)
 
-  AS 100 router: 80.249.208.10
-  AS 200 router: 80.249.208.20
+AS 200 advertises its prefixes to AS 100 over this session. AS 100 can now send traffic for AS 200's IPs directly across the IXP. No transit provider involved. Latency: sub-1ms (same building).
 
-  They establish a BGP session between each other:
+Types of peering:
 
-  [AS 100 Router]  ──BGP session──  [AS 200 Router]
-  80.249.208.10                     80.249.208.20
-
-  AS 200 advertises its prefixes to AS 100 over this session.
-  AS 100 can now send traffic for AS 200's IPs directly across the IXP.
-  No transit provider involved. Latency: sub-1ms (same building).
-
-  Types of peering:
-  - Bilateral: two networks negotiate a private BGP session
-  - Multilateral / Route Server: the IXP runs a route server that
-    collects and distributes routes from all participants.
-    Networks peer with the route server instead of each individual network.
-```
+- Bilateral: two networks negotiate a private BGP session
+- Multilateral / Route Server: the IXP runs a route server that collects and distributes routes from all participants. Networks peer with the route server instead of each individual network.
 
 ---
 
@@ -517,80 +267,51 @@ All three major cloud providers offer this, and all of them use BGP to exchange 
 
 ### Comparison
 
-```
-CLOUD INTERCONNECT OPTIONS
+| Service            | Provider | Connection type                                              | BGP used?                                                   |
+| ------------------ | -------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
+| Direct Connect     | AWS      | Dedicated fiber (1/10/100 Gbps) or hosted via partner        | Yes — BGP between your router and AWS's DX router           |
+| ExpressRoute       | Azure    | Dedicated fiber (50 Mbps – 100 Gbps) or via exchange provider | Yes — BGP via Microsoft Enterprise Edge (MSEE) routers     |
+| Cloud Interconnect | GCP      | Dedicated (10/100 Gbps) or Partner (50 Mbps – 50 Gbps)       | Yes — BGP via Cloud Router                                  |
 
-  Service              Provider   Connection Type          BGP Used?
-  ───────────────────  ────────   ────────────────────     ─────────
-  Direct Connect       AWS        Dedicated fiber (1/10/   Yes — BGP between
-                                  100 Gbps) or hosted      your router and
-                                  via partner               AWS's DX router
+When to use which:
 
-  ExpressRoute         Azure      Dedicated fiber (50      Yes — BGP via
-                                  Mbps – 100 Gbps) or      Microsoft Enterprise
-                                  via exchange provider     Edge (MSEE) routers
+**Public Internet + VPN**
 
-  Cloud Interconnect   GCP        Dedicated (10/100 Gbps)  Yes — BGP via
-                                  or Partner (50 Mbps –     Cloud Router
-                                  50 Gbps)
+- ✓ Quick to set up (minutes)
+- ✓ Encrypted (IPsec)
+- ✗ Variable latency and throughput
+- ✗ Subject to internet congestion
+- ✗ Bandwidth limited per tunnel (AWS Site-to-Site VPN: up to 1.25 Gbps per tunnel; more with ECMP across tunnels via a Transit Gateway)
+- Best for: Dev/test, small workloads, budget-conscious
 
+**Cloud Interconnect**
 
-WHEN TO USE WHICH:
-
-  Public Internet + VPN:
-  ✓ Quick to set up (minutes)
-  ✓ Encrypted (IPsec)
-  ✗ Variable latency and throughput
-  ✗ Subject to internet congestion
-  ✗ Bandwidth limited per tunnel (AWS Site-to-Site VPN: up to
-    1.25 Gbps per tunnel; more with ECMP across tunnels via a
-    Transit Gateway)
-  Best for: Dev/test, small workloads, budget-conscious
-
-  Cloud Interconnect:
-  ✓ Consistent, low latency
-  ✓ High bandwidth (up to 100+ Gbps)
-  ✓ Traffic stays on a private circuit — which is not encryption:
-    use MACsec (where offered) or IPsec over the circuit if required
-  ✗ Expensive (monthly port fees + data transfer)
-  ✗ Takes weeks to provision (physical fiber)
-  ✗ Requires BGP configuration
-  Best for: Production, large data transfer, latency-sensitive,
-            compliance (data must not traverse public internet)
-```
+- ✓ Consistent, low latency
+- ✓ High bandwidth (up to 100+ Gbps)
+- ✓ Traffic stays on a private circuit — which is not encryption: use MACsec (where offered) or IPsec over the circuit if required
+- ✗ Expensive (monthly port fees + data transfer)
+- ✗ Takes weeks to provision (physical fiber)
+- ✗ Requires BGP configuration
+- Best for: Production, large data transfer, latency-sensitive, compliance (data must not traverse public internet)
 
 ### BGP over Cloud Interconnects
 
-```
-AWS DIRECT CONNECT — BGP IN ACTION
+![AWS Direct Connect with BGP: your data center router (ASN 65001) and the AWS virtual private gateway (ASN 64512) are joined by a dedicated fiber and run a BGP session over it; your router advertises 172.16.0.0/12 (your on-prem) and AWS advertises 10.0.0.0/16 (your VPC CIDR).](./img/09/direct-connect-bgp.svg)
 
-  Your Data Center                              AWS VPC
-  ┌───────────────┐                            ┌──────────────────┐
-  │               │   Direct Connect           │ VPC: 10.0.0.0/16 │
-  │ Your Router   │◄─────────────────────────▶│ Virtual Private   │
-  │ ASN: 65001    │   (dedicated fiber)        │ Gateway           │
-  │               │                            │ ASN: 64512        │
-  │ Advertises:   │                            │                   │
-  │ 172.16.0.0/12 │   BGP session              │ Advertises:       │
-  │ (your on-prem)│◄─────────────────────────▶│ 10.0.0.0/16       │
-  │               │                            │ (your VPC CIDR)   │
-  └───────────────┘                            └──────────────────┘
+Your router advertises 172.16.0.0/12 to AWS via BGP. AWS advertises 10.0.0.0/16 to your router via BGP.
 
-  Your router advertises 172.16.0.0/12 to AWS via BGP.
-  AWS advertises 10.0.0.0/16 to your router via BGP.
+Result:
 
-  Result:
-  - AWS EC2 instances can reach 172.16.x.x (your on-prem servers)
-  - Your on-prem servers can reach 10.0.x.x (AWS instances)
-  - Traffic flows over the Direct Connect fiber, not the internet.
+- AWS EC2 instances can reach 172.16.x.x (your on-prem servers)
+- Your on-prem servers can reach 10.0.x.x (AWS instances)
+- Traffic flows over the Direct Connect fiber, not the internet.
 
-  If the Direct Connect link fails:
-  - BGP session drops within the hold time, or within about a second
-    with BFD (AWS supports BFD on Direct Connect; enable it on your side)
-  - Routes are withdrawn
-  - If you have a VPN backup, traffic fails over to the VPN
-  - Convergence: seconds to minutes depending on BGP timers
-```
+If the Direct Connect link fails:
+
+- BGP session drops within the hold time, or within about a second with BFD (AWS supports BFD on Direct Connect; enable it on your side)
+- Routes are withdrawn
+- If you have a VPN backup, traffic fails over to the VPN
+- Convergence: seconds to minutes depending on BGP timers
 
 ---
 
@@ -602,37 +323,15 @@ This section covers the practical tools you use to investigate how the internet 
 
 ### Tools for Investigating Internet Routing
 
-```
-TOOL                      WHAT IT DOES                              ACCESS
-────────────────────      ──────────────────────────────────────    ────────────
-traceroute / mtr          Maps the hop-by-hop path from your host   Local CLI
-                          to a destination. Shows intermediate
-                          routers and their ASes.
-
-BGP Looking Glass         Query a remote router's BGP table.         Web-based
-                          See how a specific AS sees your prefix.
-                          Examples:
-                          - route-views.oregon-ix.net
-                          - lg.he.net (Hurricane Electric)
-                          - bgp.tools
-
-Cloudflare Radar          Route leak and origin-hijack detection,    Web-based
-(radar.cloudflare.com)    per-AS and per-prefix routing views.
-
-RIPE RIS Live / bgp.tools Live and historical BGP updates seen by    Web / API
-                          public route collectors; RPKI status.
-
-RIPEstat                  Detailed analysis of any IP prefix or AS.  Web-based
-(stat.ripe.net)           Shows: routing history, visibility,
-                          AS-PATH, RPKI status.
-
-RIPE Atlas                Distributed measurement network.           Web-based
-                          Run traceroute, ping, DNS from thousands   (free/paid)
-                          of probes worldwide.
-
-whois                     Look up IP prefix ownership and ASN.       CLI
-                          whois -h whois.radb.net <prefix>
-```
+| Tool                                       | What it does                                                                                                                                                       | Access              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| traceroute / mtr                           | Maps the hop-by-hop path from your host to a destination. Shows intermediate routers and their ASes.                                                               | Local CLI           |
+| BGP Looking Glass                          | Query a remote router's BGP table. See how a specific AS sees your prefix. Examples: route-views.oregon-ix.net, lg.he.net (Hurricane Electric), bgp.tools          | Web-based           |
+| Cloudflare Radar (radar.cloudflare.com)    | Route leak and origin-hijack detection, per-AS and per-prefix routing views.                                                                                       | Web-based           |
+| RIPE RIS Live / bgp.tools                  | Live and historical BGP updates seen by public route collectors; RPKI status.                                                                                      | Web / API           |
+| RIPEstat (stat.ripe.net)                   | Detailed analysis of any IP prefix or AS. Shows: routing history, visibility, AS-PATH, RPKI status.                                                                | Web-based           |
+| RIPE Atlas                                 | Distributed measurement network. Run traceroute, ping, DNS from thousands of probes worldwide.                                                                     | Web-based (free/paid) |
+| whois                                      | Look up IP prefix ownership and ASN. `whois -h whois.radb.net <prefix>`                                                                                            | CLI                 |
 
 ### Reading AS-PATH in Traceroute
 
@@ -687,15 +386,7 @@ Reading this:
 
 [`bgp.json`](../labs/netlab/bgp.json) builds a small internet with documentation ASNs and addresses, every router running FRR's `zebra` and `bgpd` in its own namespace (configs in `/etc/frr/<router>/bgpd.conf`; keepalive 1 s, hold 3 s so failures show quickly):
 
-```
-                                        ┌── t1 AS64510 ──── origin AS64530 ── server 203.0.113.10
-  user ── you AS64500 ──┤                  │                   │ announces 203.0.113.0/24
-  198.18.30.10          │                  └── anya AS64550    │
-                        │                      (anycast site A) │
-                        └── t2 AS64520 ──── t3 AS64540 ─────────┘
-                               ├── anyb AS64550 (anycast site B)     anycast: 198.51.100.0/24,
-                               └── rogue AS64566                     service 198.51.100.53
-```
+![The BGP lab: the user (198.18.30.10) sits behind router "you" (AS64500), which has two transit providers, t1 (AS64510) and t2 (AS64520). t1 connects to the origin (AS64530), which announces 203.0.113.0/24 and serves 203.0.113.10, and to anycast site A, anya (AS64550). t2 connects to t3 (AS64540), which also reaches the origin, to anycast site B, anyb (AS64550), and to rogue (AS64566). The anycast prefix is 198.51.100.0/24 with service 198.51.100.53.](./img/09/bgp-lab-topology.svg)
 
 ```bash
 cd labs/go

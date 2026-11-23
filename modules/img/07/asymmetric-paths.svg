@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 260" role="img" aria-labelledby="t d"><title id="t">Asymmetric paths: why traceroute can be misleading</title><desc id="d">The forward path runs from You to ISP-A, IXP, ISP-B and the Destination. The return path runs from the Destination to ISP-C, IXP, ISP-A and back to You, so the two directions cross different networks.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="258" rx="16"/>
+<text class="zl" x="24" y="34">Forward:  You → Destination</text>
+<rect class="net" x="40" y="48" width="120" height="48" rx="10"/><text class="t" x="100" y="78" text-anchor="middle">You</text>
+<path class="arrow" d="M160 72 H193"/>
+<rect class="net" x="195" y="48" width="120" height="48" rx="10"/><text class="t" x="255" y="78" text-anchor="middle">ISP-A</text>
+<path class="arrow" d="M315 72 H348"/>
+<rect class="net" x="350" y="48" width="120" height="48" rx="10"/><text class="t" x="410" y="78" text-anchor="middle">IXP</text>
+<path class="arrow" d="M470 72 H503"/>
+<rect class="net" x="505" y="48" width="120" height="48" rx="10"/><text class="t" x="565" y="78" text-anchor="middle">ISP-B</text>
+<path class="arrow" d="M625 72 H658"/>
+<rect class="ok" x="660" y="48" width="120" height="48" rx="10"/><text class="t" x="720" y="78" text-anchor="middle">Destination</text>
+<text class="zl" x="24" y="144">Return:  Destination → You</text>
+<rect class="net" x="40" y="158" width="120" height="48" rx="10"/><text class="t" x="100" y="188" text-anchor="middle">You</text>
+<path class="arrow" d="M193 182 H162"/>
+<rect class="net" x="195" y="158" width="120" height="48" rx="10"/><text class="t" x="255" y="188" text-anchor="middle">ISP-A</text>
+<path class="arrow" d="M348 182 H317"/>
+<rect class="net" x="350" y="158" width="120" height="48" rx="10"/><text class="t" x="410" y="188" text-anchor="middle">IXP</text>
+<path class="arrow" d="M503 182 H472"/>
+<rect class="net" x="505" y="158" width="120" height="48" rx="10"/><text class="t" x="565" y="188" text-anchor="middle">ISP-C</text>
+<path class="arrow" d="M658 182 H627"/>
+<rect class="ok" x="660" y="158" width="120" height="48" rx="10"/><text class="t" x="720" y="188" text-anchor="middle">Destination</text>
+<text class="s" x="400" y="238" text-anchor="middle">The forward path may be completely different from the return path.</text>
+</svg>

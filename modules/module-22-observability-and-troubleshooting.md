@@ -135,19 +135,16 @@ Lessons from the table:
 
 A trace is a tree of spans sharing one trace ID. The ID travels between services in the W3C `traceparent` header:
 
-```
-traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
-             version-trace id (16 bytes)-parent span id (8 bytes)-flags (01 = sampled)
-```
+![The header traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01 has four hyphen-separated fields: version 00, the 16-byte trace id, the 8-byte parent span id, and flags, where 01 means sampled.](./img/22/traceparent.svg)
 
 Each service creates a **server span** for the request it handles and a **client span** for each call it makes, and passes a new `traceparent` with its client span as the parent. With spans at both ends of a call, the gaps can be computed:
 
-```
-client → frontend network   = load client span − frontend server span
-frontend's own work         = frontend server span − its client span
-network + queues to backend = frontend client span − backend server span
-backend time                = backend server span
-```
+| Gap | Computed as |
+|-----|-------------|
+| client → frontend network | load client span − frontend server span |
+| frontend's own work | frontend server span − its client span |
+| network + queues to backend | frontend client span − backend server span |
+| backend time | backend server span |
 
 In the lab, every run kept 4 spans per request and **0 spans with a missing parent**: propagation worked end to end. Two incidents, decomposed:
 
@@ -260,10 +257,7 @@ Each playbook is a sequence of discriminating questions, cheapest first.
 
 ### Lab Part 1: Run the Lab
 
-```
-client 198.18.220.10 ── frontend :8080 ── router (pathlab · conntrack flows) ── backend :8081
-                         spans + logs       delay/loss on demand                  faults: slow / fail
-```
+![The client at 198.18.220.10 calls the frontend on :8080 (spans and logs), which calls the backend on :8081 (faults: slow or fail) through a router running pathlab with conntrack flows and delay or loss on demand.](./img/22/observe-lab-topology.svg)
 
 ```bash
 cd labs/go

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" role="img" aria-labelledby="t d"><title id="t">Your lab machine and its tools</title><desc id="d">The lab machine holds the tools used in this course: tcpdump for capture, Wireshark for analysis, tshark for scripted analysis; ip and ss for interfaces, routes and TCP; dig for DNS queries; curl and openssl for HTTP and TLS testing; Docker for container networking; iperf3 for throughput testing; hping3 and mtr for path analysis and probing; and the Go toolbox in labs/go, which adds one new tool per module and is combined into netdoctor in the capstone. The machine reaches your network and the internet through eth0, ens3 or wlan0.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="518" rx="16"/>
+<rect class="zone" x="20" y="20" width="760" height="400" rx="12"/>
+<text class="zl" x="36" y="44">Your Lab Machine</text>
+<rect class="box" x="40" y="60" width="230" height="76" rx="10"/>
+<text class="t" x="155.0" y="94.5" text-anchor="middle">tcpdump</text>
+<text class="s" x="155.0" y="111.5" text-anchor="middle">Capture</text>
+<rect class="box" x="285" y="60" width="230" height="76" rx="10"/>
+<text class="t" x="400.0" y="94.5" text-anchor="middle">Wireshark</text>
+<text class="s" x="400.0" y="111.5" text-anchor="middle">Analyze</text>
+<rect class="box" x="530" y="60" width="230" height="76" rx="10"/>
+<text class="t" x="645.0" y="94.5" text-anchor="middle">tshark</text>
+<text class="s" x="645.0" y="111.5" text-anchor="middle">Scripted</text>
+<rect class="box" x="40" y="150" width="230" height="76" rx="10"/>
+<text class="t" x="155.0" y="176.0" text-anchor="middle">ip / ss</text>
+<text class="s" x="155.0" y="193.0" text-anchor="middle">Interfaces</text>
+<text class="s" x="155.0" y="210.0" text-anchor="middle">Routes, TCP</text>
+<rect class="box" x="285" y="150" width="230" height="76" rx="10"/>
+<text class="t" x="400.0" y="184.5" text-anchor="middle">dig</text>
+<text class="s" x="400.0" y="201.5" text-anchor="middle">DNS Queries</text>
+<rect class="box" x="530" y="150" width="230" height="76" rx="10"/>
+<text class="t" x="645.0" y="176.0" text-anchor="middle">curl / openssl</text>
+<text class="s" x="645.0" y="193.0" text-anchor="middle">HTTP / TLS</text>
+<text class="s" x="645.0" y="210.0" text-anchor="middle">Testing</text>
+<rect class="box" x="40" y="240" width="230" height="76" rx="10"/>
+<text class="t" x="155.0" y="266.0" text-anchor="middle">Docker</text>
+<text class="s" x="155.0" y="283.0" text-anchor="middle">Container</text>
+<text class="s" x="155.0" y="300.0" text-anchor="middle">Networking</text>
+<rect class="box" x="285" y="240" width="230" height="76" rx="10"/>
+<text class="t" x="400.0" y="266.0" text-anchor="middle">iperf3</text>
+<text class="s" x="400.0" y="283.0" text-anchor="middle">Throughput</text>
+<text class="s" x="400.0" y="300.0" text-anchor="middle">Testing</text>
+<rect class="box" x="530" y="240" width="230" height="76" rx="10"/>
+<text class="t" x="645.0" y="266.0" text-anchor="middle">hping3 / mtr</text>
+<text class="s" x="645.0" y="283.0" text-anchor="middle">Path Analysis</text>
+<text class="s" x="645.0" y="300.0" text-anchor="middle">&amp; Probing</text>
+<rect class="net" x="40" y="334" width="720" height="68" rx="10"/>
+<text class="t" x="400.0" y="364.5" text-anchor="middle">Go toolbox (labs/go)</text>
+<text class="s" x="400.0" y="381.5" text-anchor="middle">phases, then one new tool per module, combined into netdoctor in the capstone</text>
+<path class="arrow" d="M400 420 V472"/>
+<text class="m" x="412" y="450">eth0 / ens3 / wlan0</text>
+<rect class="box" x="300" y="476" width="200" height="34" rx="10"/>
+<text class="l" x="400.0" y="497.0" text-anchor="middle">Your Network / Internet</text>
+</svg>

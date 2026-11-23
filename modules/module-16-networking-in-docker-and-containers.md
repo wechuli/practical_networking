@@ -265,11 +265,7 @@ Part 2 changes the real host: it creates Docker networks, containers, a veth cal
 
 [`containers.json`](../labs/netlab/containers.json): two "containers" (c1 runs a web server) on bridge `cbr0` in a "host" namespace, whose uplink reaches an "internet" namespace. The checks add Docker's rules one at a time:
 
-```
-  c1 10.88.0.2 ─┐
-                ├─ cbr0 10.88.0.1 [host] eth1 198.18.140.1 ──── internet 198.18.140.10 (web :8080, hold :9000)
-  c2 10.88.0.3 ─┘
-```
+![Containers c1 (10.88.0.2) and c2 (10.88.0.3) attach to bridge cbr0 (10.88.0.1) in the host namespace, whose uplink eth1 (198.18.140.1) reaches the internet namespace at 198.18.140.10, running web on :8080 and hold on :9000.](./img/16/container-lab-topology.svg)
 
 ```bash
 cd labs/go

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 772" role="img" aria-labelledby="t d"><title id="t">Network scope: LAN, WAN, internet and cloud VPC</title><desc id="d">Four scopes stacked from top to bottom. A LAN joins two PCs and a server with sub-millisecond latency at 1 to 100 Gbps, and you own everything. A router or gateway connects it to a WAN, where your site reaches a remote site across a carrier network: you own the endpoints, the carrier owns the middle, latency is 10 to 100 ms and the carrier gives an SLA for uptime. The internet is many autonomous systems connected via BGP, such as AS1, an IXP, AS2, a CDN and AS3 in a cloud, with no single owner and variable latency and reliability. A cloud VPC is software-defined with the physical layer invisible to you; for example VPC 10.0.0.0/16 holds subnet A 10.0.1.0/24 and subnet B 10.0.2.0/24.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="770" rx="16"/>
+<text class="zl" x="24" y="30">Network scope</text>
+<rect class="zone" x="16" y="44" width="768" height="140" rx="12"/><text class="zl" x="32" y="68">LAN</text>
+<path class="line" d="M115 122 V150 M215 122 V150 M315 122 V150 M115 150 H315"/>
+<rect class="net" x="70" y="82" width="90" height="40" rx="10"/><text class="t" x="115" y="107" text-anchor="middle">PC</text>
+<rect class="net" x="170" y="82" width="90" height="40" rx="10"/><text class="t" x="215" y="107" text-anchor="middle">PC</text>
+<rect class="net" x="270" y="82" width="90" height="40" rx="10"/><text class="t" x="315" y="107" text-anchor="middle">Server</text>
+<text class="s" x="440" y="96">sub-ms latency</text><text class="s" x="440" y="116">1–100 Gbps</text><text class="s" x="440" y="136">You own everything</text>
+<path class="line" d="M215 150 V250"/>
+<text class="l" x="227" y="204">Router / Gateway</text>
+<rect class="zone" x="16" y="214" width="768" height="140" rx="12"/><text class="zl" x="32" y="238">WAN</text>
+<path class="line" d="M300 270 H370 M550 270 H610"/>
+<rect class="net" x="130" y="250" width="170" height="40" rx="10"/><text class="t" x="215" y="275" text-anchor="middle">Your Site</text>
+<rect class="box" x="370" y="250" width="180" height="40" rx="10"/><text class="t" x="460" y="275" text-anchor="middle">Carrier Network</text>
+<rect class="net" x="610" y="250" width="150" height="40" rx="10"/><text class="t" x="685" y="275" text-anchor="middle">Remote Site</text>
+<text class="s" x="32" y="318">You own endpoints. Carrier owns the middle.</text>
+<text class="s" x="32" y="338">10ms–100ms latency. Carrier SLA for uptime.</text>
+<path class="line" d="M215 354 V384"/>
+<rect class="zone" x="16" y="384" width="768" height="140" rx="12"/><text class="zl" x="32" y="408">Internet</text>
+<text class="s" x="32" y="430">Multiple autonomous systems connected via BGP.</text>
+<text class="s" x="32" y="448">No single owner. Variable latency and reliability.</text>
+<path class="line" d="M130 482 H180 M270 482 H320 M410 482 H460 M550 482 H600"/>
+<rect class="l3" x="40" y="462" width="90" height="40" rx="10"/><text class="t" x="85" y="487" text-anchor="middle">AS1</text>
+<rect class="net" x="180" y="462" width="90" height="40" rx="10"/><text class="t" x="225" y="487" text-anchor="middle">IXP</text>
+<rect class="l3" x="320" y="462" width="90" height="40" rx="10"/><text class="t" x="365" y="487" text-anchor="middle">AS2</text>
+<rect class="net" x="460" y="462" width="90" height="40" rx="10"/><text class="t" x="505" y="487" text-anchor="middle">CDN</text>
+<rect class="l3" x="600" y="462" width="150" height="40" rx="10"/><text class="t" x="675" y="487" text-anchor="middle">AS3: Cloud</text>
+<path class="line" d="M215 524 V554"/>
+<rect class="zone" x="16" y="554" width="768" height="198" rx="12"/><text class="zl" x="32" y="578">Cloud VPC</text>
+<text class="s" x="32" y="600">Software-defined. Physical layer invisible to you.</text>
+<rect class="box" x="40" y="616" width="720" height="120" rx="10"/><text class="t" x="60" y="640">VPC:</text><text class="m" x="104" y="640">10.0.0.0/16</text>
+<rect class="l3" x="80" y="656" width="220" height="62" rx="10"/><text class="t" x="190" y="681" text-anchor="middle">Subnet A</text><text class="m" x="190" y="702" text-anchor="middle">10.0.1.0/24</text>
+<rect class="l3" x="340" y="656" width="220" height="62" rx="10"/><text class="t" x="450" y="681" text-anchor="middle">Subnet B</text><text class="m" x="450" y="702" text-anchor="middle">10.0.2.0/24</text>
+</svg>

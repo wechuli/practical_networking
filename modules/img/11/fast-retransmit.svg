@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" role="img" aria-labelledby="t d"><title id="t">Loss of one segment and fast retransmit</title><desc id="d">Classic view. The sender sends seq 1001:2001 and gets ack 2001. Segment 2001:3001 is lost. Segments 3001:4001, 4001:5001 and 5001:6001 each arrive and produce ack 2001 with SACK blocks 3001:4001, 3001:5001 and 3001:6001: duplicate ACKs 1, 2 and 3. The sender then fast-retransmits 2001:3001, about one RTT after the loss, and the receiver answers ack 6001: the hole is filled.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="558" rx="16"/>
+<text class="zl" x="24" y="28">Loss of one segment (classic view)</text>
+<rect class="net" x="70" y="40" width="140" height="40" rx="10"/><text class="t" x="140" y="65" text-anchor="middle">sender</text>
+<rect class="net" x="410" y="40" width="140" height="40" rx="10"/><text class="t" x="480" y="65" text-anchor="middle">receiver</text>
+<path class="line" d="M140 80 V540"/><path class="line" d="M480 80 V540"/>
+<text class="m" x="310" y="108" text-anchor="middle">seq 1001:2001</text><path class="arrow" d="M140 118 H478"/>
+<text class="m" x="310" y="140" text-anchor="middle">ack 2001</text><path class="arrow" d="M480 150 H142"/>
+<text class="m" x="240" y="182" text-anchor="middle">seq 2001:3001</text><path class="dash" d="M140 192 H318"/>
+<rect class="warn" x="326" y="178" width="96" height="28" rx="10"/><text class="l" x="374" y="197" text-anchor="middle">✗ lost</text>
+<text class="m" x="310" y="234" text-anchor="middle">seq 3001:4001</text><path class="arrow" d="M140 244 H478"/>
+<text class="m" x="310" y="266" text-anchor="middle">ack 2001, SACK {3001:4001}</text><path class="arrow" d="M480 276 H142"/>
+<text class="l" x="494" y="280">duplicate ACK 1</text>
+<text class="m" x="310" y="308" text-anchor="middle">seq 4001:5001</text><path class="arrow" d="M140 318 H478"/>
+<text class="m" x="310" y="340" text-anchor="middle">ack 2001, SACK {3001:5001}</text><path class="arrow" d="M480 350 H142"/>
+<text class="l" x="494" y="354">duplicate ACK 2</text>
+<text class="m" x="310" y="382" text-anchor="middle">seq 5001:6001</text><path class="arrow" d="M140 392 H478"/>
+<text class="m" x="310" y="414" text-anchor="middle">ack 2001, SACK {3001:6001}</text><path class="arrow" d="M480 424 H142"/>
+<text class="l" x="494" y="428">duplicate ACK 3</text>
+<text class="l" x="310" y="460" text-anchor="middle">fast retransmit of 2001:3001</text><path class="arrow" d="M140 470 H478"/>
+<text class="s" x="494" y="474">about one RTT after the loss</text>
+<text class="m" x="310" y="502" text-anchor="middle">ack 6001</text><path class="arrow" d="M480 512 H142"/>
+<rect class="ok" x="494" y="496" width="120" height="30" rx="10"/><text class="l" x="554" y="516" text-anchor="middle">hole filled</text>
+</svg>

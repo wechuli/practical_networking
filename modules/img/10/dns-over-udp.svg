@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" role="img" aria-labelledby="t d"><title id="t">A DNS query and response over UDP</title><desc id="d">The client sends a DNS query from UDP port 52431 to port 53 on the resolver; the resolver replies from port 53 to port 52431 with the answer 192.0.2.10. One packet out, one packet back, no handshake, one RTT.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="298" rx="16"/>
+<text class="s" x="24" y="30" xml:space="preserve">Client query:   "What is the A record for api.lab.test?"</text>
+<text class="s" x="24" y="50">Server response: "api.lab.test → 192.0.2.10"</text>
+<rect class="net" x="80.0" y="66" width="140" height="37" rx="10"/>
+<text class="t" x="150.0" y="89.5" text-anchor="middle">Client</text>
+<rect class="net" x="570.0" y="66" width="160" height="37" rx="10"/>
+<text class="t" x="650.0" y="89.5" text-anchor="middle">DNS Resolver</text>
+<path class="line" d="M150 106 V250"/>
+<path class="line" d="M650 106 V250"/>
+<path class="arrow" d="M150 166 H650"/>
+<text class="l" x="400.0" y="158" text-anchor="middle">DNS Query: A example.com</text>
+<text class="m" x="400.0" y="142" text-anchor="middle">UDP src=52431, dst=53</text>
+<path class="arrow" d="M650 236 H150"/>
+<text class="l" x="400.0" y="228" text-anchor="middle">DNS Response: 192.0.2.10</text>
+<text class="m" x="400.0" y="212" text-anchor="middle">UDP src=53, dst=52431</text>
+<text class="s" x="400" y="280" text-anchor="middle">One packet out, one packet back. No handshake. One RTT.</text>
+</svg>

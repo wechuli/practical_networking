@@ -34,10 +34,7 @@ Everything here is measured in [`labs/netlab/tunnels.json`](../labs/netlab/tunne
 
 ## 19.1 What a Tunnel Is
 
-```
-inner packet (what the application sent):     [ IP 10.1.0.10 → 10.2.0.10 | TCP | data ]
-outer packet (what the internet carries):     [ IP 198.18.190.1 → 198.18.191.1 | UDP 51820 | WireGuard | encrypted inner packet ]
-```
+![The inner packet, what the application sent, is IP 10.1.0.10 → 10.2.0.10, TCP and data; the outer packet, what the internet carries, is IP 198.18.190.1 → 198.18.191.1, UDP 51820, a WireGuard header and the encrypted inner packet.](./img/19/tunnel-encapsulation.svg)
 
 Each tunnel endpoint has an address on the **underlay**, the network that actually carries packets. The **inner** packets use the overlay's addresses. Routers in between see only the outer header.
 
@@ -363,13 +360,7 @@ Some habits that help:
 
 ### Lab Part 1: Run the Lab
 
-```
- lana 10.1.0.10 ─ gwa ─(198.18.190.1)── wan (pathlab: delay, loss) ──(198.18.191.1)─ gwb ─ lanb 10.2.0.10
-   10.1.1.10      │  WireGuard 10.99.0.0/24 · IPsec 10.1.1/24⇄10.2.1/24 ·     │      10.2.1.10, web :8080
-                  │  VXLAN 10.98.0.0/24 · OpenVPN udp 10.97/24, tcp 10.96/24 │  sshd :22 (:2222 no forwarding)
-                                         │
-                      home NAT 198.18.192.2 ─ laptop 192.168.50.10 (WireGuard client 10.99.0.3)
-```
+![lana (10.1.0.10, 10.1.1.10) connects to gwa (198.18.190.1), which reaches gwb (198.18.191.1, sshd on :22 and :2222 with no forwarding) across wan (pathlab: delay, loss), and gwb connects to lanb (10.2.0.10, 10.2.1.10, web :8080); between the gateways run WireGuard 10.99.0.0/24, IPsec 10.1.1/24 ⇄ 10.2.1/24, VXLAN 10.98.0.0/24 and OpenVPN udp 10.97/24 and tcp 10.96/24; wan also reaches a home NAT at 198.18.192.2 with a laptop at 192.168.50.10 behind it, the WireGuard client 10.99.0.3.](./img/19/tunnels-lab-topology.svg)
 
 ```bash
 cd labs/go

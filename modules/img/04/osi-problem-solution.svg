@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="t d"><title id="t">The problem before OSI and the layered solution</title><desc id="d">Top: two vendor stacks, each with app protocol, transport, network and physical layers, cannot communicate because the app protocols differ, the transports are incompatible, the network layers cannot cross over and the physical layers are only maybe compatible. Bottom: a layered stack under any application, where layer 7 (HTTP, gRPC, SMTP), layer 4 (TCP or UDP), layer 3 (IPv4 or IPv6), layer 2 (Ethernet, Wi-Fi, MPLS) and layer 1 (copper, fiber, wireless) are each swappable, so one layer can change without breaking the others.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="598" rx="16"/>
+<text class="zl" x="24" y="34">The problem before OSI</text>
+<text class="l" x="140" y="64" text-anchor="middle">Vendor A stack</text>
+<text class="l" x="660" y="64" text-anchor="middle">Vendor B stack</text>
+<rect class="l7" x="50" y="76" width="180" height="34" rx="10"/><text class="s" x="140" y="98" text-anchor="middle">App Protocol</text>
+<rect class="l4" x="50" y="114" width="180" height="34" rx="10"/><text class="s" x="140" y="136" text-anchor="middle">Transport</text>
+<rect class="l3" x="50" y="152" width="180" height="34" rx="10"/><text class="s" x="140" y="174" text-anchor="middle">Network</text>
+<rect class="box" x="50" y="190" width="180" height="34" rx="10"/><text class="s" x="140" y="212" text-anchor="middle">Physical</text>
+<rect class="l7" x="570" y="76" width="180" height="34" rx="10"/><text class="s" x="660" y="98" text-anchor="middle">App Protocol</text>
+<rect class="l4" x="570" y="114" width="180" height="34" rx="10"/><text class="s" x="660" y="136" text-anchor="middle">Transport</text>
+<rect class="l3" x="570" y="152" width="180" height="34" rx="10"/><text class="s" x="660" y="174" text-anchor="middle">Network</text>
+<rect class="box" x="570" y="190" width="180" height="34" rx="10"/><text class="s" x="660" y="212" text-anchor="middle">Physical</text>
+<path class="dash" d="M240 93 H330"/><path class="dash" d="M560 93 H470"/><text class="l" x="400" y="98" text-anchor="middle">Different</text>
+<path class="dash" d="M240 131 H320"/><path class="dash" d="M560 131 H480"/><text class="l" x="400" y="136" text-anchor="middle">Incompatible</text>
+<path class="dash" d="M240 169 H310"/><path class="dash" d="M560 169 H490"/><text class="l" x="400" y="174" text-anchor="middle">Can't cross over</text>
+<path class="line" d="M240 207 H300"/><path class="line" d="M560 207 H500"/><text class="l" x="400" y="212" text-anchor="middle">Maybe compatible</text>
+<rect class="warn" x="270" y="240" width="260" height="38" rx="10"/><text class="t" x="400" y="264" text-anchor="middle">✗ Cannot communicate ✗</text>
+<text class="zl" x="24" y="318">The solution: layered independence</text>
+<text class="l" x="400" y="342" text-anchor="middle">Any Application</text>
+<rect class="l7" x="150" y="354" width="500" height="38" rx="10"/><text class="t" x="174" y="378">Layer 7</text><text class="s" x="270" y="378">HTTP, gRPC, SMTP — swappable</text>
+<rect class="l4" x="150" y="396" width="500" height="38" rx="10"/><text class="t" x="174" y="420">Layer 4</text><text class="s" x="270" y="420">TCP or UDP — swappable</text>
+<rect class="l3" x="150" y="438" width="500" height="38" rx="10"/><text class="t" x="174" y="462">Layer 3</text><text class="s" x="270" y="462">IPv4 or IPv6 — swappable</text>
+<rect class="l2" x="150" y="480" width="500" height="38" rx="10"/><text class="t" x="174" y="504">Layer 2</text><text class="s" x="270" y="504">Ethernet, Wi-Fi, MPLS — swappable</text>
+<rect class="box" x="150" y="522" width="500" height="38" rx="10"/><text class="t" x="174" y="546">Layer 1</text><text class="s" x="270" y="546">Copper, fiber, wireless — swappable</text>
+<text class="s" x="400" y="580" text-anchor="middle">Each layer works independently. Change one without breaking others.</text>
+</svg>

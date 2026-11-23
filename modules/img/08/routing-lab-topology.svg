@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 474" role="img" aria-labelledby="t d"><title id="t">The routing lab network</title><desc id="d">The client (.10, plus .20) and routers r1 (.1) and r9 (.2) share the bridged LAN 198.18.10.0/24. r1 drops packets in the INVALID conntrack state. r9 reaches the server's eth1 (.10) over 198.18.14.0/24. r1 reaches the server's eth0 (.10) over 198.18.11.0/24; the server's only default route is via r1. r1 also reaches r2 (.2) over 198.18.12.0/24 and r3 (.2) over 198.18.13.0/24; r2 (.2) and r3 (.3) share the bridge 198.19.12.0/24 with far (.10).</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="472" rx="16"/>
+<rect class="net" x="40" y="24" width="160" height="52" rx="10"/><text class="t" x="120" y="46" text-anchor="middle">client</text><text class="m" x="120" y="66" text-anchor="middle">.10 (+ .20)</text>
+<rect class="net" x="420" y="24" width="120" height="52" rx="10"/><text class="t" x="480" y="46" text-anchor="middle">r9</text><text class="m" x="480" y="66" text-anchor="middle">.2</text>
+<path class="line" d="M120 76 V100"/><path class="line" d="M480 76 V100"/>
+<rect class="l2" x="40" y="100" width="520" height="26" rx="10"/><text class="l" x="300" y="118" text-anchor="middle">LAN 198.18.10.0/24 (bridge)</text>
+<path class="line" d="M540 50 H700 V160"/><text class="m" x="620" y="42" text-anchor="middle">198.18.14.0/24</text><text class="s" x="708" y="140">eth1 .10</text>
+<path class="line" d="M295 126 V160"/>
+<rect class="net" x="200" y="160" width="190" height="74" rx="10"/><text class="t" x="295" y="184" text-anchor="middle">r1 .1</text><text class="s" x="295" y="204" text-anchor="middle">iptables: drop INVALID</text><text class="s" x="295" y="222" text-anchor="middle">conntrack state</text>
+<rect class="net" x="620" y="160" width="160" height="74" rx="10"/><text class="t" x="700" y="190" text-anchor="middle">server</text><text class="s" x="700" y="212" text-anchor="middle">(default via r1)</text>
+<path class="line" d="M390 197 H620"/><text class="m" x="505" y="189" text-anchor="middle">198.18.11.0/24</text><text class="s" x="612" y="216" text-anchor="end">eth0 .10</text>
+<path class="line" d="M250 234 V280 H200 V320"/><text class="m" x="192" y="304" text-anchor="end">198.18.12.0/24</text>
+<path class="line" d="M340 234 V280 H390 V320"/><text class="m" x="398" y="304">198.18.13.0/24</text>
+<rect class="net" x="140" y="320" width="120" height="44" rx="10"/><text class="t" x="200" y="347" text-anchor="middle">r2 .2</text>
+<rect class="net" x="330" y="320" width="120" height="44" rx="10"/><text class="t" x="390" y="347" text-anchor="middle">r3 .2</text>
+<path class="line" d="M200 364 V410"/><text class="s" x="208" y="392">.2</text>
+<path class="line" d="M390 364 V410"/><text class="s" x="398" y="392">.3</text>
+<rect class="l2" x="120" y="410" width="360" height="26" rx="10"/><text class="l" x="300" y="428" text-anchor="middle">198.19.12.0/24 (bridge)</text>
+<path class="line" d="M480 423 H560"/>
+<rect class="net" x="560" y="400" width="140" height="46" rx="10"/><text class="t" x="630" y="428" text-anchor="middle">far .10</text>
+</svg>

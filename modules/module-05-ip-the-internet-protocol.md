@@ -49,45 +49,7 @@ All of these guarantees are provided by TCP (Layer 4). UDP explicitly chooses no
 
 ### Diagram
 
-```
-WHAT IP PROVIDES vs WHAT IT DOES NOT
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │  IP PROVIDES                                                │
-  │                                                             │
-  │  ✓ Logical addressing  — every host has a unique address    │
-  │  ✓ Routing             — hop-by-hop forwarding to dest      │
-  │  ✓ Fragmentation       — splitting packets that are too     │
-  │                          large for a link (IPv4 only)       │
-  │  ✓ TTL                 — prevents infinite routing loops    │
-  │  ✓ Protocol muxing     — tells the next layer whether       │
-  │                          payload is TCP, UDP, or ICMP       │
-  │  ✓ Error reporting     — via its companion, ICMP            │
-  │                          (not a delivery guarantee)         │
-  └─────────────────────────────────────────────────────────────┘
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │  IP DOES NOT PROVIDE                                        │
-  │                                                             │
-  │  ✗ Reliable delivery   — packets can be silently dropped    │
-  │  ✗ Ordering            — packets may arrive out of order    │
-  │  ✗ Duplicate detection — same packet may arrive twice       │
-  │  ✗ Flow control        — no mechanism to slow the sender    │
-  │  ✗ Connection state    — each packet is independent         │
-  │  ✗ Error correction    — IPv4 detects header corruption     │
-  │                          only (header checksum) and drops;  │
-  │                          IPv6 has no header checksum        │
-  └─────────────────────────────────────────────────────────────┘
-
-  These missing guarantees are provided by TCP (Layer 4):
-  ┌──────────────┐
-  │     TCP      │ ← reliability, ordering, flow control
-  ├──────────────┤
-  │      IP      │ ← addressing and routing (best effort)
-  ├──────────────┤
-  │   Ethernet   │ ← local delivery by MAC address
-  └──────────────┘
-```
+![IP provides logical addressing, routing, fragmentation (IPv4 only), TTL, protocol multiplexing and error reporting through ICMP; it does not provide reliable delivery, ordering, duplicate detection, flow control, connection state or error correction, and TCP adds the missing guarantees on top of IP, which runs on top of Ethernet.](./img/05/ip-provides.svg)
 
 ### Production Relevance
 
@@ -103,42 +65,25 @@ Use them as evidence, not as a gate. As Module 4 showed, many cloud services and
 
 An IPv4 address is a 32-bit number that uniquely identifies a network interface. It is written in dotted decimal notation: four octets (bytes) separated by dots. Each octet ranges from 0 to 255.
 
-```
-  Binary:    11000000 . 10101000 . 00000001 . 01100100
-  Decimal:   192      . 168      . 1        . 100
-
-  32 bits total → 2^32 = 4,294,967,296 possible addresses
-  (About 4.3 billion — not enough for the modern internet)
-```
+![The address 192.168.1.100 is four 8-bit octets, 11000000, 10101000, 00000001 and 01100100 in binary; 32 bits give 2^32 = 4,294,967,296 possible addresses, about 4.3 billion.](./img/05/ipv4-dotted-decimal.svg)
 
 ### The Structure: Network Part and Host Part
 
 Every IP address has two parts: a **network portion** (identifies which network) and a **host portion** (identifies which device on that network). The boundary between them is defined by the subnet mask (covered in 5.3).
 
-```
-  IP Address:   192.168.1.100
-  Subnet Mask:  255.255.255.0  (/24)
-
-  Network part: 192.168.1      ← identifies the network
-  Host part:              .100 ← identifies the device on that network
-
-  All devices with 192.168.1.x (where x = 1–254) are on the same network.
-  A router is needed to reach 192.168.2.x — that is a different network.
-```
+![With subnet mask 255.255.255.0 (/24), 192.168.1 is the network part and .100 the host part of 192.168.1.100; devices 192.168.1.1 to .254 share one network, and reaching 192.168.2.x needs a router.](./img/05/network-host-split.svg)
 
 ### Historical: Classful Addressing (Why You Still See It)
 
 Before CIDR (1993), addresses were divided into fixed classes:
 
-```
-CLASS   FIRST OCTET    DEFAULT MASK     NETWORKS    HOSTS/NET    RANGE
-─────   ───────────    ────────────     ────────    ─────────    ─────────────────
-  A       1 – 126       /8  (255.0.0.0)      126     16,777,214   1.0.0.0 – 126.255.255.255
-  B     128 – 191      /16 (255.255.0.0)   16,384        65,534   128.0.0.0 – 191.255.255.255
-  C     192 – 223      /24 (255.255.255.0) 2,097,152        254   192.0.0.0 – 223.255.255.255
-  D     224 – 239       —  (multicast)         —            —     224.0.0.0 – 239.255.255.255
-  E     240 – 255       —  (reserved)          —            —     240.0.0.0 – 255.255.255.255
-```
+| Class | First octet | Default mask | Networks | Hosts/net | Range |
+| --- | --- | --- | --- | --- | --- |
+| A | 1 – 126 | /8 (255.0.0.0) | 126 | 16,777,214 | 1.0.0.0 – 126.255.255.255 |
+| B | 128 – 191 | /16 (255.255.0.0) | 16,384 | 65,534 | 128.0.0.0 – 191.255.255.255 |
+| C | 192 – 223 | /24 (255.255.255.0) | 2,097,152 | 254 | 192.0.0.0 – 223.255.255.255 |
+| D | 224 – 239 | — (multicast) | — | — | 224.0.0.0 – 239.255.255.255 |
+| E | 240 – 255 | — (reserved) | — | — | 240.0.0.0 – 255.255.255.255 |
 
 **Why this is obsolete:** A company needing 500 addresses would be assigned a Class B (/16 = 65,534 addresses), wasting over 65,000 addresses. This massive waste accelerated IPv4 exhaustion. CIDR replaced classful addressing by allowing subnet masks at any bit boundary, not just /8, /16, or /24.
 
@@ -148,62 +93,32 @@ CLASS   FIRST OCTET    DEFAULT MASK     NETWORKS    HOSTS/NET    RANGE
 
 RFC 1918 (1996) reserved three blocks for private use — addresses that internet routers must not route and ISPs filter, so anyone may reuse them inside their own network:
 
-```
-PRIVATE ADDRESS RANGES (RFC 1918)
+| Range | CIDR | # Addresses | Common use |
+| --- | --- | --- | --- |
+| 10.0.0.0 – 10.255.255.255 | 10.0.0.0/8 | 16,777,216 (16M) | Cloud VPCs, large enterprises |
+| 172.16.0.0 – 172.31.255.255 | 172.16.0.0/12 | 1,048,576 (1M) | Docker default (172.17.0.0/16) |
+| 192.168.0.0 – 192.168.255.255 | 192.168.0.0/16 | 65,536 (65K) | Home networks, small labs |
 
-  ┌──────────────────────┬────────────┬──────────────┬───────────────────┐
-  │  Range               │   CIDR     │  # Addresses │  Common Use       │
-  ├──────────────────────┼────────────┼──────────────┼───────────────────┤
-  │  10.0.0.0 –          │  10.0.0.0  │  16,777,216  │  Cloud VPCs,      │
-  │  10.255.255.255      │    /8      │  (16M)       │  large enterprises│
-  ├──────────────────────┼────────────┼──────────────┼───────────────────┤
-  │  172.16.0.0 –        │  172.16.0.0│  1,048,576   │  Docker default   │
-  │  172.31.255.255      │    /12     │  (1M)        │  (172.17.0.0/16)  │
-  ├──────────────────────┼────────────┼──────────────┼───────────────────┤
-  │  192.168.0.0 –       │  192.168.0.0│    65,536   │  Home networks,   │
-  │  192.168.255.255     │    /16     │  (65K)       │  small labs        │
-  └──────────────────────┴────────────┴──────────────┴───────────────────┘
-
-  KEY RULE: Private addresses CANNOT be routed on the public internet.
-  To reach the internet, private addresses must be translated to public
-  addresses using NAT (Network Address Translation).
-```
+**Key rule:** Private addresses CANNOT be routed on the public internet. To reach the internet, private addresses must be translated to public addresses using NAT (Network Address Translation).
 
 **How to immediately classify an address:**
 
-```
-  10.x.x.x           → Private (RFC 1918)
-  172.16.x.x–31.x.x  → Private (RFC 1918); 172.32.x.x is outside this block
-  192.168.x.x         → Private (RFC 1918)
-  127.x.x.x           → Loopback (never leaves the host)
-  169.254.x.x         → Link-local: a client that got no DHCP lease, or an
-                        intentional service (cloud metadata 169.254.169.254)
-  100.64.x.x–127.x.x → CGNAT (RFC 6598, shared address space)
-  224.x.x.x–239.x.x  → Multicast
-  192.0.2.x, 198.51.100.x, 203.0.113.x → Documentation (RFC 5737); never real
-  198.18.x.x–198.19.x.x → Benchmarking (RFC 2544); this course's lab networks
-  Other addresses      → Check IANA special-purpose registries and actual routes
-```
+| Address | What it is |
+| --- | --- |
+| `10.x.x.x` | Private (RFC 1918) |
+| `172.16.x.x`–`31.x.x` | Private (RFC 1918); 172.32.x.x is outside this block |
+| `192.168.x.x` | Private (RFC 1918) |
+| `127.x.x.x` | Loopback (never leaves the host) |
+| `169.254.x.x` | Link-local: a client that got no DHCP lease, or an intentional service (cloud metadata 169.254.169.254) |
+| `100.64.x.x`–`127.x.x` | CGNAT (RFC 6598, shared address space) |
+| `224.x.x.x`–`239.x.x` | Multicast |
+| `192.0.2.x`, `198.51.100.x`, `203.0.113.x` | Documentation (RFC 5737); never real |
+| `198.18.x.x`–`198.19.x.x` | Benchmarking (RFC 2544); this course's lab networks |
+| Other addresses | Check IANA special-purpose registries and actual routes |
 
 ### Diagram
 
-```
-PUBLIC vs PRIVATE — HOW NAT CONNECTS THEM
-
-  Private Network (10.0.1.0/24)               Public Internet
-  ┌────────────────────────┐                  ┌──────────────┐
-  │                        │                  │              │
-  │  10.0.1.10 (Web App)  │                  │  Web Server  │
-  │  10.0.1.11 (API)      │──── NAT GW ─────│ 198.51.100.80│
-  │  10.0.1.12 (Worker)   │  203.0.113.5    │              │
-  │                        │  (public IP)     │              │
-  └────────────────────────┘                  └──────────────┘
-
-  Inside the VPC: packets have source 10.0.1.10
-  After NAT:      packets have source 203.0.113.5
-  The internet sees 203.0.113.5, never 10.0.1.10.
-  The NAT gateway maintains a translation table to route replies back.
-```
+![Hosts 10.0.1.10 (Web App), 10.0.1.11 (API) and 10.0.1.12 (Worker) in the private network 10.0.1.0/24 reach a web server at 198.51.100.80 through a NAT gateway with public IP 203.0.113.5; inside the VPC packets have source 10.0.1.10, after NAT they have source 203.0.113.5, the internet never sees 10.0.1.10, and the gateway's translation table routes replies back.](./img/05/nat-public-private.svg)
 
 ### Production Relevance
 
@@ -233,47 +148,25 @@ Subnetting divides a large network into smaller, more manageable networks called
 
 The `/n` after an IP address tells you how many bits (from the left) are the network portion. The remaining bits are the host portion.
 
-```
-CIDR NOTATION — HOW TO READ IT
-
-  192.168.1.0/24
-                ↑
-                24 bits are the network portion
-                32 - 24 = 8 bits are the host portion
-                2^8 = 256 addresses (254 usable, 2 reserved)
-
-  10.0.0.0/16
-            ↑
-            16 bits are the network portion
-            32 - 16 = 16 bits are the host portion
-            2^16 = 65,536 addresses (65,534 usable)
-
-  10.0.0.0/8
-            ↑
-            8 bits are the network portion
-            32 - 8 = 24 bits are the host portion
-            2^24 = 16,777,216 addresses
-```
+![CIDR notation drawn as 32-bit bars: 192.168.1.0/24 has 24 network bits and 8 host bits (256 addresses, 254 usable, 2 reserved), 10.0.0.0/16 has 16 and 16 (65,536 addresses, 65,534 usable), and 10.0.0.0/8 has 8 and 24 (16,777,216 addresses).](./img/05/cidr-notation.svg)
 
 ### The Subnet Mask
 
 The subnet mask is a 32-bit number where the network bits are all 1s and the host bits are all 0s. It is another way of expressing the same information as the CIDR prefix length.
 
-```
-CIDR     SUBNET MASK          BINARY MASK
-────     ───────────────      ─────────────────────────────────
-/8       255.0.0.0            11111111.00000000.00000000.00000000
-/16      255.255.0.0          11111111.11111111.00000000.00000000
-/20      255.255.240.0        11111111.11111111.11110000.00000000
-/24      255.255.255.0        11111111.11111111.11111111.00000000
-/25      255.255.255.128      11111111.11111111.11111111.10000000
-/26      255.255.255.192      11111111.11111111.11111111.11000000
-/27      255.255.255.224      11111111.11111111.11111111.11100000
-/28      255.255.255.240      11111111.11111111.11111111.11110000
-/30      255.255.255.252      11111111.11111111.11111111.11111100
-/31      255.255.255.254      11111111.11111111.11111111.11111110
-/32      255.255.255.255      11111111.11111111.11111111.11111111
-```
+| CIDR | Subnet mask | Binary mask |
+| --- | --- | --- |
+| /8 | 255.0.0.0 | `11111111.00000000.00000000.00000000` |
+| /16 | 255.255.0.0 | `11111111.11111111.00000000.00000000` |
+| /20 | 255.255.240.0 | `11111111.11111111.11110000.00000000` |
+| /24 | 255.255.255.0 | `11111111.11111111.11111111.00000000` |
+| /25 | 255.255.255.128 | `11111111.11111111.11111111.10000000` |
+| /26 | 255.255.255.192 | `11111111.11111111.11111111.11000000` |
+| /27 | 255.255.255.224 | `11111111.11111111.11111111.11100000` |
+| /28 | 255.255.255.240 | `11111111.11111111.11111111.11110000` |
+| /30 | 255.255.255.252 | `11111111.11111111.11111111.11111100` |
+| /31 | 255.255.255.254 | `11111111.11111111.11111111.11111110` |
+| /32 | 255.255.255.255 | `11111111.11111111.11111111.11111111` |
 
 ### How to Calculate Subnet Properties
 
@@ -309,15 +202,6 @@ EXAMPLE 1: 192.168.1.0/24
   First usable:  192.168.1.1
   Last usable:   192.168.1.254
 
-  ┌─────────────────────────────────────────────┐
-  │  192.168.1.0/24                             │
-  │                                             │
-  │  .0         = Network address (reserved)    │
-  │  .1 – .254  = Usable host addresses (254)   │
-  │  .255       = Broadcast address (reserved)  │
-  └─────────────────────────────────────────────┘
-
-
 EXAMPLE 2: 10.0.0.0/20
 
   Prefix:        /20  → 20 network bits, 12 host bits
@@ -337,17 +221,6 @@ EXAMPLE 2: 10.0.0.0/20
   First usable:  10.0.0.1
   Last usable:   10.0.15.254
 
-  ┌─────────────────────────────────────────────┐
-  │  10.0.0.0/20                                │
-  │                                             │
-  │  10.0.0.0         = Network address         │
-  │  10.0.0.1         = First usable host       │
-  │  10.0.15.254      = Last usable host        │
-  │  10.0.15.255      = Broadcast address       │
-  │  Total: 4,094 usable hosts                  │
-  └─────────────────────────────────────────────┘
-
-
 EXAMPLE 3: 172.16.0.0/28
 
   Prefix:        /28  → 28 network bits, 4 host bits
@@ -358,33 +231,27 @@ EXAMPLE 3: 172.16.0.0/28
   Broadcast:     172.16.0.15    (4 host bits all 1 = 15)
   First usable:  172.16.0.1
   Last usable:   172.16.0.14
-
-  ┌───────────────────────────────────────┐
-  │  172.16.0.0/28                        │
-  │  .0 = Network  .1–.14 = Hosts  .15 = Bcast │
-  │  Only 14 usable addresses              │
-  └───────────────────────────────────────┘
 ```
+
+![The three worked examples as address ranges: in 192.168.1.0/24, .0 is the network address and .255 the broadcast address (both reserved) with .1 to .254 usable (254); in 10.0.0.0/20, 10.0.0.0 is the network, 10.0.0.1 to 10.0.15.254 are usable (4,094 hosts) and 10.0.15.255 is broadcast; in 172.16.0.0/28, .0 is the network, .1 to .14 are hosts and .15 is broadcast, only 14 usable addresses.](./img/05/subnet-ranges.svg)
 
 ### CIDR Quick Reference Table
 
-```
-PREFIX   ADDRESSES   USABLE    COMMON USE
-──────   ─────────   ──────    ──────────────────────────────────
-/8       16,777,216  16,777,214  Entire 10.x.x.x private space
-/12       1,048,576   1,048,574  The 172.16.0.0/12 private block (Docker carves its networks from it)
-/16          65,536      65,534  AWS default VPC (172.31.0.0/16); largest AWS VPC CIDR block
-/20           4,096       4,094  Large cloud subnet
-/24             256         254  Standard cloud subnet, small LAN
-/25             128         126  Split a /24 in two
-/26              64          62  Small subnet for a tier
-/27              32          30  Small tier, small DMZ
-/28              16          14  Smallest AWS subnet
-/29               8           6  Smallest Azure and Google Cloud subnet
-/30               4           2  Traditional point-to-point router link
-/31               2           2  Point-to-point link (RFC 3021): no network/broadcast, both usable
-/32               1           1  Host route (single address), loopback or VIP
-```
+| Prefix | Addresses | Usable | Common use |
+| --- | ---: | ---: | --- |
+| /8 | 16,777,216 | 16,777,214 | Entire 10.x.x.x private space |
+| /12 | 1,048,576 | 1,048,574 | The 172.16.0.0/12 private block (Docker carves its networks from it) |
+| /16 | 65,536 | 65,534 | AWS default VPC (172.31.0.0/16); largest AWS VPC CIDR block |
+| /20 | 4,096 | 4,094 | Large cloud subnet |
+| /24 | 256 | 254 | Standard cloud subnet, small LAN |
+| /25 | 128 | 126 | Split a /24 in two |
+| /26 | 64 | 62 | Small subnet for a tier |
+| /27 | 32 | 30 | Small tier, small DMZ |
+| /28 | 16 | 14 | Smallest AWS subnet |
+| /29 | 8 | 6 | Smallest Azure and Google Cloud subnet |
+| /30 | 4 | 2 | Traditional point-to-point router link |
+| /31 | 2 | 2 | Point-to-point link (RFC 3021): no network/broadcast, both usable |
+| /32 | 1 | 1 | Host route (single address), loopback or VIP |
 
 > **Cloud reservations:** the providers reserve more than the protocol's two addresses in every subnet, so "how many hosts fit" is smaller than the table says:
 >
@@ -402,40 +269,17 @@ do not mean a cloud subnet API accepts those prefix lengths.
 
 ### Practical: Subnet Design for a Multi-Tier App
 
-```
-SCENARIO: Design subnets for a 3-tier app in a VPC
+**Scenario:** design subnets for a 3-tier app in a VPC.
 
-  VPC CIDR: 10.0.0.0/16  (65,534 usable addresses)
+![A VPC with CIDR 10.0.0.0/16 (65,534 usable addresses) spans two availability zones: zone A has a public subnet 10.0.1.0/24 (ALB, NAT GW), a private subnet 10.0.10.0/24 (app servers) and a data subnet 10.0.20.0/24 (RDS, Redis); zone B mirrors them with 10.0.3.0/24, 10.0.11.0/24 and 10.0.21.0/24; the gaps at 10.0.2.0, 10.0.4–9.0, 10.0.12–19.0 and so on are left for future expansion.](./img/05/vpc-subnet-design.svg)
 
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  VPC: 10.0.0.0/16                                              │
-  │                                                                 │
-  │  Availability Zone A          Availability Zone B               │
-  │  ┌──────────────────┐         ┌──────────────────┐             │
-  │  │ Public Subnet    │         │ Public Subnet    │             │
-  │  │ 10.0.1.0/24      │         │ 10.0.3.0/24      │             │
-  │  │ (ALB, NAT GW)    │         │ (ALB, NAT GW)    │             │
-  │  ├──────────────────┤         ├──────────────────┤             │
-  │  │ Private Subnet   │         │ Private Subnet   │             │
-  │  │ 10.0.10.0/24     │         │ 10.0.11.0/24     │             │
-  │  │ (App servers)     │         │ (App servers)     │             │
-  │  ├──────────────────┤         ├──────────────────┤             │
-  │  │ Data Subnet      │         │ Data Subnet      │             │
-  │  │ 10.0.20.0/24     │         │ 10.0.21.0/24     │             │
-  │  │ (RDS, Redis)     │         │ (RDS, Redis)     │             │
-  │  └──────────────────┘         └──────────────────┘             │
-  │                                                                 │
-  │  Gap at 10.0.2.0, 10.0.4–9.0, 10.0.12–19.0, etc.             │
-  │  Left intentionally for future expansion.                       │
-  └─────────────────────────────────────────────────────────────────┘
+Design principles:
 
-  Design principles:
-  - Public subnets: hold load balancers and NAT gateways. Route to IGW.
-  - Private subnets: hold application instances. Route to NAT GW (no direct internet).
-  - Data subnets: hold databases. No internet access at all.
-  - Number subnets with gaps to allow inserting new ones later.
-  - Mirror across AZs for high availability.
-```
+- Public subnets: hold load balancers and NAT gateways. Route to IGW.
+- Private subnets: hold application instances. Route to NAT GW (no direct internet).
+- Data subnets: hold databases. No internet access at all.
+- Number subnets with gaps to allow inserting new ones later.
+- Mirror across AZs for high availability.
 
 ---
 
@@ -447,121 +291,41 @@ Every IPv4 packet begins with a 20-byte header (minimum, no options). This heade
 
 ### The Header
 
-```
-IPv4 HEADER (20 bytes minimum)
-
-  0                   1                   2                   3
-  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |Version|  IHL  |    DSCP   |ECN|         Total Length          |  ← Row 1
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |         Identification        |Flags|     Fragment Offset     |  ← Row 2
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |  Time to Live |    Protocol   |        Header Checksum        |  ← Row 3
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |                       Source IP Address                       |  ← Row 4
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |                    Destination IP Address                     |  ← Row 5
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |                    Options (if IHL > 5)                       |  ← Optional
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-```
+![The IPv4 header is 20 bytes minimum, in five 32-bit rows: Version, IHL, DSCP, ECN and Total Length; Identification, Flags and Fragment Offset; Time to Live, Protocol and Header Checksum; Source IP Address; Destination IP Address; an Options row follows only if IHL is greater than 5.](./img/05/ipv4-header.svg)
 
 ### Field-by-Field Explanation
 
-```
-FIELD               BITS   WHAT IT DOES                           WHAT YOU SEE IN TCPDUMP
-────────────────    ────   ───────────────────────────────────    ───────────────────────
-Version              4     IP version. Always 4 for IPv4.         (not shown separately)
-
-IHL                  4     Internet Header Length in 32-bit        Shown if options present.
-                           words. Minimum = 5 (20 bytes).         Usually 5 (no options).
-                           Maximum = 15 (60 bytes).
-
-DSCP + ECN           8     The old ToS byte. Top 6 bits: DSCP,    "tos 0x0" in tcpdump -v
-                           a QoS class (0 = best effort).          (the whole byte). Linux
-                           Bottom 2 bits: ECN, congestion          marks its own ICMP errors
-                           signals (Module 13).                    "tos 0xc0" = DSCP 48 (CS6).
-
-Total Length        16     Total packet size in bytes (header      "length 1500" in tcpdump.
-                           + data). Maximum = 65,535 bytes.        Actual size of this packet.
-
-Identification      16     Groups the fragments of one packet.    "id XXXX" (tcpdump -v).
-                           Only meaningful when fragmentation      Same ID on all fragments
-                           can happen (RFC 6864); with DF set,     of one packet. Linux may
-                           senders may use any value.              send DF packets with id 0.
-
-Flags                3     Bit 0: Reserved (0)                    "flags [DF]" = Don't Fragment
-                           Bit 1: DF (Don't Fragment)              "flags [+]"  = More Fragments
-                           Bit 2: MF (More Fragments)              "flags [none]" = neither
-
-Fragment Offset     13     Where this fragment belongs in the      "offset 1376" — tcpdump
-                           original packet. Measured in 8-byte     converts to bytes. Non-zero,
-                           units. 0 = first (or only) fragment.    or offset 0 with [+], = a fragment
-
-TTL                  8     Time To Live. Decremented by 1 at      "ttl 64" (Linux default)
-                           each router hop. When it reaches 0,     "ttl 128" (Windows default)
-                           the router drops the packet and         "ttl 255" (network equipment)
-                           sends ICMP Time Exceeded.               Low TTL = many hops traversed
-
-Protocol             8     Identifies the Layer 4 protocol.       "proto TCP (6)"
-                           1 = ICMP, 6 = TCP, 17 = UDP,           "proto UDP (17)"
-                           47 = GRE, 50 = ESP (IPsec)             "proto ICMP (1)"
-
-Header Checksum     16     Error detection for the header only.   tcpdump -v prints "bad cksum"
-                           Recalculated at each hop (because       only when it is wrong.
-                           TTL changes). If invalid, packet        On a received packet that
-                           is silently dropped.                    means corruption. (Bad TCP/
-                                                                   UDP checksums on packets your
-                                                                   own host sends are usually
-                                                                   checksum offload — Module 3.)
-
-Source IP           32     The sender's IP address.               "10.0.1.50.52431 >"
-                                                                   (source IP and port)
-
-Destination IP      32     The receiver's IP address.             "> 203.0.113.80.443"
-                                                                   (destination IP and port)
-```
+| Field | Bits | What it does | What you see in tcpdump |
+| --- | ---: | --- | --- |
+| Version | 4 | IP version. Always 4 for IPv4. | (not shown separately) |
+| IHL | 4 | Internet Header Length in 32-bit words. Minimum = 5 (20 bytes). Maximum = 15 (60 bytes). | Shown if options present. Usually 5 (no options). |
+| DSCP + ECN | 8 | The old ToS byte. Top 6 bits: DSCP, a QoS class (0 = best effort). Bottom 2 bits: ECN, congestion signals (Module 13). | "tos 0x0" in tcpdump -v (the whole byte). Linux marks its own ICMP errors "tos 0xc0" = DSCP 48 (CS6). |
+| Total Length | 16 | Total packet size in bytes (header + data). Maximum = 65,535 bytes. | "length 1500" in tcpdump. Actual size of this packet. |
+| Identification | 16 | Groups the fragments of one packet. Only meaningful when fragmentation can happen (RFC 6864); with DF set, senders may use any value. | "id XXXX" (tcpdump -v). Same ID on all fragments of one packet. Linux may send DF packets with id 0. |
+| Flags | 3 | Bit 0: Reserved (0). Bit 1: DF (Don't Fragment). Bit 2: MF (More Fragments). | "flags [DF]" = Don't Fragment; "flags [+]" = More Fragments; "flags [none]" = neither |
+| Fragment Offset | 13 | Where this fragment belongs in the original packet. Measured in 8-byte units. 0 = first (or only) fragment. | "offset 1376" — tcpdump converts to bytes. Non-zero, or offset 0 with [+], = a fragment |
+| TTL | 8 | Time To Live. Decremented by 1 at each router hop. When it reaches 0, the router drops the packet and sends ICMP Time Exceeded. | "ttl 64" (Linux default); "ttl 128" (Windows default); "ttl 255" (network equipment). Low TTL = many hops traversed |
+| Protocol | 8 | Identifies the Layer 4 protocol. 1 = ICMP, 6 = TCP, 17 = UDP, 47 = GRE, 50 = ESP (IPsec) | "proto TCP (6)", "proto UDP (17)", "proto ICMP (1)" |
+| Header Checksum | 16 | Error detection for the header only. Recalculated at each hop (because TTL changes). If invalid, packet is silently dropped. | tcpdump -v prints "bad cksum" only when it is wrong. On a received packet that means corruption. (Bad TCP/UDP checksums on packets your own host sends are usually checksum offload — Module 3.) |
+| Source IP | 32 | The sender's IP address. | "10.0.1.50.52431 >" (source IP and port) |
+| Destination IP | 32 | The receiver's IP address. | "> 203.0.113.80.443" (destination IP and port) |
 
 ### TTL — Time to Live
 
 TTL is one of the most important fields for troubleshooting. It prevents routing loops from consuming infinite bandwidth.
 
-```
-HOW TTL WORKS
-
-  Sender sets TTL = 64 (Linux default)
-
-  [Sender]  TTL=64  →  [Router 1]  TTL=63  →  [Router 2]  TTL=62  →  [Destination]
-                         ↑ decrements          ↑ decrements
-                           by 1                  by 1
-
-  If there is a routing loop:
-
-  [Router A]  TTL=3  →  [Router B]  TTL=2  →  [Router A]  TTL=1  →  [Router B]
-                                                                          ↑
-                                                                    TTL=0!
-                                                                    Drop packet.
-                                                                    Send ICMP
-                                                                    Time Exceeded
-                                                                    back to sender.
-
-  This is exactly how traceroute works:
-   - Send packets with TTL=1 → first router drops, sends ICMP → you learn hop 1
-   - Send packets with TTL=2 → second router drops, sends ICMP → you learn hop 2
-   - Continue incrementing until the destination is reached
-```
+![A sender sets TTL 64 (the Linux default) and each router decrements it by 1, so the packet carries 64, then 63, then 62 on its way to the destination; in a routing loop between Router A and Router B the TTL falls 3, 2, 1 until it reaches 0, when the router drops the packet and sends ICMP Time Exceeded back to the sender; traceroute sends TTL 1, then 2, and so on to learn each hop.](./img/05/ttl-decrement.svg)
 
 **Reading TTL in practice:**
 
-```
-  TTL = 64    → Packet came from a Linux host, likely 0 hops away (same subnet)
-  TTL = 63    → Packet traversed 1 hop from a Linux host
-  TTL = 56    → Packet traversed 8 hops from a Linux host (64 - 56)
-  TTL = 128   → Common Windows default
-  TTL = 255   → Network equipment (routers, switches)
-  TTL = 1     → Packet is about to expire — only 1 hop left
-```
+| TTL | What it suggests |
+| --- | --- |
+| 64 | Packet came from a Linux host, likely 0 hops away (same subnet) |
+| 63 | Packet traversed 1 hop from a Linux host |
+| 56 | Packet traversed 8 hops from a Linux host (64 - 56) |
+| 128 | Common Windows default |
+| 255 | Network equipment (routers, switches) |
+| 1 | Packet is about to expire — only 1 hop left |
 
 TTL estimates are guesses: the sender's initial value is a convention, not a rule, and anything that terminates and re-originates traffic (a proxy, a load balancer, a NAT64 gateway) starts a fresh TTL.
 
@@ -569,58 +333,13 @@ TTL estimates are guesses: the sender's initial value is a convention, not a rul
 
 ### Fragmentation
 
-```
-IP FRAGMENTATION — WHEN PACKETS ARE TOO BIG
+![A 4000-byte packet meets a link with an MTU of 1500 bytes; without the DF bit, the router splits it into three fragments that share ID 12345: 1500 bytes at offset 0 with MF=1, 1500 bytes at offset 185 with MF=1, and 1040 bytes at offset 370 with MF=0, so the same ID links them, the offset gives the order and MF=0 marks the last.](./img/05/fragmentation-df-clear.svg)
 
-  Original packet: 4000 bytes, MTU of link: 1500 bytes
+Each fragment repeats the 20-byte header, so fragments 1 and 2 carry 1480 data bytes (a multiple of 8): 3980 = 1480 + 1480 + 1020. Offsets are in 8-byte units (185 × 8 = 1480); tcpdump prints them in bytes: offset 0, 1480, 2960. Only the first fragment carries the TCP or UDP header, so later fragments have no ports — a firewall or load balancer that matches on ports cannot classify them without reassembly. The receiver (not a router) reassembles; losing one fragment loses the whole packet.
 
-  WITHOUT DF (Don't Fragment) bit set:
-  ┌──────────────────────┐
-  │ Original: 4000 bytes │
-  └──────────┬───────────┘
-             │ Router fragments
-             ▼
-  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-  │ Fragment 1      │  │ Fragment 2      │  │ Fragment 3      │
-  │ 1500 bytes      │  │ 1500 bytes      │  │ 1040 bytes      │
-  │ Offset=0, MF=1  │  │ Offset=185,MF=1 │  │ Offset=370,MF=0 │
-  │ ID=12345        │  │ ID=12345        │  │ ID=12345        │
-  └─────────────────┘  └─────────────────┘  └─────────────────┘
-  Same ID links them.   Offset tells order.   MF=0 means last.
+![With DF set, the modern default for path MTU discovery, the router cannot fragment the 4000-byte packet and returns ICMP type 3 code 4, Fragmentation Needed and DF Set, with the next-hop MTU (for example 1400); the sender caches that path MTU and sends smaller packets, but if a firewall drops the ICMP message the packets silently disappear, TCP hangs after the handshake and large transfers stall: a PMTUD black hole.](./img/05/fragmentation-df-set.svg)
 
-  Each fragment repeats the 20-byte header, so fragments 1 and 2 carry
-  1480 data bytes (a multiple of 8): 3980 = 1480 + 1480 + 1020.
-  Offsets are in 8-byte units (185 × 8 = 1480); tcpdump prints them in
-  bytes: offset 0, 1480, 2960. Only the first fragment carries the TCP or
-  UDP header, so later fragments have no ports — a firewall or load
-  balancer that matches on ports cannot classify them without reassembly.
-  The receiver (not a router) reassembles; losing one fragment loses the
-  whole packet.
-
-  WITH DF bit set (modern default — Path MTU Discovery):
-  ┌──────────────────────┐
-  │ Original: 4000 bytes │
-  │ DF=1                 │
-  └──────────┬───────────┘
-             │ Router cannot fragment!
-             ▼
-  ICMP Type 3 Code 4: "Fragmentation Needed and DF Set"
-  Message includes: MTU of the next hop (e.g., 1400)
-  Sender caches that path MTU and sends smaller packets
-  (TCP resends the lost segment at the smaller size).
-
-  Linux sets DF on TCP and, by default, on ping; the lab below shows
-  the ICMP error, the cached "mtu 1400" in `ip route get`, and the next
-  oversize ping failing locally. IPv6 routers never fragment: there is
-  no DF bit because every IPv6 packet behaves as if DF were set (5.5).
-
-  IF ICMP IS BLOCKED (firewall drops ICMP):
-  → Sender never gets the "too big" message
-  → Packets silently disappear
-  → TCP connection hangs after SYN/SYN-ACK succeeds (small packets work)
-  → Large data transfer stalls
-  → This is a PMTUD BLACK HOLE — one of the hardest problems to diagnose
-```
+Linux sets DF on TCP and, by default, on ping; the lab below shows the ICMP error, the cached "mtu 1400" in `ip route get`, and the next oversize ping failing locally. IPv6 routers never fragment: there is no DF bit because every IPv6 packet behaves as if DF were set (5.5).
 
 ### DSCP / ToS — Quality of Service
 
@@ -640,107 +359,54 @@ IPv6 uses 128-bit addresses: 2^128 = 340 undecillion addresses. That is approxim
 
 ### IPv6 Address Format
 
-```
-IPv6 ADDRESS FORMAT
+Full notation: `2001:0db8:0000:0000:0000:0000:0000:0001` — 8 groups of 4 hex digits, separated by colons. Each group = 16 bits. 8 × 16 = 128 bits.
 
-  Full notation:
-  2001:0db8:0000:0000:0000:0000:0000:0001
+Shortening rules:
 
-  8 groups of 4 hex digits, separated by colons.
-  Each group = 16 bits. 8 × 16 = 128 bits.
+1. Leading zeros in each group can be omitted: `2001:0db8:0000:0000:0000:0000:0000:0001` → `2001:db8:0:0:0:0:0:1`
+2. One consecutive run of all-zero groups can be replaced with `::` : `2001:db8:0:0:0:0:0:1` → `2001:db8::1`
+3. `::` can only appear ONCE (otherwise ambiguous).
+4. Tools print the canonical form (RFC 5952): lowercase, `::` replaces the LONGEST run of zero groups, never a single group. Compare addresses in that form; a string match of `2001:DB8:0::1` against `2001:db8::1` fails although they are the same address.
 
-  SHORTENING RULES:
-  1. Leading zeros in each group can be omitted:
-     2001:0db8:0000:0000:0000:0000:0000:0001
-     → 2001:db8:0:0:0:0:0:1
+In URLs and host:port strings the address goes in brackets, because the colons would be ambiguous: `https://[2001:db8::1]:8443/`
 
-  2. One consecutive run of all-zero groups can be replaced with :::
-     2001:db8:0:0:0:0:0:1
-     → 2001:db8::1
+| Example | Address | Note |
+| --- | --- | --- |
+| Loopback | `::1` | full: `0000:0000:0000:0000:0000:0000:0000:0001` |
+| All zeros | `::` | the unspecified address |
+| Link-local | `fe80::1` | fe80::/10; in practice always fe80::/64 |
+| Google DNS | `2001:4860:4860::8888` | |
+| AWS VPC | `2600:1f18:xxxx::` | one of Amazon's blocks |
 
-  3. :: can only appear ONCE (otherwise ambiguous).
-
-  4. Tools print the canonical form (RFC 5952): lowercase, :: replaces
-     the LONGEST run of zero groups, never a single group. Compare
-     addresses in that form; a string match of "2001:DB8:0::1" against
-     "2001:db8::1" fails although they are the same address.
-
-  In URLs and host:port strings the address goes in brackets, because
-  the colons would be ambiguous: https://[2001:db8::1]:8443/
-
-  EXAMPLES:
-  Loopback:       ::1               (full: 0000:0000:0000:0000:0000:0000:0000:0001)
-  All zeros:      ::                (the unspecified address)
-  Link-local:     fe80::1           (fe80::/10; in practice always fe80::/64)
-  Google DNS:     2001:4860:4860::8888
-  AWS VPC:        2600:1f18:xxxx::  (one of Amazon's blocks)
-
-  SIZE CONVENTION: every LAN or cloud subnet is a /64 (64 bits of
-  network, 64 bits of interface identifier). SLAAC needs exactly /64.
-  Sites get a /48 or /56 to carve into /64s; an AWS VPC gets a /56, for
-  example. Cloud subnets are /64s (AWS assigns each instance addresses or
-  a /80 prefix from it). There is no "running out" inside a subnet, and
-  no host-count subnetting math.
-
-```
+**Size convention:** every LAN or cloud subnet is a /64 (64 bits of network, 64 bits of interface identifier). SLAAC needs exactly /64. Sites get a /48 or /56 to carve into /64s; an AWS VPC gets a /56, for example. Cloud subnets are /64s (AWS assigns each instance addresses or a /80 prefix from it). There is no "running out" inside a subnet, and no host-count subnetting math.
 
 ### IPv6 Address Types
 
-```
-IPv6 ADDRESS TYPES
+| Type | Prefix | Scope | Equivalent in IPv4 |
+| --- | --- | --- | --- |
+| Global Unicast | 2000::/3 | Internet-routable (assigned by ISP) | Public IPv4 address |
+| Link-Local | fe80::/10 | Single link only (never routed). Auto-configured and always present on every IPv6 interface; needs the interface: `ping fe80::1%eth0` | 169.254.x.x (auto-assigned) |
+| Unique Local (ULA) | fc00::/7 (fd00::/8 in practice) | Private network (not internet-routable) | 10.x.x.x / 172.16.x.x / 192.168.x.x |
+| Multicast | ff00::/8 | One-to-many | 224.0.0.0/4 |
+| Loopback | ::1 | Local host only | 127.0.0.1 |
 
-  TYPE          PREFIX        SCOPE              EQUIVALENT IN IPv4
-  ──────────    ──────────    ─────────────────  ───────────────────
-  Global        2000::/3      Internet-routable  Public IPv4 address
-  Unicast                     (assigned by ISP)
-
-  Link-Local    fe80::/10     Single link only   169.254.x.x
-                              (never routed)      (auto-assigned)
-                              Auto-configured     Always present on
-                              on every interface  every IPv6 interface;
-                                                  needs the interface:
-                                                  ping fe80::1%eth0
-
-  Unique        fc00::/7      Private network     10.x.x.x / 172.16.x.x /
-  Local (ULA)   (fd00::/8     (not internet-      192.168.x.x
-                 in practice)  routable)
-
-  Multicast     ff00::/8      One-to-many         224.0.0.0/4
-
-  Loopback      ::1           Local host only     127.0.0.1
-
-  KEY DIFFERENCE: IPv6 has NO broadcast.
-  What IPv4 does with broadcast, IPv6 does with multicast.
-  ff02::1 = all nodes on link (equivalent of IPv4 broadcast)
-  ff02::2 = all routers on link
-```
+**Key difference:** IPv6 has NO broadcast. What IPv4 does with broadcast, IPv6 does with multicast. `ff02::1` = all nodes on link (equivalent of IPv4 broadcast); `ff02::2` = all routers on link.
 
 ### The IPv6 Header
 
 The IPv6 header is a fixed 40 bytes, simpler than IPv4's, and routers do less work per packet:
 
-```
-IPv6 HEADER (40 bytes, fixed)
+![The IPv6 header is a fixed 40 bytes: Version (4 bits), Traffic Class (8) and Flow Label (20); Payload Length (16), Next Header (8) and Hop Limit (8); then the 128-bit Source Address and the 128-bit Destination Address.](./img/05/ipv6-header.svg)
 
-  Version (4) | Traffic Class (8) | Flow Label (20)
-  Payload Length (16)   | Next Header (8) | Hop Limit (8)
-  Source Address (128)
-  Destination Address (128)
-
-  IPv4 FIELD          IN IPv6
-  ─────────────────   ──────────────────────────────────────────────
-  TTL                 Hop Limit (same job; ping -6 shows "ttl=")
-  Protocol            Next Header (58 = ICMPv6, 6 = TCP, 17 = UDP),
-                      or the type of an extension header that follows
-  DSCP/ECN (ToS)      Traffic Class
-  ID, flags, offset   Gone. Only the SENDER may fragment, using a
-                      Fragment extension header. Routers never fragment.
-  Header checksum     Gone. TCP/UDP checksums cover the addresses, and
-                      the UDP checksum becomes mandatory.
-  Options             Extension headers, chained by Next Header
-  (none)              Flow Label: lets routers hash a flow without
-                      reading past extension headers to the ports
-```
+| IPv4 field | In IPv6 |
+| --- | --- |
+| TTL | Hop Limit (same job; `ping -6` shows "ttl=") |
+| Protocol | Next Header (58 = ICMPv6, 6 = TCP, 17 = UDP), or the type of an extension header that follows |
+| DSCP/ECN (ToS) | Traffic Class |
+| ID, flags, offset | Gone. Only the SENDER may fragment, using a Fragment extension header. Routers never fragment. |
+| Header checksum | Gone. TCP/UDP checksums cover the addresses, and the UDP checksum becomes mandatory. |
+| Options | Extension headers, chained by Next Header |
+| (none) | Flow Label: lets routers hash a flow without reading past extension headers to the ports |
 
 The minimum link MTU is 1280 bytes. A router that cannot forward a packet sends ICMPv6 **Packet Too Big** with the next-hop MTU, and the sender must make its packets smaller. Blocking ICMPv6 therefore breaks IPv6 far more thoroughly than blocking ICMP breaks IPv4: there is no fallback to fragmentation in the network, and Neighbor Discovery (below) is ICMPv6 too. RFC 4890 lists which ICMPv6 types a firewall must let through.
 
@@ -748,107 +414,52 @@ The minimum link MTU is 1280 bytes. A router that cannot forward a packet sends 
 
 IPv6 has no ARP and no broadcast. Neighbor Discovery (RFC 4861) does the same jobs with ICMPv6 messages sent to multicast groups:
 
-```
-NEIGHBOR DISCOVERY MESSAGES (all ICMPv6)
+Neighbor Discovery messages (all ICMPv6):
 
-  TYPE  NAME                         JOB                       IPv4 EQUIVALENT
-  ────  ───────────────────────────  ────────────────────────  ────────────────
-  133   Router Solicitation (RS)     "any routers here?"       (DHCP discover)
-  134   Router Advertisement (RA)    prefix, default router,   DHCP offer +
-                                     MTU, DNS (RDNSS)          default gateway
-  135   Neighbor Solicitation (NS)   "who has fd42:1::1?"      ARP request
-  136   Neighbor Advertisement (NA)  "I do; my MAC is ..."     ARP reply
-  137   Redirect                     "use that router instead" ICMP redirect
-    2   Packet Too Big               "next hop MTU is 1280"    ICMP frag needed
+| Type | Name | Job | IPv4 equivalent |
+| ---: | --- | --- | --- |
+| 133 | Router Solicitation (RS) | "any routers here?" | (DHCP discover) |
+| 134 | Router Advertisement (RA) | prefix, default router, MTU, DNS (RDNSS) | DHCP offer + default gateway |
+| 135 | Neighbor Solicitation (NS) | "who has fd42:1::1?" | ARP request |
+| 136 | Neighbor Advertisement (NA) | "I do; my MAC is ..." | ARP reply |
+| 137 | Redirect | "use that router instead" | ICMP redirect |
+| 2 | Packet Too Big | "next hop MTU is 1280" | ICMP frag needed |
 
-  An NS is not broadcast. It goes to the target's SOLICITED-NODE
-  multicast group, ff02::1:ffXX:XXXX (the last 24 bits of the target
-  address), so only hosts whose address ends the same way process it.
-  fd42:1::99 → ff02::1:ff00:99.
+An NS is not broadcast. It goes to the target's SOLICITED-NODE multicast group, `ff02::1:ffXX:XXXX` (the last 24 bits of the target address), so only hosts whose address ends the same way process it. `fd42:1::99` → `ff02::1:ff00:99`.
 
-  `ip -6 neigh` is the IPv6 `ip neigh`: states REACHABLE, STALE, DELAY,
-  PROBE, FAILED work as in Module 3; "router" marks a neighbor that
-  sent an RA.
-```
+`ip -6 neigh` is the IPv6 `ip neigh`: states REACHABLE, STALE, DELAY, PROBE, FAILED work as in Module 3; "router" marks a neighbor that sent an RA.
 
 ### SLAAC — Stateless Address Autoconfiguration
 
 An IPv6 host can configure itself without a DHCP server. The router advertises a prefix; the host picks its own address inside it and checks that nobody else has it.
 
-```
-SLAAC — HOW IPv6 HOSTS CONFIGURE THEMSELVES
+![A sequence diagram of SLAAC between the host, the router and other nodes on the link: the host builds a link-local address and runs duplicate address detection, sends a Router Solicitation to ff02::2, receives a Router Advertisement with the prefix 2001:db8:1::/64, builds a global address from the prefix and an interface ID, then sends a Neighbor Solicitation from :: to its solicited-node group; any Neighbor Advertisement in reply marks the address dadfailed, while silence lets it be used, leaving the host with a link-local address, a global address and a default route via fe80:: learned from the RA.](./img/05/slaac.svg)
 
-  1. Interface comes up. The host builds a link-local address,
-     fe80:: + a 64-bit interface identifier, and runs Duplicate
-     Address Detection (step 5) on it.
+1. Interface comes up. The host builds a link-local address, fe80:: + a 64-bit interface identifier, and runs Duplicate Address Detection (step 5) on it.
+2. Host sends a Router Solicitation (RS) to ff02::2 (all routers). Routers also send unsolicited RAs periodically to ff02::1.
+3. Router answers with a Router Advertisement (RA), sent from its link-local address:
+   - Prefix information: 2001:db8:1::/64 with the A (autonomous) flag, meaning "build your own address in this"
+   - Router lifetime > 0: "use me as a default router". The default route therefore points at a link-local address (fe80::...).
+   - M/O flags: get addresses (M) or other settings (O) from DHCPv6
+   - Optional: MTU, DNS servers (RDNSS, RFC 8106)
+4. Host builds a global address: prefix + interface identifier. The identifier is often NOT the MAC-derived EUI-64 any more: NetworkManager, Windows, and macOS use stable but opaque identifiers (RFC 7217), and many systems add short-lived temporary "privacy" addresses (RFC 8981) for outgoing connections. Do not try to read a MAC out of an IPv6 address.
+5. Duplicate Address Detection (DAD) on each new address: the host sends an NS for its own candidate address, from the unspecified address ::, to the solicited-node group. While it waits (about 1 second) the address is "tentative" and unusable. If anyone answers with an NA, the address is marked "dadfailed" and never used. Silence permits the address; it is not a guarantee that nobody will claim it later.
 
-  2. Host sends a Router Solicitation (RS) to ff02::2 (all routers).
-     Routers also send unsolicited RAs periodically to ff02::1.
-
-  3. Router answers with a Router Advertisement (RA), sent from its
-     link-local address:
-     - Prefix information: 2001:db8:1::/64 with the A (autonomous)
-       flag, meaning "build your own address in this"
-     - Router lifetime > 0: "use me as a default router". The default
-       route therefore points at a link-local address (fe80::...).
-     - M/O flags: get addresses (M) or other settings (O) from DHCPv6
-     - Optional: MTU, DNS servers (RDNSS, RFC 8106)
-
-  4. Host builds a global address: prefix + interface identifier.
-     The identifier is often NOT the MAC-derived EUI-64 any more:
-     NetworkManager, Windows, and macOS use stable but opaque
-     identifiers (RFC 7217), and many systems add short-lived temporary
-     "privacy" addresses (RFC 8981) for outgoing connections. Do not
-     try to read a MAC out of an IPv6 address.
-
-  5. Duplicate Address Detection (DAD) on each new address: the host
-     sends an NS for its own candidate address, from the unspecified
-     address ::, to the solicited-node group. While it waits (about
-     1 second) the address is "tentative" and unusable. If anyone
-     answers with an NA, the address is marked "dadfailed" and never
-     used. Silence permits the address; it is not a guarantee that
-     nobody will claim it later.
-
-  Result: Host has both:
-    fe80::xxxx          (link-local, for local communication)
-    2001:db8:1::xxxx    (global, for internet communication)
-    plus a default route "via fe80::... proto ra"
-```
+Result: the host has both `fe80::xxxx` (link-local, for local communication) and `2001:db8:1::xxxx` (global, for internet communication), plus a default route "via fe80::... proto ra".
 
 Cloud VMs usually get their IPv6 address from DHCPv6 or the provider's guest agent rather than from SLAAC, but the default route still typically arrives by RA (`proto ra`), and NDP still resolves neighbors, so `ip -6 route` and `ip -6 neigh` read the same as in the lab.
 
 ### IPv6 in Production
 
-```
-DUAL-STACK — THE TRANSITION REALITY
+![A dual-stack server: eth0 has IPv4 10.0.1.50/24, IPv6 2001:db8:1::50/64 and the link-local fe80::a1b2:c3d4:e5f6:7890; applications listen on 0.0.0.0:443 for all IPv4 addresses and on [::]:443 for all IPv6 addresses (and on Linux IPv4 too, unless IPV6_V6ONLY is set), which netstat prints as :::443.](./img/05/dual-stack-server.svg)
 
-  Most production environments run both IPv4 and IPv6 simultaneously.
+DNS returns both A (IPv4) and AAAA (IPv6) records. Client chooses which to use — browsers and many libraries use Happy Eyeballs (RFC 8305):
 
-  ┌────────────────────────────────────────────────┐
-  │  Server                                        │
-  │                                                │
-  │  eth0:                                         │
-  │    IPv4: 10.0.1.50/24                          │
-  │    IPv6: 2001:db8:1::50/64                     │
-  │    IPv6: fe80::a1b2:c3d4:e5f6:7890 (link-local)│
-  │                                                │
-  │  Applications listen on:                       │
-  │    0.0.0.0:443    (all IPv4 addresses)         │
-  │    [::]:443       (all IPv6 addresses, and on  │
-  │                    Linux IPv4 too, unless      │
-  │                    IPV6_V6ONLY is set)         │
-  │    (netstat prints [::]:443 as :::443)         │
-  └────────────────────────────────────────────────┘
+- Start connecting to the first IPv6 address
+- If it has not connected after a short delay, start IPv4 too (RFC 8305 recommends 250 ms; Chrome uses 300 ms; curl 200 ms)
+- Use whichever connects first, cancel the other
 
-  DNS returns both A (IPv4) and AAAA (IPv6) records.
-  Client chooses which to use — browsers and many libraries use
-  Happy Eyeballs (RFC 8305):
-  - Start connecting to the first IPv6 address
-  - If it has not connected after a short delay, start IPv4 too
-    (RFC 8305 recommends 250 ms; Chrome uses 300 ms; curl 200 ms)
-  - Use whichever connects first, cancel the other
-  An IPv4-mapped peer shows up in IPv6 logs as ::ffff:10.0.1.20.
-```
+An IPv4-mapped peer shows up in IPv6 logs as `::ffff:10.0.1.20`.
 
 **Production pitfalls:**
 
@@ -869,125 +480,33 @@ Certain IP addresses have special meanings defined by IANA and various RFCs. Rec
 
 ### IPv4 Special Addresses
 
-```
-ADDRESS/RANGE               NAME             RFC      WHAT IT MEANS IN PRODUCTION
-───────────────────         ─────────────    ─────    ──────────────────────────────────────
-127.0.0.0/8                 Loopback         1122     Traffic to 127.x.x.x never leaves the
-(typically 127.0.0.1)                                 host. Used for local-only services.
-                                                      If you see 127.0.0.1 in a remote
-                                                      connection attempt, something is wrong.
-
-0.0.0.0/8                   "This network"   1122     Meaning depends on context:
-                                                      - In a route: 0.0.0.0/0 = default route
-                                                        (matches any destination)
-                                                      - In bind(): 0.0.0.0 = INADDR_ANY
-                                                        (listen on all interfaces)
-                                                      - As source: "I don't have an IP yet"
-                                                        (DHCP Discover)
-
-169.254.0.0/16              Link-local       3927     Link-local IPv4, possibly intentional
-                                                      or a client fallback. Not forwarded
-                                                      by routers. Inspect the intended
-                                                      configuration before blaming DHCP.
-
-                                                      Exception: 169.254.169.254 is the
-                                                      cloud metadata endpoint in AWS, GCP,
-                                                      and Azure (AWS also offers IPv6
-                                                      fd00:ec2::254). Not a DHCP failure.
-
-100.64.0.0/10               CGNAT / Shared   6598     Carrier-Grade NAT. Used by ISPs to
-                                                      NAT subscribers behind another layer
-                                                      of NAT. Tailscale uses this range
-                                                      for its VPN addresses (100.x.x.x).
-
-224.0.0.0/4                 Multicast        1112     One-to-many delivery. Not used for
-(224.0.0.0 – 239.255.255.255)                        normal unicast traffic.
-                                                      224.0.0.1 = all hosts on link
-                                                      224.0.0.2 = all routers on link
-                                                      239.x.x.x = organization-local
-
-255.255.255.255             Broadcast        919      The limited broadcast address. Sent to
-                                                      all hosts on the local network. DHCP
-                                                      can use it; ARP is not an IP packet.
-                                                      Never forwarded by
-                                                      routers.
-
-198.51.100.0/24             Documentation    5737     Reserved for use in documentation and
-203.0.113.0/24              ranges                    examples. If you see these in
-192.0.2.0/24                                          production configs, someone copy-pasted
-                                                      from a tutorial.
-
-198.18.0.0/15               Benchmarking     2544     Reserved for network device testing;
-                                                      never on the internet. This course's
-                                                      labs use it so they cannot clash with
-                                                      your real networks.
-```
+| Address/range | Name | RFC | What it means in production |
+| --- | --- | --- | --- |
+| `127.0.0.0/8` (typically `127.0.0.1`) | Loopback | 1122 | Traffic to 127.x.x.x never leaves the host. Used for local-only services. If you see 127.0.0.1 in a remote connection attempt, something is wrong. |
+| `0.0.0.0/8` | "This network" | 1122 | Meaning depends on context: in a route, 0.0.0.0/0 = default route (matches any destination); in bind(), 0.0.0.0 = INADDR_ANY (listen on all interfaces); as source, "I don't have an IP yet" (DHCP Discover). |
+| `169.254.0.0/16` | Link-local | 3927 | Link-local IPv4, possibly intentional or a client fallback. Not forwarded by routers. Inspect the intended configuration before blaming DHCP. Exception: 169.254.169.254 is the cloud metadata endpoint in AWS, GCP, and Azure (AWS also offers IPv6 fd00:ec2::254). Not a DHCP failure. |
+| `100.64.0.0/10` | CGNAT / Shared | 6598 | Carrier-Grade NAT. Used by ISPs to NAT subscribers behind another layer of NAT. Tailscale uses this range for its VPN addresses (100.x.x.x). |
+| `224.0.0.0/4` (224.0.0.0 – 239.255.255.255) | Multicast | 1112 | One-to-many delivery. Not used for normal unicast traffic. 224.0.0.1 = all hosts on link; 224.0.0.2 = all routers on link; 239.x.x.x = organization-local |
+| `255.255.255.255` | Broadcast | 919 | The limited broadcast address. Sent to all hosts on the local network. DHCP can use it; ARP is not an IP packet. Never forwarded by routers. |
+| `198.51.100.0/24`, `203.0.113.0/24`, `192.0.2.0/24` | Documentation ranges | 5737 | Reserved for use in documentation and examples. If you see these in production configs, someone copy-pasted from a tutorial. |
+| `198.18.0.0/15` | Benchmarking | 2544 | Reserved for network device testing; never on the internet. This course's labs use it so they cannot clash with your real networks. |
 
 ### IPv6 Special Addresses
 
-```
-ADDRESS                     NAME             WHAT IT MEANS
-───────────────────         ─────────────    ──────────────────────────────────────
-::1                         Loopback         IPv6 equivalent of 127.0.0.1
-
-::                          Unspecified       IPv6 equivalent of 0.0.0.0
-                                              "I don't have an address yet"
-
-fe80::/10                   Link-local       Auto-configured on every IPv6 interface.
-                                              Never routed beyond the local link.
-                                              Used for neighbor discovery, SLAAC.
-
-fc00::/7 (fd00::/8)        Unique Local     IPv6 equivalent of RFC 1918 private space.
-                            Address (ULA)     Not routed on the internet.
-
-ff00::/8                    Multicast        ff02::1 = all nodes on link
-                                              ff02::2 = all routers on link
-                                              ff02::fb = mDNS
-
-2001:db8::/32               Documentation    Reserved for examples. If seen in
-                                              production: someone copy-pasted.
-
-::ffff:0:0/96               IPv4-mapped      An IPv4 peer seen through an IPv6
-                                              socket: ::ffff:10.0.1.20 in a log
-                                              is an IPv4 client, not IPv6.
-
-64:ff9b::/96                NAT64             Used for IPv6-to-IPv4 translation.
-                                              Last 32 bits contain the IPv4 address.
-```
+| Address | Name | What it means |
+| --- | --- | --- |
+| `::1` | Loopback | IPv6 equivalent of 127.0.0.1 |
+| `::` | Unspecified | IPv6 equivalent of 0.0.0.0: "I don't have an address yet" |
+| `fe80::/10` | Link-local | Auto-configured on every IPv6 interface. Never routed beyond the local link. Used for neighbor discovery, SLAAC. |
+| `fc00::/7` (`fd00::/8`) | Unique Local Address (ULA) | IPv6 equivalent of RFC 1918 private space. Not routed on the internet. |
+| `ff00::/8` | Multicast | ff02::1 = all nodes on link; ff02::2 = all routers on link; ff02::fb = mDNS |
+| `2001:db8::/32` | Documentation | Reserved for examples. If seen in production: someone copy-pasted. |
+| `::ffff:0:0/96` | IPv4-mapped | An IPv4 peer seen through an IPv6 socket: ::ffff:10.0.1.20 in a log is an IPv4 client, not IPv6. |
+| `64:ff9b::/96` | NAT64 | Used for IPv6-to-IPv4 translation. Last 32 bits contain the IPv4 address. |
 
 ### Diagram: Special Address Decision Tree
 
-```
-  WHAT IS THIS IP ADDRESS?
-
-  Start: Look at the IP
-         │
-         ├── Starts with 10.?           → Private (RFC 1918)
-         ├── Starts with 172.16–31.?    → Private (RFC 1918)
-         ├── Starts with 192.168.?      → Private (RFC 1918)
-         ├── Starts with 127.?          → Loopback (localhost)
-         ├── Starts with 169.254.?      → Link-local (no DHCP lease, or a service)
-         │   └── Is it 169.254.169.254?  → Cloud instance metadata endpoint
-         ├── Starts with 100.64–127.?   → CGNAT (ISP NAT or Tailscale)
-         ├── Starts with 224–239.?      → Multicast
-         ├── Is it 255.255.255.255?     → Broadcast
-         ├── Is it 0.0.0.0?            → Default route or INADDR_ANY
-         ├── Starts with 198.51.100.?   → Documentation range (should not be in prod)
-         ├── Starts with 203.0.113.?    → Documentation range (should not be in prod)
-         ├── Starts with 192.0.2.?      → Documentation range (should not be in prod)
-         ├── Starts with 198.18–19.?    → Benchmarking / lab range
-         └── Other space                 → Check IANA classification and routes
-
-  IPv6:
-         ├── ::1                         → Loopback
-         ├── ::                          → Unspecified
-         ├── ::ffff:a.b.c.d              → IPv4 client on an IPv6 socket
-         ├── fe80::                      → Link-local
-         ├── fd00::                      → Unique Local (private)
-         ├── ff00::                      → Multicast
-         ├── 2001:db8::                  → Documentation
-         └── 2000::/3                    → Global unicast (public)
-```
+![A decision tree for classifying an address: for IPv4, 10, 172.16–31 and 192.168 are private (RFC 1918), 127 is loopback, 169.254 is link-local with 169.254.169.254 the cloud metadata endpoint, 100.64–127 is CGNAT, 224–239 multicast, 255.255.255.255 broadcast, 0.0.0.0 the default route or INADDR_ANY, 198.51.100, 203.0.113 and 192.0.2 documentation ranges, 198.18–19 the benchmarking and lab range, and anything else needs an IANA and route check; for IPv6, ::1 is loopback, :: unspecified, ::ffff:a.b.c.d an IPv4 client on an IPv6 socket, fe80:: link-local, fd00:: unique local, ff00:: multicast, 2001:db8:: documentation and 2000::/3 global unicast.](./img/05/address-decision-tree.svg)
 
 ### Production Relevance
 
@@ -1110,13 +629,7 @@ The last command is the question behind half of all "can't reach" tickets: is th
 
 [`ip.json`](../labs/netlab/ip.json) builds a client and a server in two subnets joined by a Linux router whose server-side link has an MTU of 1400, plus two hosts, `a` and `b`, on one cable but in different subnets:
 
-```
-  client 198.18.5.1/24 ── eth0 router eth1 ── server 198.19.5.2/24
-                         .254        .254
-                                MTU 1400 on this link
-
-  a 198.51.100.10/25 ───────────── b 198.51.100.200/25   (one cable, two /25s)
-```
+![The ip.json lab: client 198.18.5.1/24 connects to the router's eth0 (.254), the router's eth1 (.254) connects to server 198.19.5.2/24 over a link with MTU 1400, and separately hosts a (198.51.100.10/25) and b (198.51.100.200/25) share one cable but sit in two different /25 subnets.](./img/05/lab-ip-topology.svg)
 
 ```bash
 cd labs/go
@@ -1143,12 +656,17 @@ Read the first header field by field against 5.4:
 
 ```
 IP (tos 0x0, ttl 63, id 28833, offset 0, flags [DF], proto ICMP (1), length 84)
-    ↑        ↑       ↑          ↑         ↑           ↑               ↑
-    DSCP 0,  sent    ID: only   not a     Don't       payload is     20-byte header
-    ECN 0    with 64, matters   fragment  Fragment    ICMP           + 8 ICMP header
-             one hop  if frag-                                       + 56 data = 84
-             later    mented
 ```
+
+| Field | Meaning |
+| --- | --- |
+| `tos 0x0` | DSCP 0, ECN 0 |
+| `ttl 63` | sent with 64, one hop later |
+| `id 28833` | ID: only matters if fragmented |
+| `offset 0` | not a fragment |
+| `flags [DF]` | Don't Fragment |
+| `proto ICMP (1)` | payload is ICMP |
+| `length 84` | 20-byte header + 8 ICMP header + 56 data = 84 |
 
 The request carries DF and the reply does not: Linux ping asks for path MTU discovery, while the kernel's own echo replies do not. Captured on the client instead, the reply would show `ttl 63` — the router decrements both directions. That is how you estimate hop counts from received TTLs: a reply with `ttl 56` from a Linux host crossed 8 routers.
 

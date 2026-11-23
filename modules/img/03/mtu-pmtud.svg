@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 410" role="img" aria-labelledby="t d"><title id="t">MTU and fragmentation: path MTU discovery working</title><desc id="d">A sender reaches a receiver through a router: the first link is Ethernet with MTU 1500 and the second is a VPN tunnel with MTU 1450. The sender sends a 1500-byte IP packet with DF set. At the router the next link MTU is 1450, the packet is bigger and DF is set, so the router drops it and sends ICMP Type 3 Code 4 back: fragmentation needed, next hop MTU 1450. The sender receives the ICMP, reduces the packet size to 1450 and retransmits. This works correctly.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="408" rx="16"/>
+<text class="zl" x="24" y="30">MTU and fragmentation</text>
+<text class="s" x="24" y="52">Standard Ethernet: MTU = 1500 bytes</text>
+<path class="line" d="M120 90 H330 M430 90 H680"/>
+<rect class="net" x="20" y="70" width="100" height="40" rx="10"/><text class="l" x="70" y="95" text-anchor="middle">Sender</text>
+<rect class="net" x="330" y="70" width="100" height="40" rx="10"/><text class="l" x="380" y="95" text-anchor="middle">Router</text>
+<rect class="net" x="680" y="70" width="100" height="40" rx="10"/><text class="l" x="730" y="95" text-anchor="middle">Receiver</text>
+<text class="s" x="225" y="82" text-anchor="middle">Ethernet: MTU 1500</text>
+<text class="s" x="555" y="82" text-anchor="middle">VPN Tunnel: MTU 1450</text>
+<path class="line" d="M70 110 V330 M380 110 V166 M380 240 V330"/>
+<text class="m" x="225" y="142" text-anchor="middle">IP Packet: 1500 bytes, DF=1</text>
+<path class="arrow" d="M70 150 H378"/>
+<rect class="warn" x="300" y="166" width="300" height="74" rx="10"/>
+<text class="s" x="316" y="188">Arrives at router. Next link MTU = 1450.</text>
+<text class="s" x="316" y="206">Packet &gt; MTU. DF bit is set.</text>
+<text class="l" x="316" y="228">Router DROPS the packet.</text>
+<text class="l" x="225" y="270" text-anchor="middle">ICMP Type 3 Code 4</text>
+<text class="s" x="225" y="288" text-anchor="middle">"Fragmentation needed.</text>
+<text class="s" x="225" y="304" text-anchor="middle">Next hop MTU: 1450"</text>
+<path class="arrow" d="M380 314 H72"/>
+<rect class="box" x="20" y="330" width="400" height="60" rx="10"/>
+<text class="s" x="36" y="354">Sender receives ICMP → reduces packet size</text>
+<text class="s" x="36" y="374">to 1450 → retransmits</text>
+<rect class="ok" x="440" y="330" width="340" height="60" rx="10"/><text class="t" x="610" y="366" text-anchor="middle">✓ This works correctly.</text>
+</svg>

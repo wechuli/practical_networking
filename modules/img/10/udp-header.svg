@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 222" role="img" aria-labelledby="t d"><title id="t">The UDP header</title><desc id="d">The UDP header is 8 bytes: two rows of 32 bits. The first row holds the 16-bit Source Port and the 16-bit Destination Port; the second row holds the 16-bit Length and the 16-bit Checksum.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="220" rx="16"/>
+<text class="zl" x="24" y="32">UDP HEADER (8 bytes)</text>
+<text class="m" x="59.0" y="58" text-anchor="middle">0</text>
+<text class="m" x="59.0" y="76" text-anchor="middle">0</text>
+<text class="m" x="81.0" y="76" text-anchor="middle">1</text>
+<text class="m" x="103.0" y="76" text-anchor="middle">2</text>
+<text class="m" x="125.0" y="76" text-anchor="middle">3</text>
+<text class="m" x="147.0" y="76" text-anchor="middle">4</text>
+<text class="m" x="169.0" y="76" text-anchor="middle">5</text>
+<text class="m" x="191.0" y="76" text-anchor="middle">6</text>
+<text class="m" x="213.0" y="76" text-anchor="middle">7</text>
+<text class="m" x="235.0" y="76" text-anchor="middle">8</text>
+<text class="m" x="257.0" y="76" text-anchor="middle">9</text>
+<text class="m" x="279.0" y="58" text-anchor="middle">1</text>
+<text class="m" x="279.0" y="76" text-anchor="middle">0</text>
+<text class="m" x="301.0" y="76" text-anchor="middle">1</text>
+<text class="m" x="323.0" y="76" text-anchor="middle">2</text>
+<text class="m" x="345.0" y="76" text-anchor="middle">3</text>
+<text class="m" x="367.0" y="76" text-anchor="middle">4</text>
+<text class="m" x="389.0" y="76" text-anchor="middle">5</text>
+<text class="m" x="411.0" y="76" text-anchor="middle">6</text>
+<text class="m" x="433.0" y="76" text-anchor="middle">7</text>
+<text class="m" x="455.0" y="76" text-anchor="middle">8</text>
+<text class="m" x="477.0" y="76" text-anchor="middle">9</text>
+<text class="m" x="499.0" y="58" text-anchor="middle">2</text>
+<text class="m" x="499.0" y="76" text-anchor="middle">0</text>
+<text class="m" x="521.0" y="76" text-anchor="middle">1</text>
+<text class="m" x="543.0" y="76" text-anchor="middle">2</text>
+<text class="m" x="565.0" y="76" text-anchor="middle">3</text>
+<text class="m" x="587.0" y="76" text-anchor="middle">4</text>
+<text class="m" x="609.0" y="76" text-anchor="middle">5</text>
+<text class="m" x="631.0" y="76" text-anchor="middle">6</text>
+<text class="m" x="653.0" y="76" text-anchor="middle">7</text>
+<text class="m" x="675.0" y="76" text-anchor="middle">8</text>
+<text class="m" x="697.0" y="76" text-anchor="middle">9</text>
+<text class="m" x="719.0" y="58" text-anchor="middle">3</text>
+<text class="m" x="719.0" y="76" text-anchor="middle">0</text>
+<text class="m" x="741.0" y="76" text-anchor="middle">1</text>
+<rect class="l4" x="48" y="86" width="352" height="48" rx="4"/>
+<text class="t" x="224.0" y="115.0" text-anchor="middle">Source Port</text>
+<rect class="l4" x="400" y="86" width="352" height="48" rx="4"/>
+<text class="t" x="576.0" y="115.0" text-anchor="middle">Destination Port</text>
+<rect class="l4" x="48" y="134" width="352" height="48" rx="4"/>
+<text class="t" x="224.0" y="163.0" text-anchor="middle">Length</text>
+<rect class="l4" x="400" y="134" width="352" height="48" rx="4"/>
+<text class="t" x="576.0" y="163.0" text-anchor="middle">Checksum</text>
+<text class="s" x="400" y="206" text-anchor="middle">Each field is 16 bits (2 bytes).</text>
+</svg>

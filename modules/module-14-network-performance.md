@@ -29,20 +29,14 @@ Everything is measured in the lab on an emulated path — 50 ms of round-trip ti
 
 ### The components of one-way delay
 
-```
-DELAY = PROPAGATION + TRANSMISSION + QUEUEING + PROCESSING
+**DELAY = PROPAGATION + TRANSMISSION + QUEUEING + PROCESSING**
 
-  Propagation   distance ÷ signal speed. Light in fibre covers ~200 km per millisecond
-                (about 5 µs/km), so Nairobi–London (~6,800 km great circle, longer by
-                cable) is at least ~34 ms one way, ~70 ms round trip, before any equipment.
-                Fixed by physics and routing; only moving the endpoints helps (CDNs, regions).
-  Transmission  packet size ÷ link rate: 1500 bytes take 12 µs at 1 Gbit/s, 120 µs at
-                100 Mbit/s, 0.6 ms at 20 Mbit/s. Matters on slow links and adds up per hop.
-  Queueing      time waiting behind other packets in a buffer — zero on an idle path,
-                hundreds of milliseconds on a full one (14.5). The component that VARIES.
-  Processing    lookup, ACLs, NAT, encryption in routers, firewalls and hosts: microseconds
-                in hardware; can be milliseconds in overloaded software paths.
-```
+| Component | What it is |
+|-----------|------------|
+| Propagation | distance ÷ signal speed. Light in fibre covers ~200 km per millisecond (about 5 µs/km), so Nairobi–London (~6,800 km great circle, longer by cable) is at least ~34 ms one way, ~70 ms round trip, before any equipment. Fixed by physics and routing; only moving the endpoints helps (CDNs, regions). |
+| Transmission | packet size ÷ link rate: 1500 bytes take 12 µs at 1 Gbit/s, 120 µs at 100 Mbit/s, 0.6 ms at 20 Mbit/s. Matters on slow links and adds up per hop. |
+| Queueing | time waiting behind other packets in a buffer — zero on an idle path, hundreds of milliseconds on a full one (14.5). The component that VARIES. |
+| Processing | lookup, ACLs, NAT, encryption in routers, firewalls and hosts: microseconds in hardware; can be milliseconds in overloaded software paths. |
 
 `ping` measures the **round trip**, so it includes both directions and the target's response time. The lab's path adds 25 ms in each direction; ping reports `rtt min/avg/max/mdev = 50.963/51.310/51.681/0.275 ms` — the 50 ms of emulated propagation, plus a fraction of a millisecond of real forwarding. `mdev` is the variation (jitter). A minimum that stays put while the average and maximum climb is queueing, not distance.
 
@@ -79,14 +73,11 @@ The first transfer phase took 456 ms; the second 66 ms — **7× faster** on the
 
 ## 14.2 Bandwidth, Throughput and Goodput
 
-```
-BANDWIDTH   the capacity of a link (20 Mbit/s for the lab's bottleneck)
-THROUGHPUT  bits per second actually carried at some layer — always say which: interface
-            counters include Ethernet/IP/TCP headers and retransmissions; iperf3 reports
-            application bytes
-GOODPUT     useful application bytes delivered per second: the file size ÷ the transfer
-            time. Excludes headers, retransmissions, protocol chatter.
-```
+| Term | Meaning |
+|------|---------|
+| BANDWIDTH | the capacity of a link (20 Mbit/s for the lab's bottleneck) |
+| THROUGHPUT | bits per second actually carried at some layer — always say which: interface counters include Ethernet/IP/TCP headers and retransmissions; iperf3 reports application bytes |
+| GOODPUT | useful application bytes delivered per second: the file size ÷ the transfer time. Excludes headers, retransmissions, protocol chatter. |
 
 The lab measured all three for a 4 MiB HTTP download through 1% random loss, **capturing at the sender**:
 
@@ -108,16 +99,16 @@ Overhead and retransmissions cost 1.4% here; at higher loss or with smaller pack
 
 A TCP sender can have at most one window of unacknowledged data in flight, and an acknowledgment takes a round trip to come back. So:
 
-```
-throughput ≤ window ÷ RTT                 BDP = bandwidth × RTT
+**throughput ≤ window ÷ RTT** · **BDP = bandwidth × RTT**
 
-  20 Mbit/s × 50 ms     = 125,000 bytes   (the lab's bottleneck path)
-  100 Mbit/s × 50 ms    = 625 KB
-  1 Gbit/s × 100 ms     = 12.5 MB         (one intercontinental flow at full rate)
-  10 Gbit/s × 0.5 ms    = 625 KB          (a data centre)
+| Bandwidth × RTT | BDP | |
+|-----------------|-----|---|
+| 20 Mbit/s × 50 ms | 125,000 bytes | the lab's bottleneck path |
+| 100 Mbit/s × 50 ms | 625 KB | |
+| 1 Gbit/s × 100 ms | 12.5 MB | one intercontinental flow at full rate |
+| 10 Gbit/s × 0.5 ms | 625 KB | a data centre |
 
-  To fill a path, the window (min of receive window and congestion window) must be ≥ BDP.
-```
+To fill a path, the window (min of receive window and congestion window) must be ≥ BDP.
 
 The lab limits iperf3's socket buffers on the 20 Mbit/s, 50 ms path (BDP 125 KB):
 
@@ -173,15 +164,15 @@ Same throughput; one-fifth of the delay. The deep queue avoided drops — and ma
 
 A loss-based sender halves (Reno) or cuts by 30% (CUBIC) its window at each loss and grows it back about one segment per round trip. In steady state with random loss rate *p*, that gives the **Mathis model** (Mathis, Semke, Mahdavi and Ott, 1997):
 
-```
-throughput ≈ (MSS ÷ RTT) × (C ÷ √p)          C ≈ 1.22 (√(3/2)) for Reno-like behaviour
+**throughput ≈ (MSS ÷ RTT) × (C ÷ √p)**, where C ≈ 1.22 (√(3/2)) for Reno-like behaviour.
 
-  1448-byte segments, 51.4 ms RTT:
-    p = 0.1%   →  8.7 Mbit/s
-    p = 1%     →  2.7 Mbit/s
-    p = 2%     →  1.9 Mbit/s
-  The same 1% loss at 5 ms RTT → 28 Mbit/s; at 150 ms → 0.9 Mbit/s.
-```
+| 1448-byte segments, 51.4 ms RTT | Throughput |
+|---------------------------------|------------|
+| p = 0.1% | 8.7 Mbit/s |
+| p = 1% | 2.7 Mbit/s |
+| p = 2% | 1.9 Mbit/s |
+
+The same 1% loss at 5 ms RTT → 28 Mbit/s; at 150 ms → 0.9 Mbit/s.
 
 Throughput falls with the RTT and with the square root of the loss rate, **and does not depend on the link's bandwidth at all**: 1% loss caps one flow at a few Mbit/s on a 10 Gbit/s intercontinental link. Ping shows "1% loss" and calls the path healthy; for a bulk transfer it is an outage.
 
@@ -217,19 +208,12 @@ Older guides insist BBR "requires the fq qdisc". Since Linux 4.13 TCP paces inte
 
 ### Sizes at each layer
 
-```
-Ethernet frame:  14 header + up to 1500 (MTU) + 4 FCS  (+ 4 per VLAN tag)
-IP packet:       ≤ MTU: 20 (IPv4) or 40 (IPv6) header + payload
-TCP segment:     ≤ MSS payload; MSS = MTU − IP header − 20 = 1460 (IPv4), 1440 (IPv6)
-                 with timestamps, 1448 bytes of data per full segment
+![An Ethernet frame is a 14-byte header, up to 1500 bytes of payload (the MTU) and a 4-byte FCS, plus 4 per VLAN tag; the IP packet inside is a 20-byte (IPv4) or 40-byte (IPv6) header plus payload; the TCP segment inside that is a 20-byte header plus at most MSS bytes, where MSS = MTU − IP header − 20 = 1460 (IPv4) or 1440 (IPv6), and 1448 with timestamps.](./img/14/frame-sizes.svg)
 
-Common smaller MTUs:   PPPoE 1492 · WireGuard 1420 (60 bytes of overhead over IPv4, 80 over IPv6)
-                       IPsec ~1400–1440 (cipher and NAT-T dependent) · VXLAN 1450 (50 bytes)
-                       GRE 1476 (24 bytes) · GCP VPC default 1460 · AWS site-to-site VPN 1446
-Jumbo frames:          9000 (AWS: 9001 inside a VPC, 8500 across Transit Gateway, 1500 to the
-                       internet and across inter-region peering; GCP: up to 8896; Azure: 1500
-                       by default, larger on supported VM families — check current docs)
-```
+| | MTU |
+|---|---|
+| Common smaller MTUs | PPPoE 1492 · WireGuard 1420 (60 bytes of overhead over IPv4, 80 over IPv6) · IPsec ~1400–1440 (cipher and NAT-T dependent) · VXLAN 1450 (50 bytes) · GRE 1476 (24 bytes) · GCP VPC default 1460 · AWS site-to-site VPN 1446 |
+| Jumbo frames | 9000 (AWS: 9001 inside a VPC, 8500 across Transit Gateway, 1500 to the internet and across inter-region peering; GCP: up to 8896; Azure: 1500 by default, larger on supported VM families — check current docs) |
 
 Jumbo frames cut per-packet work for bulk traffic inside one network, but every device on the path must agree, and anything leaving that network falls back to 1500. With TSO/GSO/GRO the per-packet savings are smaller than the raw packet-count ratio suggests (Module 11).
 
@@ -270,28 +254,28 @@ Note the `ttl=62` above: the lab's emulated router counts twice (packets cross t
 
 ## 14.7 Diagnosing a Slow Connection — Measure, Then Localise
 
-```
-1. WHAT exactly is slow?     One request or all? Small requests or large transfers? From where?
-                             Since when? Get a reproducer: a URL, a size, a client location.
-2. WHERE does the time go?   curl -w '%{time_namelookup} %{time_connect} %{time_appconnect}
-                             %{time_starttransfer} %{time_total}' — from the affected client.
-     DNS large               → Module 12 (resolver, search list, timeouts)
-     connect large           → RTT or SYN retransmissions (Module 11: exactly 1 s, 3 s, …?)
-     appconnect − connect    → TLS round trips (13.5), certificate fetching, HelloRetryRequest
-     starttransfer − appconnect → server time (logs, APM) — or one network round trip
-     total − starttransfer   → transfer: steps 3–5
-3. Is the transfer window-, loss-, queue- or size-limited?
-     ss -tni on the sender: rtt, cwnd, rwnd_limited/sndbuf_limited, retrans, delivery_rate
-     window-limited          → throughput ≈ window ÷ RTT, no retransmissions (14.3)
-     loss-limited            → retransmissions; Mathis-scale throughput (14.5)
-     queue-limited           → RTT rises under load; ping during the transfer (14.4)
-     size-limited (MTU)      → small works, full-size segments retransmitted, no ACK (14.6)
-4. Is it the network at all? iperf3 between the same hosts (or nearby ones), single and multi
-     stream; compare with the application's rate. If iperf3 is fast, look at the application,
-     its buffers, its disk, its CPU.
-5. Localise along the path:  mtr / tracepath from both ends; compare RTT and loss per hop
-     (Module 7's caveats apply); compare with a healthy client or region.
-```
+1. **WHAT exactly is slow?** One request or all? Small requests or large transfers? From where? Since when? Get a reproducer: a URL, a size, a client location.
+2. **WHERE does the time go?** `curl -w '%{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer} %{time_total}'` — from the affected client.
+
+   | Phase | Points to |
+   |-------|-----------|
+   | DNS large | Module 12 (resolver, search list, timeouts) |
+   | connect large | RTT or SYN retransmissions (Module 11: exactly 1 s, 3 s, …?) |
+   | appconnect − connect | TLS round trips (13.5), certificate fetching, HelloRetryRequest |
+   | starttransfer − appconnect | server time (logs, APM) — or one network round trip |
+   | total − starttransfer | transfer: steps 3–5 |
+
+3. **Is the transfer window-, loss-, queue- or size-limited?** `ss -tni` on the sender: rtt, cwnd, rwnd_limited/sndbuf_limited, retrans, delivery_rate.
+
+   | Limit | Signature |
+   |-------|-----------|
+   | window-limited | throughput ≈ window ÷ RTT, no retransmissions (14.3) |
+   | loss-limited | retransmissions; Mathis-scale throughput (14.5) |
+   | queue-limited | RTT rises under load; ping during the transfer (14.4) |
+   | size-limited (MTU) | small works, full-size segments retransmitted, no ACK (14.6) |
+
+4. **Is it the network at all?** iperf3 between the same hosts (or nearby ones), single and multi stream; compare with the application's rate. If iperf3 is fast, look at the application, its buffers, its disk, its CPU.
+5. **Localise along the path:** mtr / tracepath from both ends; compare RTT and loss per hop (Module 7's caveats apply); compare with a healthy client or region.
 
 The order matters less than the habit: **measure the phase that is slow before changing anything**, and change one thing at a time.
 
@@ -321,12 +305,7 @@ The lab uses [`pathlab`](../labs/go/cmd/pathlab), the course's userspace path em
 
 [`perf.json`](../labs/netlab/perf.json):
 
-```
-  client 198.18.100.10 ──── router (pathlab: 25 ms each way; rate, queue, loss as set) ──── server 198.18.101.10
-                                                                                            iperf3 :5201
-                                                                                            api.perf.test :8443 (2 KB, +100 ms)
-                                                                                            files.perf.test :9443 / :8080 (4 MiB)
-```
+![The client at 198.18.100.10 connects through a router running pathlab (25 ms each way; rate, queue and loss as set) to the server at 198.18.101.10, which runs iperf3 on :5201, api.perf.test on :8443 (2 KB, +100 ms) and files.perf.test on :9443 and :8080 (4 MiB).](./img/14/perf-lab-topology.svg)
 
 ```bash
 cd labs/go

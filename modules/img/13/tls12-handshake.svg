@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="t d"><title id="t">The TLS 1.2 full handshake with ECDHE</title><desc id="d">Two round trips after TCP. The client sends ClientHello with versions, cipher suites, random and extensions, including SNI, supported groups, signature algorithms and ALPN. The server answers ServerHello with the chosen suite and its random, Certificate with the chain in cleartext, ServerKeyExchange with its ECDHE public key signed with the certificate's key, and ServerHelloDone. The client sends ClientKeyExchange with its ECDHE public key, then ChangeCipherSpec and an encrypted Finished; both now derive the keys. The server sends ChangeCipherSpec and Finished, and application data follows.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="498" rx="16"/>
+<text class="zl" x="24" y="28">TLS 1.2 full handshake (ECDHE): 2 round trips after TCP</text>
+<rect class="net" x="90" y="42" width="120" height="40" rx="10"/><text class="t" x="150" y="67" text-anchor="middle">Client</text>
+<rect class="net" x="420" y="42" width="120" height="40" rx="10"/><text class="t" x="480" y="67" text-anchor="middle">Server</text>
+<path class="line" d="M150 82 V470"/><path class="line" d="M480 82 V470"/>
+<path class="line" d="M40 112 V282"/><text class="l" x="50" y="202">RTT 1</text>
+<path class="line" d="M40 314 V396"/><text class="l" x="50" y="360">RTT 2</text>
+<text class="l" x="315" y="104" text-anchor="middle">ClientHello</text><path class="arrow" d="M150 112 H478"/>
+<text class="s" x="315" y="130" text-anchor="middle">(SNI, supported groups, signature algorithms, ALPN)</text>
+<text class="s" x="492" y="108">versions, cipher suites, random,</text><text class="s" x="492" y="126">extensions</text>
+<text class="l" x="315" y="156" text-anchor="middle">ServerHello</text><path class="arrow" d="M480 164 H152"/>
+<text class="s" x="492" y="168">chosen suite, random</text>
+<text class="l" x="315" y="196" text-anchor="middle">Certificate</text><path class="arrow" d="M480 204 H152"/>
+<rect class="warn" x="492" y="190" width="200" height="28" rx="10"/><text class="l" x="592" y="209" text-anchor="middle">chain — IN CLEARTEXT</text>
+<text class="l" x="315" y="236" text-anchor="middle">ServerKeyExchange</text><path class="arrow" d="M480 244 H152"/>
+<text class="s" x="492" y="248">ECDHE public key, signed with the</text><text class="s" x="492" y="266">certificate's key</text>
+<text class="l" x="315" y="276" text-anchor="middle">ServerHelloDone</text><path class="arrow" d="M480 284 H152"/>
+<text class="l" x="315" y="314" text-anchor="middle">ClientKeyExchange</text><path class="arrow" d="M150 322 H478"/>
+<text class="s" x="492" y="326">client's ECDHE public key</text>
+<text class="l" x="315" y="354" text-anchor="middle">ChangeCipherSpec, Finished (encrypted)</text><path class="arrow" d="M150 362 H478"/>
+<text class="s" x="492" y="366">both now derive the keys</text>
+<text class="l" x="315" y="390" text-anchor="middle">ChangeCipherSpec, Finished</text><path class="arrow" d="M480 398 H152"/>
+<rect class="ok" x="150" y="420" width="330" height="34" rx="10"/><text class="l" x="315" y="442" text-anchor="middle">application data</text>
+</svg>

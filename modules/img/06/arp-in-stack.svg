@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d"><title id="t">Where ARP fits in the stack</title><desc id="d">Application data is wrapped by a TCP header at layer 4, then by an IP header at layer 3 whose source and destination IP are already known. Before the layer 2 frame can be built, ARP resolves the destination MAC: the Ethernet header's destination MAC is the field found by ARP, next to the source MAC, followed by the IP header, TCP header and data, and the FCS. Layer 1 sends the frame as bits on the wire.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="468" rx="16"/>
+<rect class="l7" x="480" y="40" width="180" height="36" rx="10"/><text class="l" x="570" y="63" text-anchor="middle">Application data</text>
+<path class="arrow" d="M570 78 V110"/>
+<rect class="l4" x="370" y="112" width="110" height="40" rx="10"/><text class="l" x="425" y="137" text-anchor="middle">TCP Header</text>
+<rect class="l7" x="480" y="112" width="180" height="40" rx="10"/><text class="s" x="570" y="137" text-anchor="middle">Application Data</text>
+<text class="l" x="724" y="137">Layer 4</text>
+<path class="arrow" d="M570 154 V186"/>
+<rect class="l3" x="260" y="188" width="110" height="70" rx="10"/><text class="l" x="315" y="208" text-anchor="middle">IP Header</text><text class="m" x="315" y="228" text-anchor="middle">Src IP</text><text class="m" x="315" y="246" text-anchor="middle">Dst IP</text>
+<rect class="l4" x="370" y="188" width="110" height="70" rx="10"/><text class="l" x="425" y="228" text-anchor="middle">TCP Header</text>
+<rect class="l7" x="480" y="188" width="180" height="70" rx="10"/><text class="s" x="570" y="228" text-anchor="middle">Application Data</text>
+<text class="l" x="724" y="228">Layer 3</text>
+<text class="l" x="24" y="246">IP destination known</text><path class="arrow" d="M180 242 H282"/>
+<path class="arrow" d="M570 260 V300"/>
+<text class="l" x="556" y="285" text-anchor="end">ARP resolves the destination MAC here</text>
+<rect class="l2" x="150" y="302" width="110" height="70" rx="10"/><text class="l" x="205" y="322" text-anchor="middle">Eth Hdr</text><text class="m" x="205" y="342" text-anchor="middle" font-weight="700">Dst MAC</text><text class="m" x="205" y="360" text-anchor="middle">Src MAC</text>
+<rect class="l3" x="260" y="302" width="110" height="70" rx="10"/><text class="l" x="315" y="342" text-anchor="middle">IP Header</text>
+<rect class="l4" x="370" y="302" width="290" height="70" rx="10"/><text class="l" x="515" y="342" text-anchor="middle">TCP + Data</text>
+<rect class="l2" x="660" y="302" width="50" height="70" rx="10"/><text class="l" x="685" y="342" text-anchor="middle">FCS</text>
+<text class="l" x="724" y="342">Layer 2</text>
+<text class="l" x="24" y="342">Found by ARP</text><path class="arrow" d="M120 338 H168"/>
+<path class="arrow" d="M570 374 V408"/>
+<rect class="box" x="150" y="410" width="560" height="36" rx="10"/><text class="m" x="320" y="433" text-anchor="middle">1 0 1 1 0 0 1 0 0 1 1 1 0 1 0 0</text><text class="l" x="590" y="433" text-anchor="middle">Bits on wire</text>
+<text class="l" x="724" y="433">Layer 1</text>
+</svg>

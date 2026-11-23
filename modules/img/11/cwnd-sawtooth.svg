@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 430" role="img" aria-labelledby="t d"><title id="t">Loss-based congestion control, Reno illustration</title><desc id="d">The congestion window over time. In slow start it roughly doubles per RTT until a loss; then it is halved and grows by one segment per RTT in congestion avoidance until the next loss, where it is halved again, giving a sawtooth. On a fast-retransmit loss, ssthresh = cwnd × β and cwnd = ssthresh (Reno β = 0.5, CUBIC β = 0.7); on an RTO timeout, ssthresh = cwnd × β, cwnd = 1 segment and slow start begins again.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="428" rx="16"/>
+<text class="zl" x="24" y="28">Loss-based congestion control (Reno illustration)</text>
+<text class="l" x="24" y="190">cwnd</text>
+<path class="arrow" d="M70 310 V52"/>
+<path class="arrow" d="M70 310 H778"/>
+<text class="l" x="776" y="332" text-anchor="end">time</text>
+<path class="line" d="M72 300 C 170 296 230 200 260 110"/>
+<path class="line" d="M260 110 V200 L560 110 V200 L740 146"/>
+<text class="l" x="750" y="150">…</text>
+<rect class="warn" x="226" y="74" width="68" height="26" rx="10"/><text class="l" x="260" y="92" text-anchor="middle">loss ×</text>
+<rect class="warn" x="526" y="74" width="68" height="26" rx="10"/><text class="l" x="560" y="92" text-anchor="middle">loss ×</text>
+<text class="s" x="270" y="164">halve</text>
+<text class="s" x="570" y="164">halve</text>
+<text class="l" x="86" y="150">slow start</text>
+<text class="s" x="86" y="168">(doubling per RTT)</text>
+<text class="l" x="330" y="240">congestion avoidance:</text>
+<text class="s" x="330" y="258">+1 segment per RTT</text>
+<rect class="box" x="20" y="350" width="760" height="64" rx="10"/>
+<text class="m" xml:space="preserve" x="34" y="376">Fast-retransmit loss:  ssthresh = cwnd × β; cwnd = ssthresh   (Reno β = 0.5, CUBIC β = 0.7)</text>
+<text class="m" xml:space="preserve" x="34" y="400">RTO timeout:           ssthresh = cwnd × β; cwnd = 1 segment and slow start again</text>
+</svg>

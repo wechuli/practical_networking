@@ -29,10 +29,7 @@ This module measures each of these in [`labs/netlab/sockets.json`](../labs/netla
 
 ## 20.1 The Socket API and Its Errors
 
-```
-server: socket() → bind(addr:port) → listen(backlog) → accept() … read()/write() … close()
-client: socket() → [bind()] → connect(addr:port) … write()/read() … close()
-```
+![A server calls socket(), bind(addr:port), listen(backlog) and accept(), then read() and write(), then close(); a client calls socket(), optionally bind(), then connect(addr:port), then write() and read(), then close().](./img/20/socket-call-sequence.svg)
 
 | Call | What the kernel does | Errors you will see |
 | --- | --- | --- |
@@ -295,11 +292,7 @@ Watch these counters on syslog, metrics (StatsD), DNS and video receivers:
 
 ### Lab Part 1: Run the Lab
 
-```
-client 198.18.200.10 ── router (pathlab: delay on demand) ── server 198.18.201.10
-                                                             discard :7002 :7003 :7005, close :7004, HTTP :8080,
-                                                             netpoll :7032, threads :7033, relays :7101/:7102 → noread :7020
-```
+![The client at 198.18.200.10 connects through a router running pathlab (delay on demand) to the server at 198.18.201.10, which runs discard on :7002, :7003 and :7005, close on :7004, HTTP on :8080, netpoll on :7032, threads on :7033, and relays on :7101 and :7102 that forward to noread on :7020.](./img/20/sockets-lab-topology.svg)
 
 ```bash
 cd labs/go

@@ -10,9 +10,7 @@ Before the course dives into individual protocols and mechanisms, this module wa
 
 A **fresh** HTTPS request over TCP — no cached name, no open connection — follows five steps:
 
-```
-DNS resolution → TCP connection → TLS handshake → HTTP request/response → connection close
-```
+![A fresh HTTPS request runs five steps in order: DNS resolution, TCP connection, TLS handshake, HTTP request and response, and connection close.](./img/02/five-steps.svg)
 
 That sequence is the skeleton of this course. Everything else is understanding each bone — and knowing which error belongs to which bone.
 
@@ -31,28 +29,15 @@ That sequence is the skeleton of this course. Everything else is understanding e
 
 When you type `https://example.com` in a browser and press Enter, the browser has one goal: retrieve and render the HTML at that URL. To do that, it must solve a series of problems, each handled by a different protocol:
 
-```
-THE FIVE STEPS OF A FRESH HTTPS REQUEST
+**The five steps of a fresh HTTPS request**
 
-  Problem                            Protocol   What happens
-  ─────────────────────────────────  ─────────  ─────────────────────────────────────────
-  "I have a name, need an address"   DNS        Ask a resolver: "What are the IPv4 (A)
-                                                and IPv6 (AAAA) addresses of example.com?"
-
-  "I have an address, need a         TCP        Open a reliable, ordered byte stream to
-   reliable channel"                            that address on port 443.
-                                                (3-way handshake: SYN → SYN-ACK → ACK)
-                                                Routers, not TCP, find the path.
-
-  "I have a channel, need trust      TLS        Agree on keys, verify the server's
-   and privacy"                                 certificate, agree on the HTTP version (ALPN).
-
-  "I have trust, need data"          HTTP       Send a GET; receive status, headers, body.
-
-  "I'm done"                         TLS + TCP  close_notify, then FIN — or immediately,
-                                                an RST. Often much later: connections are
-                                                kept open for reuse.
-```
+| Problem | Protocol | What happens |
+| --- | --- | --- |
+| "I have a name, need an address" | DNS | Ask a resolver: "What are the IPv4 (A) and IPv6 (AAAA) addresses of example.com?" |
+| "I have an address, need a reliable channel" | TCP | Open a reliable, ordered byte stream to that address on port 443 (3-way handshake: SYN → SYN-ACK → ACK). Routers, not TCP, find the path. |
+| "I have a channel, need trust and privacy" | TLS | Agree on keys, verify the server's certificate, agree on the HTTP version (ALPN). |
+| "I have trust, need data" | HTTP | Send a GET; receive status, headers, body. |
+| "I'm done" | TLS + TCP | close_notify, then FIN — or immediately, an RST. Often much later: connections are kept open for reuse. |
 
 This is a fresh HTTPS-over-TCP example. Caching, connection reuse, proxies,
 plaintext protocols, and HTTP/3 change the sequence (2.4). Timings in diagrams are
@@ -70,27 +55,7 @@ real address would go out of date.
 
 The client needs an IP address. It does not know where `example.com` lives until it asks.
 
-```
-DNS RESOLUTION ON A TYPICAL UBUNTU HOST (simplified)
-
-  Application             C library / OS           Recursive resolver      Root, TLD,
-  (curl, a Go program)    (getaddrinfo, NSS)       (ISP, cloud, 1.1.1.1)   authoritative
-     │                        │                        │                        │
-     │ "example.com?"         │                        │                        │
-     │───────────────────────▶│ 1. /etc/hosts          │                        │
-     │                        │ 2. stub resolver       │                        │
-     │                        │    (systemd-resolved,  │                        │
-     │                        │    127.0.0.53)         │                        │
-     │                        │── A? and AAAA? ───────▶│                        │
-     │                        │                        │── (walks the hierarchy │
-     │                        │                        │    on a cache miss) ──▶│
-     │                        │                        │◀── answers + TTLs ─────│
-     │                        │◀── 203.0.113.10, ──────│                        │
-     │◀── addresses ──────────│    2001:db8::10        │                        │
-
-  Cost: from well under a millisecond (cached nearby) to tens or hundreds of
-  milliseconds (cache miss, distant resolver).
-```
+![DNS resolution on an Ubuntu host: the application asks the C library, which checks /etc/hosts and then the stub resolver at 127.0.0.53; the stub sends A and AAAA queries to a recursive resolver, which walks the root, TLD and authoritative servers on a cache miss and returns 203.0.113.10 and 2001:db8::10 to the application.](./img/02/dns-resolution.svg)
 
 Two details matter in practice:
 
@@ -109,50 +74,13 @@ thing to check in any connectivity failure.
 
 With an address in hand, the client opens a TCP connection to port 443.
 
-```
-TCP 3-WAY HANDSHAKE
-
-  Client                          Server (203.0.113.10:443)
-     │                                 │
-     │  SYN ──────────────────────────▶│   "Can we talk?" (+ MSS, window scale, SACK)
-     │◀────────────────────── SYN-ACK  │   "Yes, I'm here."
-     │  ACK ──────────────────────────▶│   "Great, let's go."
-     │                                 │
-     │  Connection ESTABLISHED         │
-     │  Cost: 1 round-trip time        │
-
-  At this point, there is a reliable, ordered byte stream between
-  the client and the server. Nothing on it is encrypted yet.
-```
+![The TCP 3-way handshake between the client and 203.0.113.10:443: SYN with MSS, window scale and SACK options, SYN-ACK, then ACK, after which the connection is established at a cost of one round trip, as an unencrypted, reliable, ordered byte stream.](./img/02/tcp-handshake.svg)
 
 ### Step 3 — TLS Handshake
 
 Immediately after the TCP handshake, the client starts TLS on the same connection.
 
-```
-TLS 1.3 HANDSHAKE — 1 round trip
-
-  Client                                       Server
-     │  ClientHello ─────────────────────────────▶│
-     │   - versions: TLS 1.3, 1.2                 │
-     │   - cipher suites, key share (X25519)      │
-     │   - SNI: example.com   ← picks the cert    │
-     │   - ALPN: h2, http/1.1 ← offers HTTP versions
-     │                                            │
-     │◀── ServerHello (+ key share) ──────────────│  clear text
-     │◀── {EncryptedExtensions} ──────────────────│  ← ALPN choice: "h2"
-     │◀── {Certificate} ──────────────────────────│  ← server's chain
-     │◀── {CertificateVerify} ────────────────────│  ← proves it holds the key
-     │◀── {Finished} ─────────────────────────────│
-     │                                            │
-     │   client verifies chain, name, and dates   │
-     │── {Finished} ─────────────────────────────▶│  (the HTTP request can
-     │                                            │   follow immediately)
-     │  ══ Encrypted from here ══                 │
-
-  {braces} = already encrypted. A capture shows the ClientHello and
-  ServerHello, but not the certificate.
-```
+![A TLS 1.3 handshake in one round trip: the ClientHello offers versions, cipher suites, a key share, SNI and ALPN; the server replies with ServerHello in clear text, then encrypted EncryptedExtensions with the ALPN choice, Certificate, CertificateVerify and Finished; the client verifies the certificate and sends Finished, after which everything is encrypted.](./img/02/tls13-handshake.svg)
 
 When the handshake succeeds, the client has keys shared only with this server, and
 it has verified that the server holds the private key for a certificate a trusted
@@ -165,26 +93,7 @@ HTTP/1.1 in a client that offers only `http/1.1`.
 Now the client sends the request over the encrypted connection. With ALPN `h2`, it
 is HTTP/2: binary frames, with headers shown in lower case.
 
-```
-HTTP/2 REQUEST/RESPONSE (inside TLS)
-
-  Client                                       Server
-     │  connection preface + SETTINGS ───────────▶│
-     │  HEADERS (stream 1)                        │
-     │    :method GET  :path /                    │
-     │    :authority example.com ────────────────▶│
-     │                                            │  server works...
-     │◀──────────── HEADERS (stream 1) ───────────│
-     │               :status 200                  │
-     │               content-type: text/html      │
-     │               content-length: 1256         │
-     │◀──────────── DATA (stream 1) ──────────────│
-     │               <!doctype html>...           │
-
-  With HTTP/1.1 the same exchange is text: "GET / HTTP/1.1", "Host: ...",
-  then "HTTP/1.1 200 OK". Subresources (CSS, JS, images) reuse this
-  connection — as more HTTP/2 streams, or in sequence with HTTP/1.1.
-```
+![An HTTP/2 exchange inside TLS: the client sends the connection preface and SETTINGS, then a HEADERS frame on stream 1 for GET / at example.com; the server answers on stream 1 with HEADERS carrying status 200, text/html and a content length of 1256, then a DATA frame with the HTML.](./img/02/http2-exchange.svg)
 
 ### Step 5 — Closing the Connection
 
@@ -193,18 +102,7 @@ command-line tool, after an idle timeout for a browser or connection pool. The
 textbook close is four segments (FIN, ACK, FIN, ACK). Real closes are often
 different, and this one, captured from a real curl request (lab Part 4), is typical:
 
-```
-CAPTURED CLOSE (curl 8.5, loopback)
-
-  Client                                       Server
-     │── TLS Alert: close_notify ───────────────▶│   "no more TLS data from me"
-     │── FIN ───────────────────────────────────▶│   curl has closed its socket
-     │◀─────────────────────────────────── ACK   │
-     │◀──────────────── TLS Alert: close_notify  │   server answers the alert...
-     │── RST ───────────────────────────────────▶│   ...to a socket that no longer
-                                                     exists, so the client kernel
-                                                     answers with a reset
-```
+![A captured close between curl and a server: the client sends a TLS close_notify alert and a FIN, the server sends an ACK and its own close_notify, and the client kernel answers that alert with an RST because the socket no longer exists.](./img/02/captured-close.svg)
 
 **An RST at the end of a connection is not, by itself, an error.** It means data
 arrived for a socket that had already been closed. Treat an RST as a problem when
@@ -216,23 +114,7 @@ implementation-dependent; Linux commonly uses about 60 seconds.
 
 ### The Full Picture
 
-```
-FULL REQUEST TIMELINE — illustrative, 15 ms RTT, fresh connection
-
-  t=0ms    DNS query sent (A and AAAA)
-  t=15ms   DNS answer: 203.0.113.10
-  t=15ms   TCP SYN sent
-  t=30ms   SYN-ACK received; ACK sent — connection established     (1 RTT)
-  t=30ms   TLS ClientHello sent
-  t=45ms   ServerHello … Finished received                          (1 RTT)
-  t=45ms   TLS Finished + HTTP request sent together
-  t=60ms   + server think time → first response byte arrives       (≥ 1 RTT)
-  t=65ms   last body byte received
-  later    close (after the client is done, or an idle timeout)
-
-  At least 3 round trips before the first byte, plus DNS on a cache miss.
-  On a 150 ms intercontinental path the same request needs ≥ 450 ms.
-```
+![An illustrative timeline of a fresh request on a 15 ms round-trip path: DNS from 0 to 15 ms, the TCP handshake from 15 to 30 ms, the TLS handshake from 30 to 45 ms, the first response byte at 60 ms after server think time, and the last body byte at 65 ms, which is at least 3 round trips before the first byte, or at least 450 ms on a 150 ms path.](./img/02/request-timeline.svg)
 
 ---
 
@@ -333,24 +215,18 @@ the subtraction already done:
 Chrome's Network tab → request → **Timing** shows (names vary slightly between
 versions):
 
-```
-BROWSER TIMING ROWS (Chrome)
+**Browser timing rows (Chrome)**
 
-  Row                          Step it maps to
-  ───────────────────────────  ─────────────────────────────────────────────────
-  Queueing / Stalled           Before the network: browser limits, waiting for a
-                               connection, cache lookups. Large values here are not
-                               network latency.
-  Proxy negotiation            Only when a proxy is configured
-  DNS Lookup                   Step 1 (0 when cached or the connection is reused)
-  Initial connection           Steps 2 and 3 together — TCP *and* TLS
-  SSL                          Step 3 alone — a subset of Initial connection;
-                               don't add it twice
-  Request sent                 Step 4: request bytes written
-  Waiting for server response  Step 4: request travel + server work + first byte
-  (older: Waiting (TTFB))      back — usually headers, not necessarily the body
-  Content Download             Step 4: the rest of the body
-```
+| Row | Step it maps to |
+| --- | --- |
+| Queueing / Stalled | Before the network: browser limits, waiting for a connection, cache lookups. Large values here are not network latency. |
+| Proxy negotiation | Only when a proxy is configured |
+| DNS Lookup | Step 1 (0 when cached or the connection is reused) |
+| Initial connection | Steps 2 and 3 together — TCP *and* TLS |
+| SSL | Step 3 alone — a subset of Initial connection; don't add it twice |
+| Request sent | Step 4: request bytes written |
+| Waiting for server response (older: Waiting (TTFB)) | Step 4: request travel + server work + first byte back — usually headers, not necessarily the body |
+| Content Download | Step 4: the rest of the body |
 
 High connect or TLS time can also involve retries, CPU, proxies, or policy, not
 only distance.

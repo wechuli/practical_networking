@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d"><title id="t">How TTL works</title><desc id="d">A sender sets TTL 64 (the Linux default). Router 1 and Router 2 each decrement it by 1, so the packet leaves the sender with TTL 64, Router 1 with 63 and Router 2 with 62 on its way to the destination. In a routing loop, Router A and Router B pass the packet back and forth with TTL 3, 2, 1; when it reaches 0 the router drops the packet and sends ICMP Time Exceeded back to the sender. Traceroute uses this: packets with TTL 1 reveal hop 1, TTL 2 reveal hop 2, and so on until the destination is reached.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="438" rx="16"/>
+<text class="zl" x="24" y="32">Sender sets TTL = 64 (Linux default)</text>
+<rect class="net" x="40" y="46" width="130" height="54" rx="10"/><text class="t" x="105" y="78" text-anchor="middle">Sender</text>
+<path class="arrow" d="M170 73 H236"/><text class="m" x="203" y="65" text-anchor="middle">TTL=64</text>
+<rect class="net" x="240" y="46" width="130" height="54" rx="10"/><text class="t" x="305" y="70" text-anchor="middle">Router 1</text><text class="s" x="305" y="90" text-anchor="middle">decrements by 1</text>
+<path class="arrow" d="M370 73 H436"/><text class="m" x="403" y="65" text-anchor="middle">TTL=63</text>
+<rect class="net" x="440" y="46" width="130" height="54" rx="10"/><text class="t" x="505" y="70" text-anchor="middle">Router 2</text><text class="s" x="505" y="90" text-anchor="middle">decrements by 1</text>
+<path class="arrow" d="M570 73 H636"/><text class="m" x="603" y="65" text-anchor="middle">TTL=62</text>
+<rect class="ok" x="640" y="46" width="130" height="54" rx="10"/><text class="t" x="705" y="78" text-anchor="middle">Destination</text>
+<text class="zl" x="24" y="138">If there is a routing loop:</text>
+<rect class="net" x="40" y="152" width="130" height="50" rx="10"/><text class="t" x="105" y="182" text-anchor="middle">Router A</text>
+<path class="arrow" d="M170 177 H236"/><text class="m" x="203" y="169" text-anchor="middle">TTL=3</text>
+<rect class="net" x="240" y="152" width="130" height="50" rx="10"/><text class="t" x="305" y="182" text-anchor="middle">Router B</text>
+<path class="arrow" d="M370 177 H436"/><text class="m" x="403" y="169" text-anchor="middle">TTL=2</text>
+<rect class="net" x="440" y="152" width="130" height="50" rx="10"/><text class="t" x="505" y="182" text-anchor="middle">Router A</text>
+<path class="arrow" d="M570 177 H636"/><text class="m" x="603" y="169" text-anchor="middle">TTL=1</text>
+<rect class="net" x="640" y="152" width="130" height="50" rx="10"/><text class="t" x="705" y="182" text-anchor="middle">Router B</text>
+<path class="arrow" d="M705 202 V224"/>
+<rect class="warn" x="560" y="228" width="210" height="88" rx="10"/><text class="t" x="665" y="250" text-anchor="middle">TTL=0!</text><text class="s" x="665" y="270" text-anchor="middle">Drop packet.</text><text class="s" x="665" y="287" text-anchor="middle">Send ICMP Time Exceeded</text><text class="s" x="665" y="304" text-anchor="middle">back to sender.</text>
+<rect class="box" x="20" y="336" width="760" height="88" rx="10"/>
+<text class="l" x="40" y="358">This is exactly how traceroute works:</text>
+<text class="s" x="40" y="378">Send packets with TTL=1 → first router drops, sends ICMP → you learn hop 1</text>
+<text class="s" x="40" y="396">Send packets with TTL=2 → second router drops, sends ICMP → you learn hop 2</text>
+<text class="s" x="40" y="414">Continue incrementing until the destination is reached</text>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d"><title id="t">PMTUD black hole: ICMP Type 3 Code 4 is blocked</title><desc id="d">A sequence diagram between sender, router and destination. The sender sends a 1500-byte IP packet with DF=1. The router's next link has MTU 1400, so it drops the packet and sends ICMP Type 3 Code 4, but a firewall blocks it. The sender never learns the maximum packet size, keeps retransmitting 1500-byte packets, all are dropped, and the TCP connection hangs.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="468" rx="16"/>
+<text class="zl" x="24" y="30">PMTUD black hole — when ICMP Type 3 Code 4 is blocked</text>
+<rect class="net" x="50" y="44" width="140" height="40" rx="10"/><text class="t" x="120" y="70" text-anchor="middle">Sender</text>
+<rect class="net" x="330" y="44" width="140" height="40" rx="10"/><text class="t" x="400" y="70" text-anchor="middle">Router</text>
+<rect class="net" x="600" y="44" width="160" height="40" rx="10"/><text class="t" x="680" y="70" text-anchor="middle">Destination</text>
+<path class="line" d="M120 84 V444"/><path class="line" d="M400 84 V444"/><path class="line" d="M680 84 V444"/>
+<text class="l" x="260" y="118" text-anchor="middle">IP packet, 1500 bytes</text>
+<text class="s" x="260" y="136" text-anchor="middle">DF bit = 1</text>
+<path class="arrow" d="M120 148 H398"/>
+<rect class="warn" x="416" y="156" width="230" height="54" rx="10"/>
+<text class="s" x="430" y="178">Next link MTU = 1400</text><text class="l" x="430" y="198">DROP the packet</text>
+<text class="l" x="330" y="234" text-anchor="middle">ICMP Type 3 Code 4</text>
+<path class="dash" d="M400 246 H262"/>
+<rect class="warn" x="134" y="228" width="126" height="36" rx="10"/><text class="l" x="197" y="251" text-anchor="middle">BLOCKED by FW!</text>
+<rect class="warn" x="136" y="290" width="250" height="120" rx="10"/>
+<text class="s" x="150" y="312">Sender never learns</text><text class="s" x="150" y="330">max packet size.</text><text class="s" x="150" y="348">Keeps retransmitting</text><text class="s" x="150" y="366">1500-byte packets.</text><text class="s" x="150" y="384">ALL are dropped.</text><text class="l" x="150" y="402">TCP connection hangs.</text>
+</svg>

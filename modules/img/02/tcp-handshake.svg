@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 396" role="img" aria-labelledby="t d"><title id="t">TCP 3-way handshake</title><desc id="d">A sequence diagram between the client and the server at 203.0.113.10:443. The client sends SYN (can we talk? with MSS, window scale and SACK options), the server answers SYN-ACK (yes, I'm here), and the client sends ACK (great, let's go). The connection is then ESTABLISHED after one round-trip time: a reliable, ordered byte stream that is not yet encrypted.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="394" rx="16"/>
+<text class="zl" x="24" y="30">TCP 3-way handshake</text>
+<rect class="net" x="90" y="44" width="140" height="56" rx="10"/><text class="t" x="160" y="77" text-anchor="middle">Client</text>
+<rect class="net" x="390" y="44" width="180" height="56" rx="10"/><text class="t" x="480" y="67" text-anchor="middle">Server</text><text class="m" x="480" y="87" text-anchor="middle">203.0.113.10:443</text>
+<path class="line" d="M160 100 V272 M480 100 V272"/>
+<text class="l" x="320" y="132" text-anchor="middle">SYN</text>
+<path class="arrow" d="M160 140 H478"/>
+<text class="s" x="500" y="134">"Can we talk?"</text><text class="s" x="500" y="152">(+ MSS, window scale, SACK)</text>
+<text class="l" x="320" y="182" text-anchor="middle">SYN-ACK</text>
+<path class="arrow" d="M480 190 H162"/>
+<text class="s" x="500" y="194">"Yes, I'm here."</text>
+<text class="l" x="320" y="232" text-anchor="middle">ACK</text>
+<path class="arrow" d="M160 240 H478"/>
+<text class="s" x="500" y="244">"Great, let's go."</text>
+<rect class="ok" x="100" y="272" width="440" height="56" rx="10"/><text class="t" x="320" y="296" text-anchor="middle">Connection ESTABLISHED</text><text class="s" x="320" y="316" text-anchor="middle">Cost: 1 round-trip time</text>
+<text class="s" x="24" y="356">At this point, there is a reliable, ordered byte stream between the client and the server.</text>
+<text class="s" x="24" y="376">Nothing on it is encrypted yet.</text>
+</svg>

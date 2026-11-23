@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" role="img" aria-labelledby="t d"><title id="t">Two switches joined by two links in the stp lab</title><desc id="d">hosta connects to the left br0 and hostb to the right br0. The two bridges are joined by two parallel links, path1 and path2. STP puts one port on path2 into blocking, so there is no loop. If path1 breaks, path2 starts forwarding after the listening and learning states.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="278" rx="16"/>
+<text class="zl" x="24" y="30">Two switches, two links (this module's stp lab)</text>
+<path class="line" d="M140 90 H220 M340 90 H460 M580 90 H660"/>
+<path class="line" d="M280 110 V180 H520 V110"/>
+<rect class="net" x="40" y="70" width="100" height="40" rx="10"/><text class="l" x="90" y="95" text-anchor="middle">hosta</text>
+<rect class="net" x="220" y="70" width="120" height="40" rx="10"/><text class="t" x="280" y="95" text-anchor="middle">left br0</text>
+<rect class="net" x="460" y="70" width="120" height="40" rx="10"/><text class="t" x="520" y="95" text-anchor="middle">right br0</text>
+<rect class="net" x="660" y="70" width="100" height="40" rx="10"/><text class="l" x="710" y="95" text-anchor="middle">hostb</text>
+<text class="l" x="400" y="80" text-anchor="middle">path1</text>
+<text class="l" x="400" y="170" text-anchor="middle">path2</text>
+<rect class="warn" x="236" y="126" width="88" height="26" rx="6"/><text class="l" x="280" y="144" text-anchor="middle">BLOCKING</text>
+<text class="s" x="24" y="220">One port on path2 is BLOCKING: no loop.</text>
+<text class="s" x="24" y="244">Break path1 → after listening + learning, path2 forwards.</text>
+</svg>

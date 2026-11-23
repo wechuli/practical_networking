@@ -55,6 +55,10 @@ sudo ./bin/netlab run ../netlab/tcp.json      # any lab in labs/netlab
 ```
 
 `node tools/check-course.mjs` checks every document link and runs the Go tools' tests.
+
+The course is also published as a website with [VitePress](https://vitepress.dev): run
+`npm ci && npm run docs:dev` to preview it locally. `npm run docs:build` builds it and
+fails on dead links.
 The [lab index](labs/index.md) maps each module to its labs.
 
 ## How this course was verified

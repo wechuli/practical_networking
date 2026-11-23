@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 700" role="img" aria-labelledby="t d"><title id="t">What is this IP address? A decision tree</title><desc id="d">A decision tree for classifying an address. IPv4: starts with 10, 172.16 to 31 or 192.168 means private (RFC 1918); 127 is loopback; 169.254 is link-local (no DHCP lease, or a service), and 169.254.169.254 is the cloud instance metadata endpoint; 100.64 to 127 is CGNAT (ISP NAT or Tailscale); 224 to 239 is multicast; 255.255.255.255 is broadcast; 0.0.0.0 is the default route or INADDR_ANY; 198.51.100, 203.0.113 and 192.0.2 are documentation ranges that should not be in production; 198.18 to 19 is the benchmarking and lab range; other space needs a check of the IANA classification and routes. IPv6: ::1 is loopback, :: is unspecified, ::ffff:a.b.c.d is an IPv4 client on an IPv6 socket, fe80:: is link-local, fd00:: is unique local (private), ff00:: is multicast, 2001:db8:: is documentation and 2000::/3 is global unicast (public).</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="698" rx="16"/>
+<text class="zl" x="24" y="30">WHAT IS THIS IP ADDRESS?</text>
+<rect class="l3" x="20" y="44" width="230" height="34" rx="10"/><text class="l" x="135" y="66" text-anchor="middle">Start: look at the IP</text>
+<path class="line" d="M40 78 V440"/>
+<path class="line" d="M40 104 H64"/>
+<text class="m" x="70" y="108">Starts with 10.?</text>
+<path class="arrow" d="M272 104 H300"/>
+<text class="s" x="308" y="108">Private (RFC 1918)</text>
+<path class="line" d="M40 128 H64"/>
+<text class="m" x="70" y="132">Starts with 172.16–31.?</text>
+<path class="arrow" d="M272 128 H300"/>
+<text class="s" x="308" y="132">Private (RFC 1918)</text>
+<path class="line" d="M40 152 H64"/>
+<text class="m" x="70" y="156">Starts with 192.168.?</text>
+<path class="arrow" d="M272 152 H300"/>
+<text class="s" x="308" y="156">Private (RFC 1918)</text>
+<path class="line" d="M40 176 H64"/>
+<text class="m" x="70" y="180">Starts with 127.?</text>
+<path class="arrow" d="M272 176 H300"/>
+<text class="s" x="308" y="180">Loopback (localhost)</text>
+<path class="line" d="M40 200 H64"/>
+<text class="m" x="70" y="204">Starts with 169.254.?</text>
+<path class="arrow" d="M272 200 H300"/>
+<text class="s" x="308" y="204">Link-local (no DHCP lease, or a service)</text>
+<path class="line" d="M84 208 V224 H96"/>
+<text class="m" x="100" y="228">Is it 169.254.169.254?</text>
+<path class="arrow" d="M272 224 H300"/>
+<text class="s" x="308" y="228">Cloud instance metadata endpoint</text>
+<path class="line" d="M40 248 H64"/>
+<text class="m" x="70" y="252">Starts with 100.64–127.?</text>
+<path class="arrow" d="M272 248 H300"/>
+<text class="s" x="308" y="252">CGNAT (ISP NAT or Tailscale)</text>
+<path class="line" d="M40 272 H64"/>
+<text class="m" x="70" y="276">Starts with 224–239.?</text>
+<path class="arrow" d="M272 272 H300"/>
+<text class="s" x="308" y="276">Multicast</text>
+<path class="line" d="M40 296 H64"/>
+<text class="m" x="70" y="300">Is it 255.255.255.255?</text>
+<path class="arrow" d="M272 296 H300"/>
+<text class="s" x="308" y="300">Broadcast</text>
+<path class="line" d="M40 320 H64"/>
+<text class="m" x="70" y="324">Is it 0.0.0.0?</text>
+<path class="arrow" d="M272 320 H300"/>
+<text class="s" x="308" y="324">Default route or INADDR_ANY</text>
+<path class="line" d="M40 344 H64"/>
+<text class="m" x="70" y="348">Starts with 198.51.100.?</text>
+<path class="arrow" d="M272 344 H300"/>
+<text class="s" x="308" y="348">Documentation range (should not be in prod)</text>
+<path class="line" d="M40 368 H64"/>
+<text class="m" x="70" y="372">Starts with 203.0.113.?</text>
+<path class="arrow" d="M272 368 H300"/>
+<text class="s" x="308" y="372">Documentation range (should not be in prod)</text>
+<path class="line" d="M40 392 H64"/>
+<text class="m" x="70" y="396">Starts with 192.0.2.?</text>
+<path class="arrow" d="M272 392 H300"/>
+<text class="s" x="308" y="396">Documentation range (should not be in prod)</text>
+<path class="line" d="M40 416 H64"/>
+<text class="m" x="70" y="420">Starts with 198.18–19.?</text>
+<path class="arrow" d="M272 416 H300"/>
+<text class="s" x="308" y="420">Benchmarking / lab range</text>
+<path class="line" d="M40 440 H64"/>
+<text class="m" x="70" y="444">Other space</text>
+<path class="arrow" d="M272 440 H300"/>
+<text class="s" x="308" y="444">Check IANA classification and routes</text>
+<text class="zl" x="24" y="480">IPv6</text>
+<path class="line" d="M40 504 H64"/><text class="m" x="70" y="508">::1</text><path class="arrow" d="M272 504 H300"/><text class="s" x="308" y="508">Loopback</text>
+<path class="line" d="M40 528 H64"/><text class="m" x="70" y="532">::</text><path class="arrow" d="M272 528 H300"/><text class="s" x="308" y="532">Unspecified</text>
+<path class="line" d="M40 552 H64"/><text class="m" x="70" y="556">::ffff:a.b.c.d</text><path class="arrow" d="M272 552 H300"/><text class="s" x="308" y="556">IPv4 client on an IPv6 socket</text>
+<path class="line" d="M40 576 H64"/><text class="m" x="70" y="580">fe80::</text><path class="arrow" d="M272 576 H300"/><text class="s" x="308" y="580">Link-local</text>
+<path class="line" d="M40 600 H64"/><text class="m" x="70" y="604">fd00::</text><path class="arrow" d="M272 600 H300"/><text class="s" x="308" y="604">Unique Local (private)</text>
+<path class="line" d="M40 624 H64"/><text class="m" x="70" y="628">ff00::</text><path class="arrow" d="M272 624 H300"/><text class="s" x="308" y="628">Multicast</text>
+<path class="line" d="M40 648 H64"/><text class="m" x="70" y="652">2001:db8::</text><path class="arrow" d="M272 648 H300"/><text class="s" x="308" y="652">Documentation</text>
+<path class="line" d="M40 672 H64"/><text class="m" x="70" y="676">2000::/3</text><path class="arrow" d="M272 672 H300"/><text class="s" x="308" y="676">Global unicast (public)</text>
+<path class="line" d="M40 486 V672"/>
+</svg>

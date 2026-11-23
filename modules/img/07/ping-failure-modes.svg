@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 720" role="img" aria-labelledby="t d"><title id="t">What happens when ping fails: three different causes</title><desc id="d">Three panels. Cause 1: a router (or your host) has no route or gets no ARP answer and sends ICMP Destination Unreachable back to you, so ping prints From router Destination Net Unreachable or Destination Host Unreachable; a genuine layer 3 or layer 2 problem. Cause 2: a firewall drops the ICMP echo and the packet vanishes, so you see silence although the host may be fine; test with a TCP probe. Cause 3: the request reaches the target but the reply's return path is broken, so you see 100 percent packet loss; verify by capturing on the target.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="718" rx="16"/>
+<rect class="zone" x="16" y="16" width="768" height="224" rx="12"/>
+<text class="zl" x="32" y="40">Cause 1: A router (or your host) reports the failure</text>
+<rect class="net" x="40" y="56" width="100" height="44" rx="10"/><text class="t" x="90" y="83" text-anchor="middle">You</text>
+<text class="l" x="220" y="70" text-anchor="middle">ICMP Echo</text><path class="arrow" d="M140 78 H298"/>
+<rect class="net" x="300" y="56" width="110" height="44" rx="10"/><text class="t" x="355" y="83" text-anchor="middle">Router</text>
+<path class="dash" d="M410 78 H498"/>
+<rect class="warn" x="500" y="56" width="230" height="44" rx="10"/><text class="l" x="615" y="83" text-anchor="middle">✗ no route / no ARP answer</text>
+<path class="arrow" d="M355 100 V132 H90 V104"/><text class="l" x="222" y="124" text-anchor="middle">ICMP Dest Unreachable</text>
+<text class="s" x="40" y="162">You see: “From &lt;router&gt; … Destination Net Unreachable” (no route at that router) or</text>
+<text class="s" x="40" y="180">“From &lt;router&gt; … Destination Host Unreachable” (the last router could not ARP for the host,</text>
+<text class="s" x="40" y="198">after ~3 s). “From &lt;your own IP&gt;” means your own host failed the same way.</text>
+<text class="l" x="40" y="220">Genuine L3/L2 problem.</text>
+
+<rect class="zone" x="16" y="256" width="768" height="196" rx="12"/>
+<text class="zl" x="32" y="280">Cause 2: ICMP filtered at firewall (host is alive)</text>
+<rect class="net" x="40" y="296" width="100" height="44" rx="10"/><text class="t" x="90" y="323" text-anchor="middle">You</text>
+<text class="l" x="220" y="310" text-anchor="middle">ICMP Echo</text><path class="arrow" d="M140 318 H298"/>
+<rect class="warn" x="300" y="296" width="110" height="44" rx="10"/><text class="t" x="355" y="323" text-anchor="middle">Firewall</text>
+<text class="l" x="455" y="310" text-anchor="middle">DROP</text><path class="dash" d="M410 318 H498"/>
+<text class="s" x="510" y="322">(packet vanishes)</text>
+<text class="s" x="40" y="374">You see: silence. Linux ping prints nothing per lost packet (use -O to print “no answer yet”);</text>
+<text class="s" x="40" y="392">Windows prints “Request timed out”.</text>
+<text class="s" x="40" y="414">Meaning: A firewall dropped the ICMP packet. The host may be fine.</text>
+<text class="s" x="40" y="434">Test with: <tspan class="m">nc -zv &lt;host&gt; 443</tspan> (TCP probe)</text>
+
+<rect class="zone" x="16" y="468" width="768" height="236" rx="12"/>
+<text class="zl" x="32" y="492">Cause 3: Asymmetric path (outbound works, return fails)</text>
+<rect class="net" x="40" y="508" width="100" height="44" rx="10"/><text class="t" x="90" y="535" text-anchor="middle">You</text>
+<text class="l" x="220" y="522" text-anchor="middle">ICMP Echo</text><path class="arrow" d="M140 530 H298"/>
+<rect class="net" x="300" y="508" width="110" height="44" rx="10"/><text class="t" x="355" y="535" text-anchor="middle">Target</text>
+<text class="s" x="424" y="534">← Request arrives</text>
+<path class="dash" d="M355 552 V584 H232"/><text class="l" x="296" y="576" text-anchor="middle">ICMP Reply</text>
+<rect class="warn" x="60" y="566" width="170" height="36" rx="10"/><text class="l" x="145" y="589" text-anchor="middle">✗ return path broken</text>
+<text class="s" x="40" y="628">You see: 100% packet loss.</text>
+<text class="s" x="40" y="648">Meaning: The target received the ping but its reply cannot reach you. Common with: wrong default</text>
+<text class="s" x="40" y="666">gateway on target, stateful firewall blocking the return, or asymmetric routing.</text>
+<text class="s" x="40" y="688">Verify by: capturing on the target to confirm requests arrive.</text>
+</svg>

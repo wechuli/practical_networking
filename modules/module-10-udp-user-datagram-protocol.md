@@ -35,157 +35,68 @@ UDP — User Datagram Protocol — is defined in RFC 768 (1980). It is one of th
 
 ### UDP's Properties
 
-```
-WHAT UDP PROVIDES:
-  ✓ Multiplexing via port numbers (source + destination port)
-  ✓ Optional integrity checking via checksum
-  ✓ Message boundaries (each send() = one datagram, received as one unit)
+What UDP provides:
 
-WHAT UDP DOES NOT PROVIDE:
-  ✗ Connection establishment (no handshake)
-  ✗ Reliable delivery (no acknowledgments, no retransmissions)
-  ✗ Ordered delivery (datagrams may arrive out of order)
-  ✗ Duplicate detection (same datagram may arrive twice)
-  ✗ Flow control (no receiver window, no backpressure)
-  ✗ Congestion control (no slow start, no cwnd)
+- ✓ Multiplexing via port numbers (source + destination port)
+- ✓ Optional integrity checking via checksum
+- ✓ Message boundaries (each send() = one datagram, received as one unit)
 
-  If the application needs any of these guarantees, the application
-  must implement them itself — or use TCP instead.
-```
+What UDP does not provide:
+
+- ✗ Connection establishment (no handshake)
+- ✗ Reliable delivery (no acknowledgments, no retransmissions)
+- ✗ Ordered delivery (datagrams may arrive out of order)
+- ✗ Duplicate detection (same datagram may arrive twice)
+- ✗ Flow control (no receiver window, no backpressure)
+- ✗ Congestion control (no slow start, no cwnd)
+
+If the application needs any of these guarantees, the application must implement them itself — or use TCP instead.
 
 ### The UDP Header
 
 The UDP header is 8 bytes. It is the smallest Layer 4 header in common use. Compare to TCP's minimum 20 bytes (and typically 32 bytes with options).
 
-```
-UDP HEADER (8 bytes)
+![The 8-byte UDP header drawn as two 32-bit rows: Source Port and Destination Port in the first row, Length and Checksum in the second, each field 16 bits wide.](./img/10/udp-header.svg)
 
-  0                   1                   2                   3
-  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |          Source Port          |       Destination Port        |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |            Length             |           Checksum            |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-
-  Field            Bytes   What It Does
-  ──────────────   ─────   ──────────────────────────────────────────
-  Source Port       2      The sender's port number. Identifies the
-                           sending process. Optional — can be 0 if
-                           no reply is expected.
-
-  Destination Port  2      The port the datagram is destined for.
-                           Identifies the receiving process.
-
-  Length            2      Total datagram length in bytes (header +
-                           payload). Minimum = 8 (header only, no data).
-                           Maximum = 65,535 bytes (theoretical, limited
-                           by IP packet size: at most 65,507 bytes of
-                           payload over IPv4 (65,535 − 20 − 8), and anything
-                           over the path MTU minus 28 is fragmented — or,
-                           with DF set, refused with EMSGSIZE).
-
-  Checksum          2      Integrity check over the header, payload,
-                           and a pseudo-header (src IP, dst IP, proto,
-                           length). Optional in IPv4 (can be 0).
-                           MANDATORY in IPv6 (RFC 8200; tunnel exceptions
-                           in RFC 6935). On the sending host a capture
-                           often shows "bad udp cksum": checksum offload,
-                           Module 3.
-```
+| Field            | Bytes | What it does |
+| ---------------- | ----- | ------------ |
+| Source Port      | 2     | The sender's port number. Identifies the sending process. Optional — can be 0 if no reply is expected. |
+| Destination Port | 2     | The port the datagram is destined for. Identifies the receiving process. |
+| Length           | 2     | Total datagram length in bytes (header + payload). Minimum = 8 (header only, no data). Maximum = 65,535 bytes (theoretical, limited by IP packet size: at most 65,507 bytes of payload over IPv4 (65,535 − 20 − 8), and anything over the path MTU minus 28 is fragmented — or, with DF set, refused with EMSGSIZE). |
+| Checksum         | 2     | Integrity check over the header, payload, and a pseudo-header (src IP, dst IP, proto, length). Optional in IPv4 (can be 0). MANDATORY in IPv6 (RFC 8200; tunnel exceptions in RFC 6935). On the sending host a capture often shows "bad udp cksum": checksum offload, Module 3. |
 
 ### UDP vs TCP — Side by Side
 
-```
-                              UDP                         TCP
-  ──────────────────────      ─────────────────────       ─────────────────────
-  Header size                 8 bytes                     20+ bytes (typ. 32)
-  Connection setup            None                        3-way handshake (1 RTT)
-  Reliability                 None                        Full (seq/ack/retransmit)
-  Ordering                    None                        Guaranteed
-  Flow control                None                        Receiver window (rwnd)
-  Congestion control          None                        Slow start, AIMD, BBR
-  Message boundaries          Preserved                   Stream (no boundaries)
-  State on server             None per client              Per-connection TCB
-  Latency penalty             Zero (send immediately)     1 RTT minimum (handshake)
-  Head-of-line blocking       None                        Yes (one lost segment
-                                                           blocks all behind it)
-  Error on closed port        ICMP Port Unreachable       TCP RST
-                              (seen only by connected
-                              sockets — see below)
-  Typical use                 DNS, DHCP, NTP, VoIP,       HTTP, SSH, SMTP,
-                              gaming, QUIC                 databases, file transfer
-```
+|                       | UDP                                                                 | TCP                                                  |
+| --------------------- | ------------------------------------------------------------------- | ---------------------------------------------------- |
+| Header size           | 8 bytes                                                             | 20+ bytes (typ. 32)                                  |
+| Connection setup      | None                                                                | 3-way handshake (1 RTT)                              |
+| Reliability           | None                                                                | Full (seq/ack/retransmit)                            |
+| Ordering              | None                                                                | Guaranteed                                           |
+| Flow control          | None                                                                | Receiver window (rwnd)                               |
+| Congestion control    | None                                                                | Slow start, AIMD, BBR                                |
+| Message boundaries    | Preserved                                                           | Stream (no boundaries)                               |
+| State on server       | None per client                                                     | Per-connection TCB                                   |
+| Latency penalty       | Zero (send immediately)                                             | 1 RTT minimum (handshake)                            |
+| Head-of-line blocking | None                                                                | Yes (one lost segment blocks all behind it)          |
+| Error on closed port  | ICMP Port Unreachable (seen only by connected sockets — see below)  | TCP RST                                              |
+| Typical use           | DNS, DHCP, NTP, VoIP, gaming, QUIC                                  | HTTP, SSH, SMTP, databases, file transfer            |
 
 ### Diagram: TCP vs UDP Communication
 
-```
-TCP — CONNECTION-ORIENTED (RELIABLE)
-
-  [Client]                    [Server]
-     │  SYN ─────────────────▶  │
-     │  ◀──────────── SYN-ACK  │     1 RTT before any data
-     │  ACK ─────────────────▶  │
-     │                          │
-     │  Data ────────────────▶  │     Data flows
-     │  ◀──────────────── ACK  │     Every segment acknowledged
-     │  Data ────────────────▶  │     Lost segment retransmitted
-     │  ◀──────────────── ACK  │     Ordering guaranteed
-     │                          │
-     │  FIN ─────────────────▶  │     Teardown
-     │  ◀──────────── FIN-ACK  │
-     │  ACK ─────────────────▶  │
-     │                          │
-
-  Minimum overhead: 1 RTT handshake + ACKs for every segment
-
-
-UDP — CONNECTIONLESS (UNRELIABLE)
-
-  [Client]                    [Server]
-     │                          │
-     │  Datagram ────────────▶  │     No handshake
-     │  ◀──────────── Reply    │     No ACK
-     │                          │     No retransmission
-     │  Datagram ────────────▶  │     No ordering
-     │     (lost) ─ ─ ─ ✗      │     Lost = gone forever
-     │                          │     (unless application re-sends)
-     │  Datagram ────────────▶  │
-     │  ◀──────────── Reply    │
-     │                          │
-
-  No transport handshake; still UDP/IP headers, socket state, and possible middlebox state
-```
+![Two ladder diagrams. TCP, connection-oriented and reliable: SYN, SYN-ACK and ACK take 1 RTT before any data, every data segment is acknowledged, lost segments are retransmitted, ordering is guaranteed, and FIN, FIN-ACK and ACK tear the connection down — minimum overhead is a 1 RTT handshake plus ACKs for every segment. UDP, connectionless and unreliable: datagrams and replies flow with no handshake, no ACK, no retransmission and no ordering, and a lost datagram is gone forever unless the application re-sends it.](./img/10/tcp-vs-udp-ladder.svg)
 
 ### How UDP Error Reporting Works
 
 UDP has no built-in error signaling. When a UDP datagram arrives at a host and no process is listening on the destination port, the host sends an **ICMP Port Unreachable** (Type 3, Code 3) message back to the sender. This is the only error signal available.
 
-```
-UDP ERROR: PORT UNREACHABLE
+![A client sends a UDP datagram to destination port 9999 on a server where no process listens on that port; the server replies with ICMP Type 3 Code 3, "Port 9999 unreachable".](./img/10/udp-port-unreachable.svg)
 
-  [Client]                              [Server — port 9999 not listening]
-     │                                       │
-     │  UDP datagram, dst port 9999   ──────▶│
-     │                                       │  No process on port 9999!
-     │  ◀── ICMP Type 3 Code 3 ─────────────│
-     │      "Port 9999 unreachable"          │
+Compare to TCP: TCP sends RST (Reset) when the port is closed. UDP relies on ICMP, which is a different protocol entirely.
 
-  Compare to TCP:
-  TCP sends RST (Reset) when the port is closed.
-  UDP relies on ICMP, which is a different protocol entirely.
+**Important:** if ICMP is blocked by a firewall, the sender NEVER learns that the port is closed. The datagram vanishes silently. This makes debugging UDP through firewalls significantly harder than TCP.
 
-  IMPORTANT: If ICMP is blocked by a firewall, the sender NEVER learns
-  that the port is closed. The datagram vanishes silently.
-  This makes debugging UDP through firewalls significantly harder than TCP.
-
-  EVEN WHEN THE ICMP ARRIVES, only some applications hear about it.
-  Linux delivers the error (as ECONNREFUSED on the next send or receive)
-  only to a CONNECTED UDP socket — one the application called connect()
-  on, as dig and most clients do. A server-style UNCONNECTED socket
-  (sendto/recvfrom) is never told; it just times out, unless it opts in
-  with IP_RECVERR. The lab shows both, side by side.
-```
+**Even when the ICMP arrives, only some applications hear about it.** Linux delivers the error (as ECONNREFUSED on the next send or receive) only to a CONNECTED UDP socket — one the application called connect() on, as dig and most clients do. A server-style UNCONNECTED socket (sendto/recvfrom) is never told; it just times out, unless it opts in with IP_RECVERR. The lab shows both, side by side.
 
 ### Production Relevance
 
@@ -201,135 +112,57 @@ The choice between UDP and TCP is not "fast vs reliable." It is about which trad
 
 ### Decision Framework
 
-```
-CHOOSE UDP WHEN:
+**Choose UDP when:**
 
-  1. Latency matters more than reliability
-     ──────────────────────────────────────
-     Voice/video calls: a dropped audio frame is inaudible.
-     A retransmitted frame arriving 200ms late causes a glitch.
-     Drop it and move on.
+1. **Latency matters more than reliability.**
+   - Voice/video calls: a dropped audio frame is inaudible. A retransmitted frame arriving 200ms late causes a glitch. Drop it and move on.
+   - Gaming: player position updates arrive 30-60 times/second. A missed update is corrected by the next one. Retransmission would cause stutter.
+2. **The interaction is request-response (query/reply).**
+   - DNS: one question, one answer. If it doesn't arrive, re-send the question. A new TCP connection for a single 100-byte exchange adds a full RTT (the handshake) and, in the lab, turns 2 packets into 10.
+   - DHCP: client doesn't even have an IP yet — cannot do a TCP handshake.
+3. **The application implements its own reliability.**
+   - QUIC: builds reliable, multiplexed streams on top of UDP. Gets the benefits of reliability without TCP's head-of-line blocking problem. One lost packet on one stream doesn't block other streams.
+   - TFTP: simple file transfer with its own ACK mechanism built on top of UDP.
+4. **Broadcast or multicast is needed.**
+   - TCP is point-to-point only. It cannot do broadcast or multicast. UDP supports both. Used by: service discovery (mDNS), streaming to multiple receivers (IPTV), DHCP.
+5. **Minimal server-side state is required.**
+   - Busy DNS servers answer hundreds of thousands of queries per second each. A TCP connection per query would cost a handshake, memory, and a file descriptor apiece. UDP requires no per-client state on the server (though firewalls and NATs on the path still keep some).
 
-     Gaming: player position updates arrive 30-60 times/second.
-     A missed update is corrected by the next one. Retransmission
-     would cause stutter.
+Whatever you choose, a UDP application owns what TCP would have done for it: timeouts, retries with backoff, pacing, and some response to congestion (RFC 8085 is the guide). The lab measures what retries buy.
 
-  2. The interaction is request-response (query/reply)
-     ─────────────────────────────────────────────────
-     DNS: one question, one answer. If it doesn't arrive,
-     re-send the question. A new TCP connection for a single
-     100-byte exchange adds a full RTT (the handshake) and, in the
-     lab, turns 2 packets into 10.
+**Choose TCP when:**
 
-     DHCP: client doesn't even have an IP yet — cannot do
-     a TCP handshake.
-
-  3. The application implements its own reliability
-     ──────────────────────────────────────────────
-     QUIC: builds reliable, multiplexed streams on top of UDP.
-     Gets the benefits of reliability without TCP's head-of-line
-     blocking problem. One lost packet on one stream doesn't
-     block other streams.
-
-     TFTP: simple file transfer with its own ACK mechanism
-     built on top of UDP.
-
-  4. Broadcast or multicast is needed
-     ──────────────────────────────────
-     TCP is point-to-point only. It cannot do broadcast or multicast.
-     UDP supports both. Used by: service discovery (mDNS),
-     streaming to multiple receivers (IPTV), DHCP.
-
-  5. Minimal server-side state is required
-     ──────────────────────────────────────
-     Busy DNS servers answer hundreds of thousands of queries per
-     second each. A TCP connection per query would cost a handshake,
-     memory, and a file descriptor apiece. UDP requires no per-client
-     state on the server (though firewalls and NATs on the path still
-     keep some).
-
-
-WHATEVER YOU CHOOSE, a UDP application owns what TCP would have done
-for it: timeouts, retries with backoff, pacing, and some response to
-congestion (RFC 8085 is the guide). The lab measures what retries buy.
-
-CHOOSE TCP WHEN:
-
-  1. Every byte must arrive, in order, exactly once
-     (file transfer, web pages, database queries, email)
-
-  2. The session is long-lived
-     (SSH, database connections, HTTP keep-alive)
-
-  3. Flow control is needed
-     (large transfers where the receiver may be slower than sender)
-
-  4. Congestion control is needed
-     (bulk transfers that should share bandwidth fairly)
-```
+1. Every byte must arrive, in order, exactly once (file transfer, web pages, database queries, email)
+2. The session is long-lived (SSH, database connections, HTTP keep-alive)
+3. Flow control is needed (large transfers where the receiver may be slower than sender)
+4. Congestion control is needed (bulk transfers that should share bandwidth fairly)
 
 ### QUIC — Reliability on Top of UDP
 
 QUIC (RFC 9000) is the most significant evolution of UDP in production networking. It was developed by Google and standardized by the IETF. HTTP/3 runs exclusively over QUIC.
 
-```
-QUIC — WHAT IT IS AND WHY IT USES UDP
+**The problem with TCP for HTTP.** HTTP/2 multiplexes many streams over one TCP connection. If ONE TCP segment is lost, ALL streams are blocked until it's retransmitted. This is TCP head-of-line blocking.
 
-  The Problem with TCP for HTTP:
-  ──────────────────────────────
-  HTTP/2 multiplexes many streams over one TCP connection.
-  If ONE TCP segment is lost, ALL streams are blocked until
-  it's retransmitted. This is TCP head-of-line blocking.
+**QUIC's solution.** QUIC runs over UDP. It implements its own reliability per-stream. If a packet for Stream 1 is lost, only Stream 1 waits for retransmission. Streams 2 and 3 continue unaffected.
 
-  ┌─ HTTP/2 over TCP ───────────────────────────────────────┐
-  │  Stream 1: ████████████████████                         │
-  │  Stream 2: ██████████ ← BLOCKED (waiting for Stream 1  │
-  │  Stream 3: ██████████    retransmission)                │
-  │                    ↑                                    │
-  │              Lost TCP segment affects ALL streams       │
-  └─────────────────────────────────────────────────────────┘
+![Head-of-line blocking compared. HTTP/2 over TCP: a lost TCP segment on stream 1 leaves streams 2 and 3 blocked, waiting for stream 1's retransmission — the lost segment affects all streams. HTTP/3 over QUIC over UDP: only stream 1 waits while its packet is retransmitted, and streams 2 and 3 continue unblocked.](./img/10/quic-hol-blocking.svg)
 
+**Why UDP and not a new protocol?** Deploying a new transport protocol on the internet is nearly impossible. Middleboxes (firewalls, NATs, load balancers) only understand TCP and UDP. A new protocol number would be dropped by most networks. By using UDP as the carrier, QUIC works through existing infrastructure.
 
-  QUIC's Solution:
-  ─────────────────
-  QUIC runs over UDP. It implements its own reliability per-stream.
-  If a packet for Stream 1 is lost, only Stream 1 waits for retransmission.
-  Streams 2 and 3 continue unaffected.
+QUIC provides (on top of UDP):
 
-  ┌─ HTTP/3 over QUIC over UDP ─────────────────────────────┐
-  │  Stream 1: ██████████ ← retransmitting, only this waits │
-  │  Stream 2: ████████████████████████ ← unblocked         │
-  │  Stream 3: ████████████████████████ ← unblocked         │
-  │                                                         │
-  │  Loss on one stream does NOT block others               │
-  └─────────────────────────────────────────────────────────┘
+- ✓ Reliable, ordered delivery per stream
+- ✓ Multiplexed streams without head-of-line blocking
+- ✓ 1-RTT handshake for transport + TLS together (TCP + TLS 1.3 needs 2)
+- ✓ Optional 0-RTT resumption with prior state, if the server accepts it
+- ✓ Built-in TLS 1.3 encryption (always encrypted, no option to run without)
+- ✓ Connection migration (survives IP address changes — mobile networks)
 
+What this means for troubleshooting:
 
-  Why UDP and not a new protocol?
-  ─────────────────────────────
-  Deploying a new transport protocol on the internet is nearly impossible.
-  Middleboxes (firewalls, NATs, load balancers) only understand TCP and UDP.
-  A new protocol number would be dropped by most networks.
-  By using UDP as the carrier, QUIC works through existing infrastructure.
-
-  QUIC provides (on top of UDP):
-  ✓ Reliable, ordered delivery per stream
-  ✓ Multiplexed streams without head-of-line blocking
-  ✓ 1-RTT handshake for transport + TLS together (TCP + TLS 1.3 needs 2)
-  ✓ Optional 0-RTT resumption with prior state, if the server accepts it
-  ✓ Built-in TLS 1.3 encryption (always encrypted, no option to run without)
-  ✓ Connection migration (survives IP address changes — mobile networks)
-
-  What this means for troubleshooting:
-  - QUIC is encrypted end to end, headers included; a capture shows
-    UDP to port 443 and little else. Use SSLKEYLOGFILE (Module 2) to
-    decrypt your own client's traffic.
-  - Networks that block or rate-limit UDP 443 do not break the web —
-    browsers fall back to TCP (HTTP/2) — but they do make HTTP/3 look
-    "flaky". Check whether UDP 443 is allowed before blaming the server.
-  - Clients learn that a server supports HTTP/3 from an `Alt-Svc`
-    header (or DNS HTTPS records) on an earlier TCP connection.
-```
+- QUIC is encrypted end to end, headers included; a capture shows UDP to port 443 and little else. Use SSLKEYLOGFILE (Module 2) to decrypt your own client's traffic.
+- Networks that block or rate-limit UDP 443 do not break the web — browsers fall back to TCP (HTTP/2) — but they do make HTTP/3 look "flaky". Check whether UDP 443 is allowed before blaming the server.
+- Clients learn that a server supports HTTP/3 from an `Alt-Svc` header (or DNS HTTPS records) on an earlier TCP connection.
 
 ---
 
@@ -339,154 +172,64 @@ QUIC — WHAT IT IS AND WHY IT USES UDP
 
 DNS is the most common UDP protocol you will encounter in production.
 
-```
-DNS OVER UDP
+![DNS over UDP: for the question "What is the A record for api.lab.test?", the client sends a query from UDP port 52431 to port 53 on the resolver, and the resolver answers from port 53 to port 52431 with 192.0.2.10 — one packet out, one packet back, no handshake, one RTT.](./img/10/dns-over-udp.svg)
 
-  Client query:   "What is the A record for api.lab.test?"
-  Server response: "api.lab.test → 192.0.2.10"
+With a new TCP connection, the same query requires: SYN → SYN-ACK → ACK → Query → Response → FIN … — 10 packets in the lab, and 2 RTTs before the answer (one extra RTT for the handshake).
 
-  [Client]                        [DNS Resolver]
-     │                                │
-     │  UDP src=52431, dst=53         │
-     │  DNS Query: A example.com      │
-     │───────────────────────────────▶│
-     │                                │
-     │  UDP src=53, dst=52431         │
-     │  DNS Response: 192.0.2.10      │
-     │◀───────────────────────────────│
+**When DNS uses TCP instead:**
 
-  One packet out, one packet back. No handshake. One RTT.
-
-  With a new TCP connection, the same query requires:
-  SYN → SYN-ACK → ACK → Query → Response → FIN … — 10 packets in the
-  lab, and 2 RTTs before the answer (one extra RTT for the handshake).
-
-
-  WHEN DNS USES TCP INSTEAD:
-  ─────────────────────────
-  1. Response is larger than 512 bytes (original limit) or
-    larger than the advertised EDNS payload limit (inspect it; 1232 is common
-    since DNS Flag Day 2020)
-     → Server sets the TC (Truncated) bit in the UDP response
-     → Client retries the query over TCP
-     → If TCP/53 is blocked, large answers fail while small ones work —
-       the lab's 737-byte TXT record shows the retry
-
-  2. AXFR uses TCP; a sufficiently small IXFR response can use UDP
-     (transferring the entire DNS zone between servers)
-
-  3. DNS over TLS (DoT) — TCP port 853; DNS over HTTPS (DoH) — HTTPS on
-     443 (TCP or QUIC); DNS over QUIC (DoQ) — UDP port 853
-
-  4. Some resolvers use TCP proactively, or after repeated UDP failures
-```
+1. Response is larger than 512 bytes (original limit) or larger than the advertised EDNS payload limit (inspect it; 1232 is common since DNS Flag Day 2020)
+   - Server sets the TC (Truncated) bit in the UDP response
+   - Client retries the query over TCP
+   - If TCP/53 is blocked, large answers fail while small ones work — the lab's 737-byte TXT record shows the retry
+2. AXFR uses TCP; a sufficiently small IXFR response can use UDP (transferring the entire DNS zone between servers)
+3. DNS over TLS (DoT) — TCP port 853; DNS over HTTPS (DoH) — HTTPS on 443 (TCP or QUIC); DNS over QUIC (DoQ) — UDP port 853
+4. Some resolvers use TCP proactively, or after repeated UDP failures
 
 ### DHCP — Ports 67 (Server) / 68 (Client)
 
-```
-DHCP — WHY IT MUST USE UDP
+A host running DHCP does not yet have an IP address. It cannot establish a TCP connection (TCP requires an IP). DHCP uses UDP broadcast to discover servers:
 
-  A host running DHCP does not yet have an IP address.
-  It cannot establish a TCP connection (TCP requires an IP).
-  DHCP uses UDP broadcast to discover servers:
+![The DHCP DORA exchange between a client at 0.0.0.0 port 68 and a DHCP server on port 67: the client broadcasts a Discover to 255.255.255.255 ("I need an IP"), the server sends an Offer of 10.0.1.50 by broadcast or unicast, the client broadcasts a Request ("I'll take 10.0.1.50"), and the server confirms with an Acknowledge by broadcast or unicast.](./img/10/dhcp-dora.svg)
 
-  DORA Process (Discover-Offer-Request-Acknowledge):
-
-  [Client 0.0.0.0:68]                    [DHCP Server x.x.x.x:67]
-     │                                        │
-     │  UDP Broadcast (255.255.255.255)       │
-     │  DHCP Discover: "I need an IP"          │
-     │────────────────────────────────────────▶│
-     │                                        │
-     │  UDP (Broadcast or Unicast)            │
-     │  DHCP Offer: "Here's 10.0.1.50"       │
-     │◀────────────────────────────────────────│
-     │                                        │
-     │  UDP Broadcast                         │
-     │  DHCP Request: "I'll take 10.0.1.50"  │
-     │────────────────────────────────────────▶│
-     │                                        │
-     │  UDP (Broadcast or Unicast)            │
-     │  DHCP Acknowledge: "Confirmed"         │
-     │◀────────────────────────────────────────│
-
-  Client src: 0.0.0.0 (has no IP yet)
-  Client dst: 255.255.255.255 (broadcast — doesn't know server IP)
-  TCP cannot work here — no IP address to establish a connection with.
-```
+- Client src: 0.0.0.0 (has no IP yet)
+- Client dst: 255.255.255.255 (broadcast — doesn't know server IP)
+- TCP cannot work here — no IP address to establish a connection with.
 
 ### NTP — Port 123
 
-```
-NTP — TIME SYNCHRONIZATION
+Accurate time is critical for:
 
-  Accurate time is critical for:
-  - TLS certificate validation (expired cert = wrong clock)
-  - Kerberos authentication (max 5-minute clock skew)
-  - Distributed databases (transaction ordering)
-  - Log correlation across multiple servers
+- TLS certificate validation (expired cert = wrong clock)
+- Kerberos authentication (max 5-minute clock skew)
+- Distributed databases (transaction ordering)
+- Log correlation across multiple servers
 
-  NTP uses UDP because:
-  - Request/response is a single small packet each
-  - Time accuracy requires minimal, predictable latency
-  - TCP handshake would add RTT to every measurement
-  - NTP packet: 48 bytes — TCP overhead would double the size
+NTP uses UDP because:
 
-  [Client]                    [NTP Server]
-     │  UDP dst=123            │
-     │  "What time is it?"     │
-     │────────────────────────▶│
-     │                         │
-     │  UDP src=123            │
-     │  Timestamps + offset    │
-     │◀────────────────────────│
+- Request/response is a single small packet each
+- Time accuracy requires minimal, predictable latency
+- TCP handshake would add RTT to every measurement
+- NTP packet: 48 bytes — TCP overhead would double the size
 
-  NTP measures the round-trip time and uses it to calculate
-  the clock offset, correcting for network delay.
-```
+![An NTP exchange: the client sends a UDP datagram to port 123 asking "What time is it?", and the NTP server replies from port 123 with timestamps and offset.](./img/10/ntp-exchange.svg)
+
+NTP measures the round-trip time and uses it to calculate the clock offset, correcting for network delay.
 
 ### Other UDP Protocols
 
-```
-PROTOCOL    PORT      WHAT IT DOES                      WHY UDP
-──────────  ────      ────────────────────────────────  ─────────────────────
-SNMP        161/162   Network management: polling        Simple request/response.
-                      device stats, receiving traps       High query volume.
-
-Syslog      514       Log forwarding between hosts       Fire and forget.
-                                                          Some loss acceptable.
-
-TFTP        69        Trivial File Transfer. Simple       Lock-step ACKs (one block
-                      firmware loading for network         in flight), so it is slow
-                      devices; PXE boot.                   over long RTTs; tiny client.
-
-RTP         Dynamic   Real-Time Transport. Audio/video    Latency-critical.
-                      streaming (VoIP, video calls).       Loss tolerable.
-
-WireGuard   51820     VPN tunnel. Encapsulates            Tunnelling TCP inside
-                      encrypted packets.                   TCP fights two sets of
-                                                           retransmissions; UDP
-                                                           leaves that to the inner
-                                                           protocol.
-
-QUIC        443       Modern transport for HTTP/3.        Builds own reliability.
-                      Multiplexed, encrypted streams.      Avoids TCP HOL blocking.
-
-mDNS        5353      Multicast DNS. Local service        Multicast requires UDP.
-                      discovery (.local domains).          TCP is point-to-point only.
-
-VXLAN       4789      Virtual Extensible LAN.             Encapsulation protocol
-                      Overlay network tunneling.           for network virtualization.
-                      (Linux's legacy default and
-                      flannel use 8472 — check which
-                      port your firewall must allow.)
-
-IPsec NAT-T 4500      ESP wrapped in UDP to cross NAT.    NAT devices cannot track
-                      Cloud site-to-site VPNs use it.     raw ESP (protocol 50).
-
-Geneve      6081      Overlay encapsulation (AWS GWLB,     Same reasons as VXLAN.
-                      OVN, some CNIs).
-```
+| Protocol    | Port     | What it does | Why UDP |
+| ----------- | -------- | ------------ | ------- |
+| SNMP        | 161/162  | Network management: polling device stats, receiving traps | Simple request/response. High query volume. |
+| Syslog      | 514      | Log forwarding between hosts | Fire and forget. Some loss acceptable. |
+| TFTP        | 69       | Trivial File Transfer. Simple firmware loading for network devices; PXE boot. | Lock-step ACKs (one block in flight), so it is slow over long RTTs; tiny client. |
+| RTP         | Dynamic  | Real-Time Transport. Audio/video streaming (VoIP, video calls). | Latency-critical. Loss tolerable. |
+| WireGuard   | 51820    | VPN tunnel. Encapsulates encrypted packets. | Tunnelling TCP inside TCP fights two sets of retransmissions; UDP leaves that to the inner protocol. |
+| QUIC        | 443      | Modern transport for HTTP/3. Multiplexed, encrypted streams. | Builds own reliability. Avoids TCP HOL blocking. |
+| mDNS        | 5353     | Multicast DNS. Local service discovery (.local domains). | Multicast requires UDP. TCP is point-to-point only. |
+| VXLAN       | 4789     | Virtual Extensible LAN. Overlay network tunneling. (Linux's legacy default and flannel use 8472 — check which port your firewall must allow.) | Encapsulation protocol for network virtualization. |
+| IPsec NAT-T | 4500     | ESP wrapped in UDP to cross NAT. Cloud site-to-site VPNs use it. | NAT devices cannot track raw ESP (protocol 50). |
+| Geneve      | 6081     | Overlay encapsulation (AWS GWLB, OVN, some CNIs). | Same reasons as VXLAN. |
 
 ---
 
@@ -515,11 +258,7 @@ The lab uses [`udplab`](../labs/go/cmd/udplab), a small Go tool written for it: 
 
 [`udp.json`](../labs/netlab/udp.json):
 
-```
-  client 198.18.40.10 ── fw (stateful: allows replies, drops anything else inbound) ── server 198.18.41.10
-                                                                                       dnsmasq :53 (api.lab.test, big.lab.test TXT)
-                                                                                       udplab echo :9999, slow echo :9998 (replies after 8 s)
-```
+![The UDP lab: the client at 198.18.40.10 reaches the server at 198.18.41.10 through fw, a stateful firewall that allows replies and drops anything else inbound. The server runs dnsmasq on port 53 (api.lab.test and a big.lab.test TXT record), udplab echo on port 9999, and a slow echo on port 9998 that replies after 8 s.](./img/10/udp-lab-topology.svg)
 
 ```bash
 cd labs/go

@@ -49,45 +49,7 @@ The categories you will encounter in practice:
 
 ### Diagram
 
-```
-NETWORK SCOPE
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │  LAN                                                        │
-  │  ┌──────┐  ┌──────┐  ┌──────┐                              │
-  │  │  PC  │  │  PC  │  │Server│  — sub-ms latency            │
-  │  └──┬───┘  └──┬───┘  └──┬───┘    1–100 Gbps               │
-  │     └─────────┴──────────┘        You own everything        │
-  │              │                                              │
-  └──────────────┼──────────────────────────────────────────────┘
-                 │ Router / Gateway
-  ┌──────────────┼──────────────────────────────────────────────┐
-  │  WAN         │                                              │
-  │    [Your Site] ──── [Carrier Network] ──── [Remote Site]   │
-  │                                                             │
-  │    You own endpoints. Carrier owns the middle.              │
-  │    10ms–100ms latency. Carrier SLA for uptime.              │
-  └─────────────────────────────────────────────────────────────┘
-                 │
-  ┌──────────────┼──────────────────────────────────────────────┐
-  │  Internet    │                                              │
-  │   Multiple autonomous systems connected via BGP             │
-  │   No single owner. Variable latency and reliability.        │
-  │   [AS1] ── [IXP] ── [AS2] ── [CDN] ── [AS3: Cloud]        │
-  └─────────────────────────────────────────────────────────────┘
-                 │
-  ┌──────────────┼──────────────────────────────────────────────┐
-  │  Cloud VPC   │                                              │
-  │   Software-defined. Physical layer invisible to you.        │
-  │   ┌─────────────────────────────────────────────────┐      │
-  │   │  VPC: 10.0.0.0/16                               │      │
-  │   │  ┌──────────────┐    ┌──────────────┐           │      │
-  │   │  │ Subnet A     │    │ Subnet B     │           │      │
-  │   │  │ 10.0.1.0/24  │    │ 10.0.2.0/24  │           │      │
-  │   │  └──────────────┘    └──────────────┘           │      │
-  │   └─────────────────────────────────────────────────┘      │
-  └─────────────────────────────────────────────────────────────┘
-```
+![Four network scopes: a LAN of PCs and a server with sub-millisecond latency that you own; a WAN joining your site to a remote site across a carrier network at 10 to 100 ms; the internet, many autonomous systems connected via BGP with no single owner; and a software-defined cloud VPC such as 10.0.0.0/16 with subnets 10.0.1.0/24 and 10.0.2.0/24.](./img/03/network-scope.svg)
 
 ### What You Will See in Production
 
@@ -117,41 +79,9 @@ You will not design topologies often. You will diagnose them often. Understandin
 
 ### Diagram
 
-```
-BUS (historical — early Ethernet)
-  ───[A]───[B]───[C]───[D]───
-  Break here → splits network. Collision domain: everyone.
+![Bus, ring and star topologies: on a bus a break anywhere splits the network and everyone shares a collision domain; a dual ring survives one broken link by sending traffic the other way; in a star every device connects to a switch, so a switch failure takes down all devices and a device failure affects only that device.](./img/03/topologies.svg)
 
-
-RING (SONET, FDDI — rare now)
-  [A]──[B]
-   │    │
-  [D]──[C]
-  Break in one link → traffic takes reverse path (if dual-ring)
-
-
-STAR (modern Ethernet — what you use every day)
-         [Switch]
-       /   |  |   \
-     [A]  [B] [C]  [D]
-
-  Switch failure → all devices lose connectivity
-  Individual device failure → only that device affected
-  Common office LAN pattern; cloud subnets are provider abstractions
-
-
-SPINE-LEAF (data center — modern)
-  Spine 1: connected to Leaf1, Leaf2, Leaf3, Leaf4
-  Spine 2: connected to Leaf1, Leaf2, Leaf3, Leaf4
-  Leaf1 -> servers   Leaf2 -> servers
-  Leaf3 -> servers   Leaf4 -> servers
-  No spine-to-spine link is required in this two-tier fabric.
-
-  Same-leaf traffic traverses one switch; cross-leaf traffic traverses
-  leaf -> spine -> leaf (three switches, two inter-switch links).
-  Lose a spine: traffic re-routes through remaining spine.
-  Lose a leaf: only that rack is affected.
-```
+![A spine-leaf fabric: two spines each connect to all four leaves, each leaf serves a rack of servers, and there is no spine-to-spine link; cross-leaf traffic crosses leaf, spine and leaf, losing a spine re-routes through the other, and losing a leaf affects only its rack.](./img/03/spine-leaf.svg)
 
 ### What You Will See in Production
 
@@ -180,46 +110,9 @@ These three terms are used interchangeably in incident reports and they should n
 
 ### Diagram
 
-```
-BANDWIDTH vs LATENCY vs THROUGHPUT
+![On a 1,000 Mbit/s link the best single TCP flow gets 941 Mbit/s of goodput, because each 1,538 bytes on the wire carry 1,448 payload bytes; a real path measures lower when the window is below the bandwidth-delay product, packets are lost, another flow shares the bottleneck, or the host cannot keep up.](./img/03/bandwidth-goodput.svg)
 
-  Link capacity:
-  ══════════════════════════════════════════ 1,000 Mbit/s (bandwidth)
-
-  Best possible single TCP flow, perfect link:
-  ═══════════════════════════════════════    941 Mbit/s goodput
-                                        ↑
-                          Ethernet framing, IP and TCP headers:
-                          1,448 payload bytes per 1,538 on the wire
-
-  What you measure on a real path is lower again when:
-  - the TCP window is smaller than bandwidth × RTT (BDP, below)
-  - packets are lost, so TCP retransmits and slows down
-  - another flow shares the bottleneck
-  - the application, CPU, or disk can't keep up
-
-
-BANDWIDTH-DELAY PRODUCT — why high latency limits throughput
-
-  Data in flight needed to fill a path at the chosen rate and RTT:
-
-    BDP = Bandwidth × Round-Trip Time
-
-  Example:
-    Link: 1 Gbps = 125 MB/s
-    RTT: 100ms = 0.1s
-    Target in-flight: 125 MB/s × 0.1s = 12.5 MB = 12,500 KB
-
-  If TCP window size is smaller than 12.5 MB,
-  TCP must pause and wait for ACKs before sending more.
-  The link sits idle. Throughput is limited by window, not bandwidth.
-
-  The cap works the other way too: maximum throughput = window / RTT.
-  A 4 MB window over a 100 ms path caps one flow at
-    4 MB × 8 / 0.1 s = 320 Mbit/s
-  however fast the link is. The same window over a 2 ms path allows
-  16 Gbit/s. Distance, not link speed, sets the ceiling.
-```
+![The bandwidth-delay product is bandwidth times round-trip time: a 1 Gbps path with 100 ms RTT needs 12.5 MB in flight, so a smaller window leaves the link idle; in reverse, a 4 MB window caps one flow at 320 Mbit/s over 100 ms but allows 16 Gbit/s over 2 ms.](./img/03/bdp.svg)
 
 ### What You Will See in Production
 
@@ -346,44 +239,7 @@ These three words are used interchangeably in casual conversation and that cause
 
 ### Diagram
 
-```
-THE SAME DATA AT EACH LAYER
-
-Application sends:  GET /index.html HTTP/1.1\r\nHost: example.com\r\n\r\n
-
-Layer 7 — Message:
-┌──────────────────────────────────────────────────────┐
-│  HTTP Request: GET /index.html HTTP/1.1              │
-│  Host: example.com                                   │
-└──────────────────────────────────────────────────────┘
-
-Layer 4 — Segment (TCP wraps the HTTP message):
-┌─────────────────────┬────────────────────────────────┐
-│  TCP Header         │  HTTP Request                  │
-│  Src: 54321         │  GET /index.html HTTP/1.1      │
-│  Dst: 443           │  Host: example.com             │
-│  Seq: 1001  Ack: 1  │                                │
-└─────────────────────┴────────────────────────────────┘
-
-Layer 3 — Packet (IP wraps the TCP segment):
-┌────────────────┬─────────────────────┬────────────────┐
-│  IP Header     │  TCP Header         │  HTTP Request  │
-│  Src: 10.0.0.5 │  Src: 54321         │  GET /...      │
-│  Dst: 203.0.113│  Dst: 443           │                │
-│  TTL: 64       │  Seq: 1001          │                │
-│  Proto: 6(TCP) │                     │                │
-└────────────────┴─────────────────────┴────────────────┘
-
-Layer 2 — Frame (Ethernet wraps the IP packet):
-┌──────────────┬────────────┬─────────────────────┬────────────────┬──────┐
-│  Eth Header  │  IP Header │  TCP Header         │  HTTP Request  │  CRC │
-│  Src MAC     │  Src IP    │  Src Port           │  GET /...      │      │
-│  Dst MAC     │  Dst IP    │  Dst Port           │                │      │
-│  Type: 0x0800│            │                     │                │      │
-└──────────────┴────────────┴─────────────────────┴────────────────┴──────┘
-
-                                                       Sent on the wire →
-```
+![The same HTTP request at each layer: a layer 7 message, wrapped by a TCP header with ports and sequence numbers into a layer 4 segment, wrapped by an IP header with addresses, TTL and protocol into a layer 3 packet, wrapped by an Ethernet header with MACs and type 0x0800 and a trailing CRC into the layer 2 frame sent on the wire.](./img/03/encapsulation.svg)
 
 ### What You Will See in Production
 
@@ -426,47 +282,9 @@ eligible ports in that VLAN except ingress. A response is not required for learn
 
 ### Diagram
 
-```
-MAC ADDRESS STRUCTURE
+![A MAC address such as 00:1a:2b:3c:4d:5e splits into a 3-byte OUI that names the manufacturer and a 3-byte device ID, with common prefixes for VMware, Hyper-V, QEMU/KVM, older Docker and broadcast.](./img/03/mac-address.svg)
 
-  00:1a:2b : 3c:4d:5e
-  ─────────   ─────────
-  OUI         Device ID
-  (Manufacturer)  (Unique per device)
-
-  Prefixes you will meet:
-  00:0c:29, 00:50:56   VMware (IEEE OUIs)
-  00:15:5d             Microsoft Hyper-V (IEEE OUI)
-  52:54:00             QEMU/KVM default — locally administered (bit 1 set)
-  02:42:…              common on older Docker — locally administered
-  ff:ff:ff:ff:ff:ff    broadcast (bit 0 set)
-
-
-SWITCH FORWARDING — how a switch uses MAC addresses
-
-  CAM Table (Content Addressable Memory):
-  ┌──────────────────┬──────┬──────────┐
-  │ MAC Address      │ Port │ Age      │
-  ├──────────────────┼──────┼──────────┤
-  │ 00:1a:2b:3c:4d:5e│  1   │  120s    │
-  │ 00:1a:2b:3c:4d:6f│  2   │   45s    │
-  │ 00:1a:2b:3c:4d:7a│  4   │    5s    │
-  └──────────────────┴──────┴──────────┘
-
-  Frame arrives destined for 00:1a:2b:3c:4d:6f
-  → Switch looks up MAC in CAM table
-  → Found on Port 2
-  → Forward ONLY to Port 2
-
-  Frame arrives destined for 00:1a:2b:3c:4d:99 (unknown)
-  → Not in CAM table
-  → Flood to ALL ports except the one it arrived on
-  → Learn source MACs on arriving frames, including any later response
-
-  Entries expire if the MAC isn't seen again: Linux bridges default to
-  300 s (ageing_time). A moved device is unreachable at its old port
-  until it sends a frame from the new one, or the entry ages out.
-```
+![A switch CAM table maps MAC addresses to ports with an age; a frame for a known MAC is forwarded only to its port, a frame for an unknown MAC is flooded to every port except the ingress port, and entries age out, after 300 s by default on Linux bridges.](./img/03/switch-cam-table.svg)
 
 ### What You Will See in Production
 
@@ -585,55 +403,9 @@ A switch with routing capability built in. Common in data center environments wh
 
 ### Diagram
 
-```
-HUB — Layer 1, no intelligence
+![A hub copies a frame from A to every other device, so C and D receive it and everyone shares one collision domain; a switch looks up the destination MAC in its CAM table and forwards the frame from A on port 1 only to B on port 2, so C and D see nothing.](./img/03/hub-switch.svg)
 
-  [A sends a frame to B]
-
-       [A]──────[HUB]──────[B]
-                  │
-                 [C]  ← Also receives the frame. Cannot send simultaneously.
-                  │
-                 [D]  ← Also receives the frame.
-
-  Collision domain = every device on the hub.
-
-
-SWITCH — Layer 2, MAC-based forwarding
-
-  [A: MAC aa:aa] sends frame to [B: MAC bb:bb]
-
-       [A]──[Port 1]                [Port 2]──[B]
-                   ╲              ╱
-                    [   SWITCH   ]
-                   ╱              ╲
-       [C]──[Port 3]                [Port 4]──[D]
-
-  Switch looks up bb:bb → Port 2
-  Forwards ONLY to Port 2
-  C and D see nothing.
-
-  CAM Table: aa:aa→Port1, bb:bb→Port2, ...
-
-
-ROUTER — Layer 3, IP-based forwarding
-
-  Network A: 10.0.1.0/24        Network B: 10.0.2.0/24
-
-  [10.0.1.5] ──── [Switch A] ──── [ROUTER] ──── [Switch B] ──── [10.0.2.7]
-                                     │
-                              Routing Table:
-                              10.0.1.0/24 → eth0
-                              10.0.2.0/24 → eth1
-                              0.0.0.0/0   → 203.0.113.1 (internet)
-
-  Packet from 10.0.1.5 to 10.0.2.7:
-  1. Arrives at router's eth0
-  2. Router reads destination: 10.0.2.7
-  3. Routing table: 10.0.2.0/24 → eth1
-  4. Router decrements TTL
-  5. Router forwards out eth1 toward 10.0.2.7
-```
+![A router joins network 10.0.1.0/24 on eth0 and network 10.0.2.0/24 on eth1, with a default route to 203.0.113.1; a packet from 10.0.1.5 to 10.0.2.7 arrives on eth0, matches 10.0.2.0/24, has its TTL decremented, and leaves on eth1.](./img/03/router-forwarding.svg)
 
 ### What You Will See in Production
 
@@ -663,17 +435,7 @@ it sends neighbours to the gateway.
 A packet crossing two routers keeps its IP addresses, but the Ethernet header is
 rebuilt on every link:
 
-```
-HOST A (10.0.1.5) → ROUTER → HOST B (10.0.2.7), as seen in captures on each link
-
-  Link 1: A → router eth0             Link 2: router eth1 → B
-  ─────────────────────────────       ─────────────────────────────
-  Eth src: A's MAC                    Eth src: router eth1's MAC    ← rewritten
-  Eth dst: router eth0's MAC          Eth dst: B's MAC              ← rewritten
-  IP  src: 10.0.1.5                   IP  src: 10.0.1.5             ← unchanged
-  IP  dst: 10.0.2.7                   IP  dst: 10.0.2.7             ← unchanged
-  TTL:     64                         TTL:     63                   ← decremented
-```
+![A packet from host A at 10.0.1.5 to host B at 10.0.2.7 through a router: on each link the Ethernet source and destination MACs are rewritten, the IP source and destination stay the same, and the TTL drops from 64 to 63.](./img/03/hop-rewrite.svg)
 
 This is how to read captures taken at different points of a path. Matching MACs
 tell you which device sent a frame onto *this* link; matching IPs, ports, and TCP
@@ -727,27 +489,9 @@ userspace daemons implement RSTP and MSTP.
 
 ### Diagram
 
-```
-VLAN-AWARE SWITCH (this module's vlan lab)
+![The vlan lab's bridge br0 with VLAN filtering has a tagged VLAN 10 port, an access port with PVID 10 and another port with PVID 20; the two hosts in VLAN 10 reach each other, while the host in VLAN 20 is unreachable even though it is in the same subnet.](./img/03/vlan-lab.svg)
 
-               ┌───────────── br0 (vlan_filtering) ─────────────┐
-               │  port "tagged"     port "access"    port "other"│
-               │  VLAN 10 tagged    VLAN 10 PVID     VLAN 20 PVID │
-               └──────┬──────────────────┬────────────────┬───────┘
-                      │ 802.1Q tag 10    │ untagged       │ untagged
-                 [eth0.10]            [eth0]           [eth0]
-                10.42.10.1          10.42.10.2       10.42.10.3
-                      └──── same VLAN: OK ┘           └ same subnet, other VLAN:
-                                                        unreachable
-
-TWO SWITCHES, TWO LINKS (this module's stp lab)
-
-  [hosta]──[left br0]══path1══[right br0]──[hostb]
-                 ║                ║
-                 ╚═════path2══════╝   one port on path2 BLOCKING: no loop
-
-  Break path1 → after listening + learning, path2 forwards
-```
+![The stp lab joins two bridges with two links, path1 and path2; STP blocks one port on path2 so there is no loop, and if path1 breaks, path2 forwards after the listening and learning states.](./img/03/stp-lab.svg)
 
 ### What You Will See in Production
 
@@ -813,12 +557,10 @@ from 1500:
 *Captured* in a namespace lab while writing this module: an `iperf3` transfer
 between two veth interfaces with MTU 1500, with tcpdump on the sender.
 
-```
-                            segment sizes tcpdump saw        throughput
-  offloads on (default)     286 × 65,160 bytes, a few small   14.3 Gbit/s
-  ethtool -K v1 tso off     395 × 1,448 bytes                  6.8 Gbit/s
-              gso off
-```
+| | Segment sizes tcpdump saw | Throughput |
+| --- | --- | --- |
+| Offloads on (default) | 286 × 65,160 bytes, a few small | 14.3 Gbit/s |
+| `ethtool -K v1 tso off gso off` | 395 × 1,448 bytes | 6.8 Gbit/s |
 
 With offloads on, the sender's capture showed segments 43 times larger than the
 MTU, and nothing was wrong. With them off, every full segment was exactly 1,448
@@ -851,48 +593,9 @@ The problem: if the ICMP Fragmentation Needed message is blocked by a firewall (
 
 ### Diagram
 
-```
-MTU AND FRAGMENTATION
+![Path MTU discovery working: a 1500-byte packet with DF set reaches a router whose next link, a VPN tunnel, has MTU 1450; the router drops it and sends ICMP Type 3 Code 4 with next-hop MTU 1450, and the sender reduces its packet size to 1450 and retransmits.](./img/03/mtu-pmtud.svg)
 
-Standard Ethernet: MTU = 1500 bytes
-
-  [Sender] ──── [Ethernet: MTU 1500] ──── [Router] ──── [VPN Tunnel: MTU 1450] ──── [Receiver]
-
-  Sender sends a 1500-byte packet with DF bit set.
-
-  ┌────────────────────────────────────────────┐
-  │ IP Packet: 1500 bytes, DF=1                │
-  └────────────────────────────────────────────┘
-                  │
-          Arrives at router.
-          Next link MTU = 1450.
-          Packet > MTU. DF bit is set.
-          Router DROPS the packet.
-          Router sends ICMP Type 3 Code 4 back to sender:
-          "Fragmentation needed. Next hop MTU: 1450"
-                  │
-                  ▼
-  [Sender receives ICMP] → reduces packet size to 1450 → retransmits
-
-  ✓ This works correctly.
-
-
-PMTUD BLACK HOLE — when ICMP is filtered
-
-  [Sender] ──── [Router] ──── [Firewall: blocks ICMP] ──── [VPN] ──── [Receiver]
-
-  Sender sends 1500-byte packet with DF=1
-  Router drops it (too big for VPN tunnel)
-  Router sends ICMP Fragmentation Needed
-  Firewall drops the ICMP message
-  Sender never learns to reduce packet size
-  Sender retransmits the same 1500-byte packet
-  Connection appears to hang for large transfers
-  Small transfers work (small packets fit in tunnel)
-
-  Symptom: SSH connects fine. Large file transfers hang.
-           Web pages load headers but not body.
-```
+![A PMTUD black hole: a firewall drops the ICMP Fragmentation Needed message, so the sender keeps retransmitting the same 1500-byte packet; small transfers work but large ones hang, so SSH connects while file transfers and page bodies stall.](./img/03/pmtud-black-hole.svg)
 
 ### What You Will See in Production
 
@@ -909,24 +612,7 @@ PMTUD BLACK HOLE — when ICMP is filtered
 
 ### Lab Topology
 
-```
-Your Lab Machine
-┌──────────────────────────────────────────────────────┐
-│                                                      │
-│  lo: 127.0.0.1/8                                    │
-│  eth0 (or ens3): <your LAN IP>/<prefix>             │
-│  docker0: 172.17.0.1/16 (if Docker is installed)    │
-│                                                      │
-│  You will read and interpret each of these.          │
-└──────────────────────────────────────────────────────┘
-                    │
-                    │ eth0
-                    ▼
-             [Default Gateway]
-                    │
-                    ▼
-               [Internet]
-```
+![The lab machine has lo at 127.0.0.1/8, eth0 or ens3 with your LAN address, and docker0 at 172.17.0.1/16 if Docker is installed; eth0 leads to the default gateway and then the internet.](./img/03/lab-machine.svg)
 
 ### Setup
 
@@ -1072,21 +758,7 @@ Running `iperf3` against localhost shows you the machine's network stack overhea
 
 ### Lab Topology (actual)
 
-```
-iperf3 loopback test:
-
-  [Your Machine]
-      │
-      ├── iperf3 client ──▶ lo (127.0.0.1) ──▶ iperf3 server
-      │                     ↑
-      │              No real network.
-      │              Tests stack overhead only.
-      │
-      └── ping ──▶ eth0 ──▶ [Gateway] ──▶ [8.8.8.8]
-                              ↑
-                    Real network path.
-                    RTT reflects actual latency to 8.8.8.8.
-```
+![The iperf3 loopback test sends from the client through lo (127.0.0.1) to the server with no real network, measuring stack overhead only, while ping goes out eth0 through the gateway to 8.8.8.8 over a real network path.](./img/03/loopback-vs-path.svg)
 
 ### Key Takeaways
 

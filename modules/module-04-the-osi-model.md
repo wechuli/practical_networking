@@ -49,34 +49,7 @@ destination, protocol, size, and time of the failure.
 
 ### Diagram
 
-```
-THE PROBLEM BEFORE OSI
-
-  Vendor A Stack              Vendor B Stack
-  ┌──────────────┐            ┌──────────────┐
-  │  App Protocol │            │  App Protocol │  ← Different
-  │  Transport    │            │  Transport    │  ← Incompatible
-  │  Network      │            │  Network      │  ← Can't cross over
-  │  Physical     │            │  Physical     │  ← Maybe compatible
-  └──────────────┘            └──────────────┘
-         ✗ Cannot communicate ✗
-
-THE SOLUTION: LAYERED INDEPENDENCE
-
-  Any Application
-  ┌──────────────┐
-  │  Layer 7     │  HTTP, gRPC, SMTP — swappable
-  ├──────────────┤
-  │  Layer 4     │  TCP or UDP — swappable
-  ├──────────────┤
-  │  Layer 3     │  IPv4 or IPv6 — swappable
-  ├──────────────┤
-  │  Layer 2     │  Ethernet, Wi-Fi, MPLS — swappable
-  ├──────────────┤
-  │  Layer 1     │  Copper, fiber, wireless — swappable
-  └──────────────┘
-  Each layer works independently. Change one without breaking others.
-```
+![Before OSI, two vendor stacks with different app protocols, incompatible transports and network layers that cannot cross over could not communicate. With layered independence, layers 7, 4, 3, 2 and 1 can each be swapped without breaking the others.](./img/04/osi-problem-solution.svg)
 
 ### Key Concept: Layers as Contracts
 
@@ -92,36 +65,15 @@ The OSI model defines seven layers, numbered 1 (bottom) through 7 (top). Each la
 
 ### The Layers
 
-```
- Layer   Name            What It Does                     PDU         Key Protocols
- ─────   ──────────────  ──────────────────────────────   ─────────   ────────────────────────
-   7     Application     User-facing services & APIs      Data        HTTP, DNS, SMTP, gRPC,
-                                                                      SSH, FTP, SNMP
-
-   6     Presentation    Data format, encoding,           Data        TLS/SSL encryption,
-                         encryption, compression                      JPEG, ASCII, UTF-8,
-                                                                      gzip compression
-
-   5     Session         Connection management,           Data        NetBIOS, RPC session
-                         session state, checkpointing                 management, SOCKS
-
-   4     Transport       End-to-end delivery,             Segment     TCP, UDP, QUIC
-                         reliability, flow control        (TCP) /
-                                                          Datagram
-                                                          (UDP)
-
-   3     Network         Logical addressing and           Packet      IP (v4/v6), ICMP,
-                         routing between networks                     IPsec; routing protocols
-                                                                      (OSPF; BGP rides on TCP)
-
-   2     Data Link       Physical addressing,             Frame       Ethernet, Wi-Fi
-                         local delivery, error                        (802.11), ARP, PPP,
-                         detection                                    VLAN (802.1Q)
-
-   1     Physical        Bits on the wire/air             Bits        Ethernet cables (Cat5/6),
-                                                                      fiber optic, radio
-                                                                      frequencies, connectors
-```
+| Layer | Name | What it does | PDU | Key protocols |
+| --- | --- | --- | --- | --- |
+| 7 | Application | User-facing services & APIs | Data | HTTP, DNS, SMTP, gRPC, SSH, FTP, SNMP |
+| 6 | Presentation | Data format, encoding, encryption, compression | Data | TLS/SSL encryption, JPEG, ASCII, UTF-8, gzip compression |
+| 5 | Session | Connection management, session state, checkpointing | Data | NetBIOS, RPC session management, SOCKS |
+| 4 | Transport | End-to-end delivery, reliability, flow control | Segment (TCP) / Datagram (UDP) | TCP, UDP, QUIC |
+| 3 | Network | Logical addressing and routing between networks | Packet | IP (v4/v6), ICMP, IPsec; routing protocols (OSPF; BGP rides on TCP) |
+| 2 | Data Link | Physical addressing, local delivery, error detection | Frame | Ethernet, Wi-Fi (802.11), ARP, PPP, VLAN (802.1Q) |
+| 1 | Physical | Bits on the wire/air | Bits | Ethernet cables (Cat5/6), fiber optic, radio frequencies, connectors |
 
 > **PDU** = Protocol Data Unit. The name for data at each layer. Using the right term tells the listener which layer you are thinking about.
 
@@ -353,44 +305,7 @@ sudo tcpdump -i any -A 'tcp port 80'
 
 ### Full Stack Summary Diagram
 
-```
- OSI LAYER STACK — WHAT YOU SEE AT EACH LAYER IN A PACKET CAPTURE
-
- ┌─────────────────────────────────────────────────────────────────────────┐
- │ Layer 7 — Application                                                  │
- │   HTTP: GET /api/v1/users HTTP/2                                       │
- │   DNS:  Query A record for api.example.com                             │
- │   Tool: curl -v, dig, browser DevTools                                 │
- ├─────────────────────────────────────────────────────────────────────────┤
- │ Layer 6 — Presentation                                                 │
- │   TLS: ClientHello, ServerHello, Certificate, Encrypted payload        │
- │   Encoding: UTF-8, gzip compression                                    │
- │   Tool: openssl s_client, Wireshark TLS dissector                      │
- ├─────────────────────────────────────────────────────────────────────────┤
- │ Layer 5 — Session                                                      │
- │   TLS Session ID / Ticket for resumption                               │
- │   (Rarely visible as a separate layer in captures)                     │
- ├─────────────────────────────────────────────────────────────────────────┤
- │ Layer 4 — Transport                                                    │
- │   TCP: SrcPort=52431, DstPort=443, Seq=1001, Ack=5001, Flags=[ACK]    │
- │   Window Size=65535, Options=[MSS 1460, SACK, Timestamps]              │
- │   Tool: ss -tnp, netstat, tcpdump 'tcp port 443'                      │
- ├─────────────────────────────────────────────────────────────────────────┤
- │ Layer 3 — Network                                                      │
- │   IPv4: Src=10.0.1.50, Dst=203.0.113.10, TTL=64, Proto=TCP(6)         │
- │   Tool: ping, traceroute, ip route, tcpdump 'host 10.0.1.50'          │
- ├─────────────────────────────────────────────────────────────────────────┤
- │ Layer 2 — Data Link                                                    │
- │   Ethernet: Src MAC=aa:bb:cc:dd:ee:ff, Dst MAC=11:22:33:44:55:66      │
- │   Type=0x0800 (IPv4), FCS for error checking                          │
- │   Tool: ip link, ip neigh, tcpdump -e, arp -n                         │
- ├─────────────────────────────────────────────────────────────────────────┤
- │ Layer 1 — Physical                                                     │
- │   1000BASE-T: electrical signals on Cat6 copper at 1 Gbps             │
- │   Not visible in packet captures — below the capture point             │
- │   Tool: ethtool, cable tester, looking at the link LED                 │
- └─────────────────────────────────────────────────────────────────────────┘
-```
+![The OSI stack as seen in a packet capture: HTTP and DNS at layer 7, TLS and encoding at layer 6, TLS session resumption at layer 5, TCP ports, sequence numbers and options at layer 4, IPv4 addresses and TTL at layer 3, Ethernet MAC addresses and EtherType at layer 2, and electrical signals at layer 1, each with the tools that show it.](./img/04/capture-stack.svg)
 
 ---
 
@@ -408,80 +323,33 @@ Think of encapsulation like putting a letter in an envelope, putting that envelo
 
 ### Diagram
 
-```
-ENCAPSULATION — SENDING SIDE (top-down)
-
-  Application Layer (Layer 7)
-  ┌───────────────────────────────────┐
-  │  HTTP GET /index.html             │  ← Application data
-  └───────────────────┬───────────────┘
-                      │ Pass down
-                      ▼
-  Transport Layer (Layer 4)
-  ┌──────────┬────────────────────────────────────┐
-  │ TCP Hdr  │  HTTP GET /index.html               │  ← Segment
-  │ SrcPort  │                                     │
-  │ DstPort  │                                     │
-  │ Seq/Ack  │                                     │
-  └──────────┴──────────────────┬─────────────────-┘
-                                │ Pass down
-                                ▼
-  Network Layer (Layer 3)
-  ┌──────────┬──────────┬──────────────────────────────────────┐
-  │  IP Hdr  │ TCP Hdr  │  HTTP GET /index.html                 │  ← Packet
-  │  SrcIP   │          │                                       │
-  │  DstIP   │          │                                       │
-  │  TTL     │          │                                       │
-  └──────────┴──────────┴────────────────┬─────────────────────┘
-                                         │ Pass down
-                                         ▼
-  Data Link Layer (Layer 2)
-  ┌──────────┬──────────┬──────────┬─────────────────────────────────┬─────┐
-  │  Eth Hdr │  IP Hdr  │ TCP Hdr  │  HTTP GET /index.html           │ FCS │ ← Frame
-  │  SrcMAC  │          │          │                                  │     │
-  │  DstMAC  │          │          │                                  │     │
-  │  Type    │          │          │                                  │     │
-  └──────────┴──────────┴──────────┴─────────────────────────────────┴─────┘
-                                         │ Pass down
-                                         ▼
-  Physical Layer (Layer 1)
-  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ← Bits
-  Electrical signals / light pulses / radio waves on the medium
-
-
-DECAPSULATION — RECEIVING SIDE (bottom-up)
-
-  The exact reverse: each layer strips its header, processes it,
-  and hands the payload to the layer above.
-
-  Bits → Frame → Packet → Segment → Application Data
-```
+![Encapsulation wraps the HTTP request in a TCP header (a segment), then an IP header (a packet), then an Ethernet header and FCS trailer (a frame), which is sent as bits; decapsulation reverses this from bits to frame, packet, segment and application data.](./img/04/encapsulation.svg)
 
 ### Header Sizes and Overhead
 
-```
-HEADER SIZES, MEASURED (this module's lab: Linux client and server, MTU 1500)
+**Header sizes, measured** (this module's lab: Linux client and server, MTU 1500):
 
-  Captured frame                     Length   Ethernet + IP + TCP     Payload
-  ─────────────────────────────────  ──────   ─────────────────────   ───────
-  SYN                                  74     14 + 20 + 40 (options)      0
-  ACK, data segments                   66+    14 + 20 + 32 (timestamps)  0+
-  GET / HTTP/1.1                      144     14 + 20 + 32               78
-  RST from a closed port               54     14 + 20 + 20                0
+| Captured frame | Length | Ethernet + IP + TCP | Payload |
+| --- | --- | --- | --- |
+| SYN | 74 | 14 + 20 + 40 (options) | 0 |
+| ACK, data segments | 66+ | 14 + 20 + 32 (timestamps) | 0+ |
+| GET / HTTP/1.1 | 144 | 14 + 20 + 32 | 78 |
+| RST from a closed port | 54 | 14 + 20 + 20 | 0 |
 
-  Minimum overhead:   54 bytes (Ethernet 14 + IPv4 20 + TCP 20), no options
-  MSS advertised:   1460 = 1500 MTU − 20 IP − 20 TCP (the SYN shows "mss 1460")
-  Payload per full segment on Linux: 1448, because every segment after the SYN
-  carries a 12-byte timestamp option (Module 3)
+- **Minimum overhead:** 54 bytes (Ethernet 14 + IPv4 20 + TCP 20), no options.
+- **MSS advertised:** 1460 = 1500 MTU − 20 IP − 20 TCP (the SYN shows "mss 1460").
+- **Payload per full segment on Linux:** 1448, because every segment after the SYN carries a 12-byte timestamp option (Module 3).
 
-  Extra layers:
-  TLS 1.3 AES-GCM record:  +22 bytes (5 header + 1 inner type + 16 tag)
-  802.1Q VLAN tag:          +4 bytes
-  GRE over IPv4:           +24 bytes (outer IP 20 + GRE 4)
-  VXLAN over IPv4:         +50 bytes (outer IP 20 + UDP 8 + VXLAN 8 + inner Ethernet 14)
-  WireGuard:               +60 bytes over IPv4, +80 over IPv6
-  IPsec ESP:               variable, roughly 50–80 bytes depending on mode and cipher
-```
+**Extra layers:**
+
+| Extra layer | Overhead |
+| --- | --- |
+| TLS 1.3 AES-GCM record | +22 bytes (5 header + 1 inner type + 16 tag) |
+| 802.1Q VLAN tag | +4 bytes |
+| GRE over IPv4 | +24 bytes (outer IP 20 + GRE 4) |
+| VXLAN over IPv4 | +50 bytes (outer IP 20 + UDP 8 + VXLAN 8 + inner Ethernet 14) |
+| WireGuard | +60 bytes over IPv4, +80 over IPv6 |
+| IPsec ESP | variable, roughly 50–80 bytes depending on mode and cipher |
 
 ### What Wireshark Shows You
 
@@ -511,36 +379,7 @@ The TCP/IP model (also called the Internet model or DoD model) is the model that
 
 ### The Mapping
 
-```
-  OSI Model (7 Layers)              TCP/IP Model (4 Layers)
-  ════════════════════              ═══════════════════════
-
-  ┌──────────────────┐
-  │ 7  Application   │
-  ├──────────────────┤              ┌──────────────────┐
-  │ 6  Presentation  │  ──────────▶ │   Application    │
-  ├──────────────────┤              │                  │
-  │ 5  Session       │              │  HTTP, DNS, TLS, │
-  └──────────────────┘              │  SSH, SMTP, gRPC │
-                                    └──────────────────┘
-
-  ┌──────────────────┐              ┌──────────────────┐
-  │ 4  Transport     │  ──────────▶ │   Transport      │
-  │                  │              │  TCP, UDP, QUIC   │
-  └──────────────────┘              └──────────────────┘
-
-  ┌──────────────────┐              ┌──────────────────┐
-  │ 3  Network       │  ──────────▶ │   Internet       │
-  │                  │              │  IP, ICMP, IPsec  │
-  └──────────────────┘              └──────────────────┘
-
-  ┌──────────────────┐
-  │ 2  Data Link     │              ┌──────────────────┐
-  ├──────────────────┤  ──────────▶ │   Link           │
-  │ 1  Physical      │              │  Ethernet, Wi-Fi,│
-  └──────────────────┘              │  ARP, PPP        │
-                                    └──────────────────┘
-```
+![OSI layers 7, 6 and 5 map to the TCP/IP application layer (HTTP, DNS, TLS, SSH, SMTP, gRPC); layer 4 maps to transport (TCP, UDP, QUIC); layer 3 maps to internet (IP, ICMP, IPsec); and layers 2 and 1 map to link (Ethernet, Wi-Fi, ARP, PPP).](./img/04/osi-vs-tcpip.svg)
 
 ### When to Use Which
 
@@ -560,27 +399,7 @@ The TCP/IP model (also called the Internet model or DoD model) is the model that
 
 TLS is famously hard to place in the OSI model:
 
-```
-  Where does TLS live?
-
-  OSI says:        Layer 6 (Presentation) — it handles encryption and encoding
-  But also:        Layer 5 (Session) — TLS sessions have state, resumption, IDs
-  In TCP/IP:       Application layer — TLS sits between the socket API and HTTP
-  In practice:     Between Layer 4 (TCP) and Layer 7 (HTTP)
-
-  ┌──────────────────┐
-  │  HTTP (Layer 7)  │
-  ├──────────────────┤
-  │  TLS (Layer 6/5) │  ← Operates on top of TCP, below HTTP
-  ├──────────────────┤
-  │  TCP  (Layer 4)  │
-  ├──────────────────┤
-  │  IP   (Layer 3)  │
-  └──────────────────┘
-
-  TLS is often discussed alongside session/presentation functions;
-  "Layer 6.5" is not a standard. BGP controls routing but is carried over TCP.
-```
+![TLS is placed at layer 6 by OSI, also has layer 5 session features, is part of the application layer in TCP/IP, and in practice sits between TCP at layer 4 and HTTP at layer 7, on top of TCP and below HTTP.](./img/04/where-tls-lives.svg)
 
 The honest answer: TLS does not fit cleanly into OSI. It spans Session and Presentation in function. In the TCP/IP model, it is simply part of the Application layer. Do not spend time trying to force a clean mapping — understand what TLS does and where it sits in the packet, and you will never be confused.
 
@@ -598,57 +417,39 @@ every OSI abstraction appears as a distinct header.
 
 ### The Layer-by-Layer Checklist
 
-```
-TROUBLESHOOTING CHECKLIST — CHOOSE TESTS FOR THE FAILING FLOW
+**Troubleshooting checklist — choose tests for the failing flow:**
 
-  ┌──────────────────────────────────────────────────────────────────────┐
-  │  Layer 1 — Physical                                                 │
-  │  ✓ Is the link up?            ip link show eth0                     │
-  │  ✓ Is LOWER_UP present?       (no = physical link down)            │
-  │  ✓ Speed/duplex correct?      ethtool eth0                         │
-  │  ✓ Any interface errors?      ip -s link show eth0                 │
-  │  If Layer 1 fails → stop. Fix the physical before proceeding.       │
-  ├──────────────────────────────────────────────────────────────────────┤
-  │  Layer 2 — Data Link                                                │
-  │  ✓ Is ARP resolving?          ip neigh show                        │
-  │  ✓ Can you reach the gateway? arping -I eth0 <gateway>             │
-  │  ✓ Correct VLAN?              ip -d link show (tagged sub-ifaces);  │
-  │                               access VLANs live on the switch port  │
-  │  If Layer 2 fails → check switch port, VLAN config, cabling.       │
-  ├──────────────────────────────────────────────────────────────────────┤
-  │  Layer 3 — Network                                                  │
-  │  ✓ Do you have an IP address? ip addr show                         │
-  │  ✓ Is the route present?      ip route show                        │
-  │  ✓ Can you ping the gateway?  ping -c 3 <gateway>                  │
-  │  ✓ Can you ping the target?   ping -c 3 <target_ip>               │
-  │  ✓ What does the path look    traceroute <target_ip>               │
-  │    like?                                                            │
-  │  If Layer 3 fails → check routes, NACLs, security groups, NAT.     │
-  ├──────────────────────────────────────────────────────────────────────┤
-  │  Layer 4 — Transport                                                │
-  │  ✓ Is the port open?          ss -tlnp | grep <port>               │
-  │  ✓ Can you TCP connect?       nc -zv <host> <port>                 │
-  │  ✓ Connection refused or      (refused = an RST came back: closed   │
-  │    timed out?                  port, REJECT rule, or proxy)          │
-  │                               (timeout = nothing came back)         │
-  │  ✓ Any socket state issues?   ss -s (check TIME_WAIT, CLOSE_WAIT)  │
-  │  If Layer 4 fails → check firewall rules, process status, ports.   │
-  ├──────────────────────────────────────────────────────────────────────┤
-  │  Layer 5/6 — Session / Presentation                                │
-  │  ✓ Does TLS handshake         openssl s_client -connect host:443   │
-  │    complete?                                                        │
-  │  ✓ Certificate valid?         Check dates, SAN, chain              │
-  │  ✓ Cipher suite negotiated?   Look for "Cipher" in output          │
-  │  If TLS fails → check certs, expiry, SNI, cipher compatibility.    │
-  ├──────────────────────────────────────────────────────────────────────┤
-  │  Layer 7 — Application                                              │
-  │  ✓ Does the app respond?      curl -v https://host/endpoint        │
-  │  ✓ HTTP status code?          200 OK, 502, 504, etc.               │
-  │  ✓ Response body correct?     Check for error messages in body      │
-  │  ✓ DNS resolving correctly?   dig A hostname                        │
-  │  If Layer 7 fails → now it's time to look at application logs.     │
-  └──────────────────────────────────────────────────────────────────────┘
-```
+| Layer | Check | Command or evidence |
+| --- | --- | --- |
+| **1 — Physical** | Is the link up? | `ip link show eth0` |
+| | Is LOWER_UP present? | No = physical link down |
+| | Speed/duplex correct? | `ethtool eth0` |
+| | Any interface errors? | `ip -s link show eth0` |
+| | *If Layer 1 fails* | Stop. Fix the physical before proceeding. |
+| **2 — Data Link** | Is ARP resolving? | `ip neigh show` |
+| | Can you reach the gateway? | `arping -I eth0 <gateway>` |
+| | Correct VLAN? | `ip -d link show` (tagged sub-interfaces); access VLANs live on the switch port |
+| | *If Layer 2 fails* | Check switch port, VLAN config, cabling. |
+| **3 — Network** | Do you have an IP address? | `ip addr show` |
+| | Is the route present? | `ip route show` |
+| | Can you ping the gateway? | `ping -c 3 <gateway>` |
+| | Can you ping the target? | `ping -c 3 <target_ip>` |
+| | What does the path look like? | `traceroute <target_ip>` |
+| | *If Layer 3 fails* | Check routes, NACLs, security groups, NAT. |
+| **4 — Transport** | Is the port open? | `ss -tlnp \| grep <port>` |
+| | Can you TCP connect? | `nc -zv <host> <port>` |
+| | Connection refused or timed out? | Refused = an RST came back: closed port, REJECT rule, or proxy. Timeout = nothing came back. |
+| | Any socket state issues? | `ss -s` (check TIME_WAIT, CLOSE_WAIT) |
+| | *If Layer 4 fails* | Check firewall rules, process status, ports. |
+| **5/6 — Session / Presentation** | Does TLS handshake complete? | `openssl s_client -connect host:443` |
+| | Certificate valid? | Check dates, SAN, chain |
+| | Cipher suite negotiated? | Look for "Cipher" in output |
+| | *If TLS fails* | Check certs, expiry, SNI, cipher compatibility. |
+| **7 — Application** | Does the app respond? | `curl -v https://host/endpoint` |
+| | HTTP status code? | 200 OK, 502, 504, etc. |
+| | Response body correct? | Check for error messages in body |
+| | DNS resolving correctly? | `dig A hostname` |
+| | *If Layer 7 fails* | Now it's time to look at application logs. |
 
 ### Failure Isolation Examples
 

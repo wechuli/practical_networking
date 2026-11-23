@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" role="img" aria-labelledby="t d"><title id="t">The socket call sequences</title><desc id="d">A server calls socket(), bind(addr:port), listen(backlog) and accept(), then read() and write(), and finally close(). A client calls socket(), optionally bind(), then connect(addr:port), then write() and read(), and finally close().</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="198" rx="16"/>
+<text class="zl" x="20" y="36">server</text>
+<rect class="box" x="20" y="48" width="78" height="40" rx="10"/><text class="m" x="59" y="72" text-anchor="middle">socket()</text>
+<path class="arrow" d="M98 68 H120"/>
+<rect class="box" x="120" y="48" width="128" height="40" rx="10"/><text class="m" x="184" y="72" text-anchor="middle">bind(addr:port)</text>
+<path class="arrow" d="M248 68 H270"/>
+<rect class="box" x="270" y="48" width="128" height="40" rx="10"/><text class="m" x="334" y="72" text-anchor="middle">listen(backlog)</text>
+<path class="arrow" d="M398 68 H420"/>
+<rect class="box" x="420" y="48" width="78" height="40" rx="10"/><text class="m" x="459" y="72" text-anchor="middle">accept()</text>
+<text class="l" x="512" y="72" text-anchor="middle">…</text>
+<rect class="box" x="526" y="48" width="121" height="40" rx="10"/><text class="m" x="586" y="72" text-anchor="middle">read()/write()</text>
+<text class="l" x="661" y="72" text-anchor="middle">…</text>
+<rect class="box" x="675" y="48" width="70" height="40" rx="10"/><text class="m" x="710" y="72" text-anchor="middle">close()</text>
+<text class="zl" x="20" y="126">client</text>
+<rect class="box" x="20" y="138" width="78" height="40" rx="10"/><text class="m" x="59" y="162" text-anchor="middle">socket()</text>
+<path class="arrow" d="M98 158 H120"/>
+<rect class="zone" x="120" y="138" width="78" height="40" rx="10"/><text class="m" x="159" y="162" text-anchor="middle">[bind()]</text>
+<path class="arrow" d="M198 158 H220"/>
+<rect class="box" x="220" y="138" width="150" height="40" rx="10"/><text class="m" x="295" y="162" text-anchor="middle">connect(addr:port)</text>
+<text class="l" x="384" y="162" text-anchor="middle">…</text>
+<rect class="box" x="398" y="138" width="121" height="40" rx="10"/><text class="m" x="458" y="162" text-anchor="middle">write()/read()</text>
+<text class="l" x="533" y="162" text-anchor="middle">…</text>
+<rect class="box" x="547" y="138" width="70" height="40" rx="10"/><text class="m" x="582" y="162" text-anchor="middle">close()</text>
+<text class="s" x="636" y="162">[ ] = optional</text>
+</svg>

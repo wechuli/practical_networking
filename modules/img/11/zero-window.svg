@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 470" role="img" aria-labelledby="t d"><title id="t">A zero window and the persist timer</title><desc id="d">The sender sends data while the receiver's buffer fills, and the receiver acknowledges with win 1448. More data fills the buffer and the receiver answers ack, win 0: stop. The sender's persist timer sends a window probe; the receiver again answers win 0, and the probes back off: 0.2, 0.4, 0.9, 1.7, 3.5 s and so on. When the application reads, the receiver sends a window update and the sender resumes.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="468" rx="16"/>
+<text class="zl" x="24" y="28">Zero window</text>
+<rect class="net" x="80" y="40" width="160" height="50" rx="10"/><text class="t" x="160" y="70" text-anchor="middle">sender</text>
+<rect class="net" x="370" y="40" width="220" height="50" rx="10"/><text class="t" x="480" y="61" text-anchor="middle">receiver</text><text class="s" x="480" y="80" text-anchor="middle">(application not reading)</text>
+<path class="line" d="M160 90 V450"/><path class="line" d="M480 90 V450"/>
+<text class="m" x="320" y="120" text-anchor="middle">data</text><path class="arrow" d="M160 130 H478"/>
+<text class="s" x="492" y="134">buffer filling</text>
+<text class="m" x="320" y="160" text-anchor="middle">ack, win 1448</text><path class="arrow" d="M480 170 H162"/>
+<text class="m" x="320" y="200" text-anchor="middle">data</text><path class="arrow" d="M160 210 H478"/>
+<text class="s" x="492" y="214">buffer full</text>
+<text class="m" x="320" y="240" text-anchor="middle">ack, win 0</text><path class="arrow" d="M480 250 H162"/>
+<rect class="warn" x="492" y="234" width="70" height="28" rx="10"/><text class="l" x="527" y="253" text-anchor="middle">"stop"</text>
+<text class="m" x="320" y="280" text-anchor="middle">window probe (persist timer)</text><path class="arrow" d="M160 290 H478"/>
+<text class="m" x="320" y="320" text-anchor="middle">ack, win 0</text><path class="arrow" d="M480 330 H162"/>
+<text class="s" x="492" y="326">probes back off:</text><text class="s" x="492" y="344">0.2, 0.4, 0.9, 1.7, 3.5 s …</text>
+<text class="l" x="320" y="374" text-anchor="middle">…</text>
+<text class="s" x="492" y="374">application reads</text>
+<text class="m" x="320" y="410" text-anchor="middle">window update</text><path class="arrow" d="M480 420 H162"/>
+<rect class="ok" x="492" y="404" width="84" height="28" rx="10"/><text class="l" x="534" y="423" text-anchor="middle">"resume"</text>
+</svg>

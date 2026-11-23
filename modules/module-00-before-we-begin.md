@@ -49,29 +49,7 @@ If you get stuck on a concept, skip to the lab and come back. Seeing the thing i
 
 ### Diagram
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                       COURSE PROGRESSION                                 │
-│                                                                          │
-│  0          1–4             5–9              10–15            16–23      │
-│  Setup ──→ Foundations ──→ Addressing ──→ Transport and ──→ Production  │
-│  & Go      history, a      & paths:        applications:     containers, │
-│  toolbox   request end      IP, ARP,        UDP, TCP, DNS,    Kubernetes, │
-│            to end, OSI      ICMP,           TLS, performance, firewalls,  │
-│                             routing, BGP    HTTP/2, gRPC      VPNs, sockets,│
-│                                                               capture,    │
-│                                                               diagnosis   │
-│                                                                          │
-│  then: 24 Linux kernel internals → 25 Cloud and CI/CD paths              │
-│        → 26 Capstones                                                    │
-└──────────────────────────────────────────────────────────────────────────┘
-
-Each module:
-  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
-  │ Concept  │──▶│Mechanism │──▶│   Lab    │──▶│ Failure  │──▶│ Write-up │
-  │          │   │+ Diagram │   │ (+ Go)   │   │ Patterns │   │          │
-  └──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
-```
+![The course runs in five stages: setup (module 0), foundations (1–4), addressing and paths (5–9), transport and applications (10–15) and production topics (16–23), then kernel internals, cloud paths and the capstones (24–26). Every module follows the same loop: concept, mechanism and diagram, lab, failure patterns, write-up](./img/00/course-map.svg)
 
 ---
 
@@ -100,83 +78,7 @@ Diagrams and unattributed transcripts are illustrative; timings and addresses ar
 not fixed. This course uses documentation addresses such as `203.0.113.10`
 (RFC 5737) where a real address would go out of date.
 
-```
-You type: curl -v https://example.com
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 1: DNS Resolution                          (Module 12)    │
-│                                                                 │
-│  "What is the IP address of example.com?"                       │
-│                                                                 │
-│  Your machine ──ask──▶ Recursive resolver ──ask──▶ root, TLD,   │
-│                                                    authoritative│
-│               ◀──answer──────────────────────────               │
-│                                                                 │
-│  Result: one or more A/AAAA records, e.g. 203.0.113.10          │
-└─────────────────────────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 2: TCP Connection                          (Module 11)    │
-│                                                                 │
-│  Your machine          example.com server                       │
-│       │                       │                                 │
-│       │──── SYN ─────────────▶│   "I want to connect"          │
-│       │◀─── SYN-ACK ──────────│   "Okay, I'm ready"            │
-│       │──── ACK ─────────────▶│   "Great, let's go"            │
-│       │                       │                                 │
-│        [CONNECTED after 1 round trip]                           │
-└─────────────────────────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 3: TLS 1.3 Handshake (simplified)          (Module 13)    │
-│                                                                 │
-│  Your machine                          example.com server       │
-│       │── ClientHello ──────────────────────▶│                  │
-│       │   versions, ciphers, key share,      │                  │
-│       │   SNI "example.com", ALPN h2/http1.1 │                  │
-│       │                                      │                  │
-│       │◀─ ServerHello (+ key share) ─────────│                  │
-│       │◀─ {EncryptedExtensions} ─────────────│  everything in   │
-│       │◀─ {Certificate} ─────────────────────│  {braces} is     │
-│       │◀─ {CertificateVerify} ───────────────│  already         │
-│       │◀─ {Finished} ────────────────────────│  encrypted       │
-│       │                                      │                  │
-│       │  client verifies the certificate chain and hostname     │
-│       │── {Finished} ───────────────────────▶│                  │
-│                                                                 │
-│        [ENCRYPTED after 1 more round trip]                      │
-└─────────────────────────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 4: HTTP Request + Response                 (Module 15)    │
-│                                                                 │
-│  Your machine          example.com server                       │
-│       │── GET / ─────────────▶│  HTTP/2 if both sides chose     │
-│       │   Host: example.com   │  "h2" via ALPN, else HTTP/1.1   │
-│       │                       │                                 │
-│       │◀─ 200 ────────────────│                                 │
-│       │   content-type: html  │                                 │
-│       │   [body...]           │                                 │
-└─────────────────────────────────────────────────────────────────┘
-              │
-              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  STEP 5: TCP Teardown                            (Module 11)    │
-│                                                                 │
-│  Your machine          example.com server                       │
-│       │──── FIN ─────────────▶│   either side may close first;  │
-│       │◀─── FIN, ACK ─────────│   the reply ACK and FIN are     │
-│       │──── ACK ─────────────▶│   often combined (3 segments)   │
-│                [CLOSED]                                         │
-│                                                                 │
-│  Keep-alive and HTTP/2 hold the connection open for reuse;      │
-│  some applications abort with RST instead of closing with FIN.  │
-└─────────────────────────────────────────────────────────────────┘
-```
+![A fresh HTTPS request in five steps: DNS resolution through a recursive resolver (Module 12), the TCP three-way handshake (Module 11), the TLS 1.3 handshake in which everything after ServerHello is encrypted (Module 13), the HTTP request and response (Module 15), and TCP teardown with FIN and ACK (Module 11).](./img/00/request-five-steps.svg)
 
 Two things in this picture matter for troubleshooting from day one:
 
@@ -323,37 +225,7 @@ setting; your shell's `HTTPS_PROXY` does not apply to it (Module 16).
 
 ### Diagram
 
-```
-Your Lab Machine
-┌──────────────────────────────────────────────────────────────┐
-│                                                              │
-│  ┌──────────────┐   ┌──────────────┐   ┌─────────────────┐  │
-│  │   tcpdump    │   │   Wireshark  │   │    tshark       │  │
-│  │  Capture     │   │  Analyze     │   │  Scripted       │  │
-│  └──────────────┘   └──────────────┘   └─────────────────┘  │
-│                                                              │
-│  ┌──────────────┐   ┌──────────────┐   ┌─────────────────┐  │
-│  │  ip / ss     │   │  dig         │   │  curl / openssl │  │
-│  │  Interfaces  │   │  DNS Queries │   │  HTTP / TLS     │  │
-│  │  Routes, TCP │   │              │   │  Testing        │  │
-│  └──────────────┘   └──────────────┘   └─────────────────┘  │
-│                                                              │
-│  ┌──────────────┐   ┌──────────────┐   ┌─────────────────┐  │
-│  │   Docker     │   │  iperf3      │   │  hping3 / mtr   │  │
-│  │  Container   │   │  Throughput  │   │  Path Analysis  │  │
-│  │  Networking  │   │  Testing     │   │  & Probing      │  │
-│  └──────────────┘   └──────────────┘   └─────────────────┘  │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │  Go toolbox (labs/go): phases, then one new tool per   │ │
-│  │  module, combined into netdoctor in the capstone       │ │
-│  └────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────┘
-                              │
-                              │ eth0 / ens3 / wlan0
-                              ▼
-                       [Your Network / Internet]
-```
+![Your lab machine holds capture and analysis tools (tcpdump, Wireshark, tshark), interface and socket tools (ip, ss), dig for DNS, curl and openssl for HTTP and TLS, Docker, iperf3, hping3 and mtr, plus the Go toolbox in labs/go that grows by one tool per module into netdoctor; it reaches your network and the internet through eth0, ens3 or wlan0.](./img/00/lab-machine.svg)
 
 ### What You Will See in Production
 
@@ -562,35 +434,7 @@ throughput.
 
 ### Diagram
 
-```
-ENCAPSULATION — data gets wrapped at each layer
-
-Application data:  [ HTTP Request: GET / HTTP/1.1 ]
-                                │
-                                ▼ TCP wraps it
-Transport:         [ TCP Header | HTTP Request ]
-                                │
-                                ▼ IP wraps it
-Network:           [ IP Header | TCP Header | HTTP Request ]
-                                │
-                                ▼ Ethernet wraps it
-Link:              [ Eth Header | IP Header | TCP Header | HTTP Request | FCS ]
-                                │
-                                ▼
-                         Sent on the wire
-                                │
-                                ▼
-                   [ Eth Header | IP Header | TCP Header | HTTP Request | FCS ]
-                                │
-                                ▼ Ethernet checks the FCS, strips its header
-Network:           [ IP Header | TCP Header | HTTP Request ]
-                                │
-                                ▼ IP strips its header
-Transport:         [ TCP Header | HTTP Request ]
-                                │
-                                ▼ TCP strips its header
-Application:       [ HTTP Request: GET / HTTP/1.1 ]
-```
+![Encapsulation of an HTTP request: going down, TCP adds a TCP header, IP adds an IP header and Ethernet adds an Ethernet header and FCS trailer before the frame is sent on the wire; going up on the receiver, Ethernet checks the FCS and strips its header, then IP and TCP strip theirs until the application gets the HTTP request back.](./img/00/encapsulation.svg)
 
 At each layer going down, a header is added. At each layer going up on the receiving side, a header is removed. This is decapsulation. When engineers say a device "operates at Layer X," they mean it reads and acts on the header for that layer. With HTTPS, a TLS record sits between TCP and HTTP, so anything that only sees packets can read the IP and TCP headers but not the HTTP request.
 

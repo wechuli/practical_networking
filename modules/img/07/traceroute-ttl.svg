@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 560" role="img" aria-labelledby="t d"><title id="t">How traceroute uses ICMP Time Exceeded</title><desc id="d">A sequence diagram between sender, router 1, router 2 and destination. A probe with TTL=1 reaches router 1, where TTL drops to 0; router 1 drops it and sends ICMP TTL Exceeded back. A probe with TTL=2 passes router 1 with TTL=1 and expires at router 2, which sends ICMP TTL Exceeded back. A probe with TTL=3 reaches the destination, which answers with Echo Reply or UDP Port Unreachable: destination reached. Each hop reveals its IP address by sending ICMP Time Exceeded; traceroute increments TTL from 1 to N until the destination responds.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="558" rx="16"/>
+<rect class="net" x="30" y="30" width="120" height="40" rx="10"/><text class="t" x="90" y="56" text-anchor="middle">Sender</text>
+<rect class="net" x="240" y="30" width="120" height="40" rx="10"/><text class="t" x="300" y="56" text-anchor="middle">Router 1</text>
+<rect class="net" x="450" y="30" width="120" height="40" rx="10"/><text class="t" x="510" y="56" text-anchor="middle">Router 2</text>
+<rect class="net" x="650" y="30" width="140" height="40" rx="10"/><text class="t" x="720" y="56" text-anchor="middle">Destination</text>
+<path class="line" d="M90 70 V470"/><path class="line" d="M300 70 V470"/><path class="line" d="M510 70 V470"/><path class="line" d="M720 70 V470"/>
+<text class="m" x="195" y="100" text-anchor="middle">TTL=1</text><path class="arrow" d="M90 110 H298"/>
+<rect class="warn" x="312" y="114" width="120" height="30" rx="8"/><text class="l" x="372" y="134" text-anchor="middle">TTL→0, DROP</text>
+<text class="l" x="195" y="152" text-anchor="middle">ICMP TTL Exc</text><text class="s" x="195" y="168" text-anchor="middle">(from Router 1)</text>
+<path class="arrow" d="M300 180 H92"/>
+<text class="m" x="195" y="220" text-anchor="middle">TTL=2</text><path class="arrow" d="M90 230 H298"/>
+<text class="m" x="405" y="240" text-anchor="middle">TTL=1</text><path class="arrow" d="M300 250 H508"/>
+<rect class="warn" x="522" y="254" width="120" height="30" rx="8"/><text class="l" x="582" y="274" text-anchor="middle">TTL→0, DROP</text>
+<text class="l" x="195" y="292" text-anchor="middle">ICMP TTL Exc</text><text class="s" x="195" y="308" text-anchor="middle">(from Router 2)</text>
+<path class="arrow" d="M510 320 H92"/>
+<text class="m" x="195" y="360" text-anchor="middle">TTL=3</text><path class="arrow" d="M90 370 H718"/>
+<text class="l" x="615" y="410" text-anchor="middle">Echo Reply (or UDP</text><text class="l" x="615" y="426" text-anchor="middle">Port Unreachable)</text>
+<path class="arrow" d="M720 438 H92"/>
+<rect class="ok" x="104" y="450" width="180" height="36" rx="10"/><text class="l" x="194" y="473" text-anchor="middle">Destination reached!</text>
+<text class="s" x="400" y="516" text-anchor="middle">Each hop reveals its IP address by sending the ICMP Time Exceeded.</text>
+<text class="s" x="400" y="536" text-anchor="middle">Traceroute increments TTL from 1 to N until the destination responds.</text>
+</svg>

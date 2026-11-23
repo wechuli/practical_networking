@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-labelledby="t d"><title id="t">DNS resolution: who talks to whom</title><desc id="d">An application calls getaddrinfo() on the stub resolver in the OS or runtime, which reads /etc/hosts and /etc/resolv.conf and sends one recursive query (RD=1) to a recursive resolver. The caching, often validating, recursive resolver (systemd-resolved, then a corporate, ISP or cloud resolver, or 8.8.8.8, 1.1.1.1, 9.9.9.9) answers from cache or asks iteratively (RD=0): the root servers say test. is served by ns.tld.test and give its address as glue; the TLD servers say shop.test. is served by ns.shop.test with glue; the authoritative server answers app.shop.test is 198.18.70.10, TTL 10, with aa set.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="478" rx="16"/>
+<rect class="l7" x="24" y="52" width="140" height="56" rx="10"/><text class="t" x="94" y="85" text-anchor="middle">application</text>
+<text class="m" x="226" y="72" text-anchor="middle">getaddrinfo()</text><path class="arrow" d="M164 80 H288"/>
+<rect class="box" x="290" y="30" width="486" height="100" rx="10"/>
+<text class="t" x="533" y="54" text-anchor="middle">Stub resolver (in the OS or the runtime)</text>
+<text class="s" x="533" y="78" text-anchor="middle">reads /etc/hosts, /etc/resolv.conf;</text>
+<text class="s" x="533" y="98" text-anchor="middle">sends ONE recursive query (RD=1)</text>
+<path class="arrow" d="M533 130 V164"/>
+<rect class="net" x="200" y="166" width="440" height="112" rx="10"/>
+<text class="t" x="420" y="190" text-anchor="middle">Recursive resolver (caching, often validating)</text>
+<text class="s" x="420" y="214" text-anchor="middle">systemd-resolved → corporate/ISP/cloud resolver,</text>
+<text class="s" x="420" y="232" text-anchor="middle">8.8.8.8, 1.1.1.1, 9.9.9.9 …</text>
+<text class="s" x="420" y="256" text-anchor="middle">answers from cache, or asks iteratively (RD=0):</text>
+<path class="line" d="M420 278 V302"/><path class="line" d="M144 302 H656"/>
+<path class="arrow" d="M144 302 V328"/><path class="arrow" d="M400 302 V328"/><path class="arrow" d="M656 302 V328"/>
+<rect class="net" x="24" y="330" width="240" height="128" rx="10"/><text class="t" x="144" y="354" text-anchor="middle">Root servers</text>
+<text class="s" x="144" y="382" text-anchor="middle">“test. is served by</text><text class="s" x="144" y="400" text-anchor="middle">ns.tld.test, here is its</text><text class="s" x="144" y="418" text-anchor="middle">address (glue)”</text>
+<rect class="net" x="280" y="330" width="240" height="128" rx="10"/><text class="t" x="400" y="354" text-anchor="middle">TLD servers</text>
+<text class="s" x="400" y="382" text-anchor="middle">“shop.test. is served by</text><text class="s" x="400" y="400" text-anchor="middle">ns.shop.test, here is its</text><text class="s" x="400" y="418" text-anchor="middle">address (glue)”</text>
+<rect class="ok" x="536" y="330" width="240" height="128" rx="10"/><text class="t" x="656" y="354" text-anchor="middle">Authoritative</text>
+<text class="s" x="656" y="382" text-anchor="middle">“app.shop.test is</text><text class="s" x="656" y="400" text-anchor="middle">198.18.70.10, TTL 10”</text><text class="s" x="656" y="424" text-anchor="middle">(aa: authoritative answer)</text>
+</svg>

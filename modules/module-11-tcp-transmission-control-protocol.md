@@ -33,31 +33,27 @@ This module covers TCP at the depth a support engineer needs: the header fields 
 
 TCP — Transmission Control Protocol — was specified in RFC 793 (1981); RFC 9293 (2022) is the current consolidated specification. It is a transport-layer (Layer 4) protocol: connection-oriented, reliable, ordered, byte-stream delivery between two applications identified by IP address and port.
 
-```
-TCP PROVIDES
-  ✓ Connections          An explicit handshake before data flows; both ends keep state.
-  ✓ Reliable stream      Lost data is retransmitted until acknowledged, or the
-                         connection fails with an error. An ACK means "my TCP has
-                         these bytes" — not "the application processed them".
-  ✓ Ordering             Bytes reach the application in the order they were sent,
-                         even when IP delivers segments out of order.
-  ✓ Duplicate removal    Sequence numbers let the receiver drop copies.
-  ✓ Flow control         The receiver advertises how much buffer it has left
-                         (the window); the sender never sends more.
-  ✓ Congestion control   The sender limits itself to what the path seems able to
-                         carry, backing off on loss (or ECN marks, or rising delay).
-  ✓ Byte stream          No message boundaries: two writes may arrive as one read,
-                         one write as several reads. Framing is the application's job.
+**TCP provides**
 
-THE PRICE
-  ✗ Latency              One RTT for the handshake before any data (two or more
-                         with TLS on top)
-  ✗ Overhead             20–60 byte header per segment (UDP: 8)
-  ✗ State                Per-connection buffers and timers at both ends and in
-                         every stateful middlebox
-  ✗ Head-of-line block   One lost segment delays every byte behind it
-  ✗ Slow start           New connections begin at about 14 KB per round trip
-```
+| | Feature | What it means |
+| --- | --- | --- |
+| ✓ | Connections | An explicit handshake before data flows; both ends keep state. |
+| ✓ | Reliable stream | Lost data is retransmitted until acknowledged, or the connection fails with an error. An ACK means "my TCP has these bytes" — not "the application processed them". |
+| ✓ | Ordering | Bytes reach the application in the order they were sent, even when IP delivers segments out of order. |
+| ✓ | Duplicate removal | Sequence numbers let the receiver drop copies. |
+| ✓ | Flow control | The receiver advertises how much buffer it has left (the window); the sender never sends more. |
+| ✓ | Congestion control | The sender limits itself to what the path seems able to carry, backing off on loss (or ECN marks, or rising delay). |
+| ✓ | Byte stream | No message boundaries: two writes may arrive as one read, one write as several reads. Framing is the application's job. |
+
+**The price**
+
+| | Cost | What it means |
+| --- | --- | --- |
+| ✗ | Latency | One RTT for the handshake before any data (two or more with TLS on top) |
+| ✗ | Overhead | 20–60 byte header per segment (UDP: 8) |
+| ✗ | State | Per-connection buffers and timers at both ends and in every stateful middlebox |
+| ✗ | Head-of-line block | One lost segment delays every byte behind it |
+| ✗ | Slow start | New connections begin at about 14 KB per round trip |
 
 Things TCP does **not** provide that people assume it does: message boundaries; any timeout an application would consider reasonable (an established connection with unacknowledged data retries for about 15 minutes by default; an idle connection whose peer vanished can sit forever unless keepalives are on); and encryption or authentication (that is TLS, Module 13). HTTP/3 does not use TCP at all — it runs over QUIC, on UDP (Module 10).
 
@@ -65,67 +61,36 @@ Things TCP does **not** provide that people assume it does: message boundaries; 
 
 ## 11.2 The TCP Header
 
-```
-TCP HEADER (RFC 9293): 20 bytes, up to 60 with options
-
-   0                   1                   2                   3
-   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |          Source Port          |       Destination Port        |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |                        Sequence Number                        |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |                    Acknowledgment Number                      |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |  Data |       |C|E|U|A|P|R|S|F|                               |
-  | Offset| Rsrvd |W|C|R|C|S|S|Y|I|            Window             |
-  |       |       |R|E|G|K|H|T|N|N|                               |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |           Checksum            |         Urgent Pointer        |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |                    Options (if Data Offset > 5)               |
-  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-```
+![The TCP header (RFC 9293), 20 bytes and up to 60 with options, in 32-bit rows: source and destination port; sequence number; acknowledgment number; data offset, reserved bits, the eight flags CWR, ECE, URG, ACK, PSH, RST, SYN and FIN, and the window; checksum and urgent pointer; then options if the data offset is greater than 5.](./img/11/tcp-header.svg)
 
 There are eight flag bits. Older diagrams show a ninth, NS (ECN nonce, RFC 3540); that experiment was declared historic by RFC 8311 in 2018 and the bit is reserved again.
 
-```
-FIELD                 SIZE   WHAT IT DOES                               IN TCPDUMP
-────────────────────  ─────  ─────────────────────────────────────────  ───────────────────────
-Source port            16 b  Sender's port                              198.18.42.10.48628
-Destination port       16 b  Receiver's port                            > 198.18.43.10.8080
-Sequence number        32 b  Number of the first payload byte in this   seq 1:1449
-                             segment (a SYN or FIN consumes one number)  (bytes 1–1448)
-Acknowledgment number  32 b  Next byte the sender of this segment        ack 3001
-                             expects: everything before it has arrived
-Data offset             4 b  Header length in 32-bit words (5–15)
-Flags                   8 b  CWR ECE URG ACK PSH RST SYN FIN            Flags [S.] etc.
-Window                 16 b  Receive buffer space the sender of this     win 63
-                             segment offers, in bytes << window scale
-Checksum               16 b  Over header, payload and an IP pseudo-      (-v: "cksum … (correct)")
-                             header (offloaded: often "incorrect" in a
-                             capture on the sending host)
-Urgent pointer         16 b  Only with URG; obsolete in practice
-Options                0–40 B MSS, window scale, SACK, timestamps …     options [mss 1460,…]
-```
+| Field | Size | What it does | In tcpdump |
+| --- | --- | --- | --- |
+| Source port | 16 b | Sender's port | `198.18.42.10.48628` |
+| Destination port | 16 b | Receiver's port | `> 198.18.43.10.8080` |
+| Sequence number | 32 b | Number of the first payload byte in this segment (a SYN or FIN consumes one number) | `seq 1:1449` (bytes 1–1448) |
+| Acknowledgment number | 32 b | Next byte the sender of this segment expects: everything before it has arrived | `ack 3001` |
+| Data offset | 4 b | Header length in 32-bit words (5–15) | |
+| Flags | 8 b | CWR ECE URG ACK PSH RST SYN FIN | `Flags [S.]` etc. |
+| Window | 16 b | Receive buffer space the sender of this segment offers, in bytes << window scale | `win 63` |
+| Checksum | 16 b | Over header, payload and an IP pseudo-header (offloaded: often "incorrect" in a capture on the sending host) | (`-v`: `cksum … (correct)`) |
+| Urgent pointer | 16 b | Only with URG; obsolete in practice | |
+| Options | 0–40 B | MSS, window scale, SACK, timestamps … | `options [mss 1460,…]` |
 
 ### Flags as tcpdump prints them
 
-```
-FLAG   TCPDUMP  MEANING                                   WHEN YOU SEE IT
-─────  ───────  ────────────────────────────────────────  ─────────────────────────────────
-SYN    S        Synchronise: open, carries the initial    First packet of a connection
-                sequence number and the options
-ACK    .        The acknowledgment field is valid         Every segment after the first SYN
-SYN+ACK S.      "Yes, and here is my sequence number"     Second packet of the handshake
-PSH    P        Push: deliver to the application now;     Typically on the last segment of
-                the sender has no more queued just now    a write; not a message boundary
-FIN    F        No more data from me (graceful close)     Teardown; F. = FIN with ACK
-RST    R        Reset: abort, discard state               Closed port, abort, unknown connection
-URG    U        Urgent data (obsolete)                    Practically never
-ECE    E        ECN echo: "a router marked congestion"    With ECN negotiated
-CWR    W        Congestion window reduced (ECN response)  With ECN negotiated
-```
+| Flag | tcpdump | Meaning | When you see it |
+| --- | --- | --- | --- |
+| SYN | `S` | Synchronise: open, carries the initial sequence number and the options | First packet of a connection |
+| ACK | `.` | The acknowledgment field is valid | Every segment after the first SYN |
+| SYN+ACK | `S.` | "Yes, and here is my sequence number" | Second packet of the handshake |
+| PSH | `P` | Push: deliver to the application now; the sender has no more queued just now | Typically on the last segment of a write; not a message boundary |
+| FIN | `F` | No more data from me (graceful close) | Teardown; `F.` = FIN with ACK |
+| RST | `R` | Reset: abort, discard state | Closed port, abort, unknown connection |
+| URG | `U` | Urgent data (obsolete) | Practically never |
+| ECE | `E` | ECN echo: "a router marked congestion" | With ECN negotiated |
+| CWR | `W` | Congestion window reduced (ECN response) | With ECN negotiated |
 
 Combinations read left to right: `[P.]` is PSH+ACK (data), `[F.]` FIN+ACK, `[R.]` RST+ACK (the usual answer to a SYN on a closed port), `[R]` a bare reset, `[S.E]` or `[SEW]` a SYN negotiating ECN.
 
@@ -137,20 +102,7 @@ Combinations read left to right: `[P.]` is PSH+ACK (data), `[F.]` FIN+ACK, `[R.]
 
 Before any data flows, both ends agree to talk and learn each other's initial sequence number (ISN). Each side picks its ISN unpredictably (RFC 6528), so an off-path attacker cannot guess it and inject data.
 
-```
-THREE-WAY HANDSHAKE
-
-  client 198.18.42.10:48628                         server 198.18.43.10:8080
-     │  1  SYN  seq=2999890995                            │
-     │     win 64240, mss 1460, sackOK, TS, wscale 10     │
-     │───────────────────────────────────────────────────▶│ SYN_RECV
-     │  2  SYN-ACK  seq=3450125985 ack=2999890996         │
-     │     win 65160, mss 1460, sackOK, TS, wscale 10     │
-     │◀───────────────────────────────────────────────────│
-     │  3  ACK  ack=1 (relative)                          │
-ESTAB│───────────────────────────────────────────────────▶│ ESTABLISHED
-     │  data can follow immediately (or ride on packet 3) │
-```
+![The three-way handshake: client 198.18.42.10:48628 sends SYN seq=2999890995 with win 64240, mss 1460, sackOK, TS and wscale 10, and the server 198.18.43.10:8080 enters SYN_RECV; the server answers SYN-ACK seq=3450125985 ack=2999890996 with win 65160, mss 1460, sackOK, TS and wscale 10; the client sends ACK ack=1 (relative) and both ends are ESTABLISHED, after which data can follow immediately or ride on packet 3.](./img/11/tcp-handshake.svg)
 
 The SYN consumes one sequence number, so the SYN-ACK acknowledges ISN + 1. Each side announces its options in its own SYN; an option is used only if both offered it (MSS is the exception: each side simply tells the other the largest segment it wants to receive). Options cannot be renegotiated later. The client can send data right after packet 3, so a request costs one round trip of handshake before the first byte — plus TLS (Module 13) on top.
 
@@ -240,25 +192,7 @@ Linux queues backlog + 1 connections. On a **listening** socket `ss` repurposes 
 
 Each direction of a TCP connection is closed separately. A FIN means "I will send no more data"; the other side may keep sending until it closes too.
 
-```
-TEARDOWN (the client closes first)
-
-  client                                                 server
-  ESTABLISHED                                            ESTABLISHED
-     │  FIN  seq=3001                                       │
-     │─────────────────────────────────────────────────────▶│ CLOSE_WAIT  (application told: EOF)
-  FIN_WAIT_1                                                │
-     │            ACK  ack=3002                             │
-     │◀─────────────────────────────────────────────────────│
-  FIN_WAIT_2                                                │  application calls close()
-     │            FIN  seq=1                                │
-     │◀─────────────────────────────────────────────────────│ LAST_ACK
-  TIME_WAIT                                                 │
-     │  ACK  ack=2                                          │
-     │─────────────────────────────────────────────────────▶│ CLOSED
-  (60 s on Linux)
-  CLOSED
-```
+![Teardown when the client closes first: the client sends FIN seq=3001 and enters FIN_WAIT_1 while the server enters CLOSE_WAIT and its application is told EOF; the server's ACK ack=3002 moves the client to FIN_WAIT_2; when the server's application calls close() it sends FIN seq=1 and enters LAST_ACK; the client enters TIME_WAIT and sends ACK ack=2, the server is CLOSED, and the client stays in TIME_WAIT for 60 s on Linux before it is CLOSED.](./img/11/tcp-teardown.svg)
 
 In practice the server's ACK and FIN often travel together, as in the lab capture — three segments, not four:
 
@@ -276,18 +210,15 @@ A **half-close** — `shutdown(fd, SHUT_WR)` — sends a FIN while keeping the s
 
 A RST ends a connection at once: no FIN, no TIME_WAIT, unread data discarded at both ends. The peer's next `read()` or `write()` fails with `ECONNRESET` ("connection reset by peer"); a write after that gets `EPIPE` (and, unless ignored, `SIGPIPE`).
 
-```
-A HOST SENDS RST WHEN
-  - a SYN arrives for a port nobody listens on                      (Flags [R.] answering [S])
-  - an application closes with SO_LINGER set to 0 (deliberate abort)
-  - an application closes a socket that still has unread received data (RFC 2525)
-  - a segment arrives for a connection it has no record of — after a reboot, after the
-    connection was reset, after a stateful device lost its entry, or for a stray old segment
-  - a firewall or load balancer rejects (REJECT --reject-with tcp-reset), or an idle-timeout
-    on a middlebox expires and it resets the next packet it sees (or both ends)
-  NOT on a crash by itself: if a process dies, the kernel closes its sockets normally (FIN),
-  or with RST if unread data was pending. If the whole host dies, nothing is sent at all.
-```
+A host sends RST when:
+
+- a SYN arrives for a port nobody listens on (`Flags [R.]` answering `[S]`)
+- an application closes with SO_LINGER set to 0 (deliberate abort)
+- an application closes a socket that still has unread received data (RFC 2525)
+- a segment arrives for a connection it has no record of — after a reboot, after the connection was reset, after a stateful device lost its entry, or for a stray old segment
+- a firewall or load balancer rejects (`REJECT --reject-with tcp-reset`), or an idle-timeout on a middlebox expires and it resets the next packet it sees (or both ends)
+
+**Not** on a crash by itself: if a process dies, the kernel closes its sockets normally (FIN), or with RST if unread data was pending. If the whole host dies, nothing is sent at all.
 
 In the lab, a server reads the first kilobyte and closes with `SO_LINGER 0`. The client was in the middle of writing 4 MiB:
 
@@ -353,25 +284,11 @@ If the passive side never closes, the active side waits in FIN_WAIT_2 and the pa
 
 Every byte has a sequence number. A segment's `seq` is the number of its first byte; an `ack` is the number of the next byte the receiver expects — "everything before this has arrived". ACKs are cumulative: one ACK can acknowledge many segments, and receivers delay ACKs to send fewer of them — Linux acknowledges at least every second full segment, and otherwise waits typically 40 ms (at most 200 ms); during slow start it ACKs immediately ("quickack").
 
-```
-sender: seq 1:1449      ───▶  receiver: ack 1449
-sender: seq 1449:2897   ───▶  receiver: ack 2897
-sender: seq 2897:3001   ───▶  receiver: ack 3001     ← all 3000 bytes received
-```
+![Sequence and acknowledgment numbers for a 3000-byte write: the sender sends seq 1:1449 and the receiver answers ack 1449, then seq 1449:2897 and ack 2897, then seq 2897:3001 and ack 3001, meaning all 3000 bytes were received.](./img/11/seq-ack.svg)
 
 ### Detecting a loss: duplicate ACKs, SACK, RACK
 
-```
-LOSS OF ONE SEGMENT (classic view)
-
-  seq 1001:2001 ───▶                      ack 2001
-  seq 2001:3001 ──✗ (lost)
-  seq 3001:4001 ───▶                      ack 2001, SACK {3001:4001}   duplicate ACK 1
-  seq 4001:5001 ───▶                      ack 2001, SACK {3001:5001}   duplicate ACK 2
-  seq 5001:6001 ───▶                      ack 2001, SACK {3001:6001}   duplicate ACK 3
-                     → fast retransmit of 2001:3001, about one RTT after the loss
-                                          ack 6001                      hole filled
-```
+![Loss of one segment, classic view: seq 1001:2001 is acknowledged with ack 2001; seq 2001:3001 is lost; seq 3001:4001, 4001:5001 and 5001:6001 each produce ack 2001 with SACK blocks {3001:4001}, {3001:5001} and {3001:6001}, duplicate ACKs 1 to 3; the sender then fast-retransmits 2001:3001, about one RTT after the loss, and ack 6001 shows the hole filled.](./img/11/fast-retransmit.svg)
 
 The receiver keeps acknowledging the last in-order byte; each such duplicate ACK says "something arrived, but there is a hole". Classic TCP (RFC 5681) retransmits after three duplicate ACKs. With SACK (11.9) the receiver also lists the blocks it does hold, so the sender repairs exactly the holes. Modern Linux detects loss primarily by time (RACK, RFC 8985): a segment is presumed lost when a segment sent sufficiently later has already been acknowledged — robust against reordering and against losses at the end of a burst. For a tail loss, where nothing follows to trigger duplicate ACKs, Linux sends a **tail loss probe** (TLP) after about two RTTs, retransmitting the last segment to provoke a SACK.
 
@@ -428,19 +345,7 @@ The path returned partway through the last wait, but TCP only found out at its n
 
 The receiver advertises how much more data it can buffer — the **receive window** (rwnd) — in every segment. The sender never has more unacknowledged data in flight than that window. When the receiving application stops reading, its buffer fills, the advertised window falls to zero, and the sender stops.
 
-```
-ZERO WINDOW
-
-  sender                                   receiver (application not reading)
-    │ data ─────────────────────────────▶ │ buffer filling
-    │ ◀──────────────── ack, win 1448     │
-    │ data ─────────────────────────────▶ │ buffer full
-    │ ◀──────────────── ack, win 0        │ "stop"
-    │ window probe (persist timer) ─────▶ │
-    │ ◀──────────────── ack, win 0        │ probes back off: 0.2, 0.4, 0.9, 1.7, 3.5 s …
-    │ …                                   │ application reads
-    │ ◀──────────────── window update     │ "resume"
-```
+![A zero window: the sender sends data while the receiver's buffer fills and is acknowledged with win 1448; more data fills the buffer and the receiver answers ack, win 0 ("stop"); the sender's persist timer sends window probes, each answered with win 0, and the probes back off at 0.2, 0.4, 0.9, 1.7, 3.5 s and so on; when the application reads, the receiver sends a window update ("resume").](./img/11/zero-window.svg)
 
 The sender's **persist timer** sends a probe — on Linux a zero-length segment carrying an old sequence number — so the receiver must answer with its current window; without probes, a lost window update would deadlock both sides. Probes back off exponentially, and as long as they are answered the connection never times out: a reader that stops reading can hold a writer for hours.
 
@@ -496,21 +401,7 @@ On a 100 ms path, reaching a 1 MB window takes about 7 RTTs — 0.7 s — so a s
 
 ### Loss-based: Reno and CUBIC
 
-```
-LOSS-BASED CONGESTION CONTROL (Reno illustration)
-
-  cwnd │            loss ×                      loss ×
-       │             ╱│                          ╱│
-       │           ╱  │ halve                  ╱  │
-       │         ╱    └──────╱─────────────╱      └──── …
-       │       ╱  slow       congestion avoidance:
-       │     ╱    start      +1 segment per RTT
-       │  ╱       (doubling per RTT)
-       └──────────────────────────────────────────── time
-
-  Fast-retransmit loss:  ssthresh = cwnd × β; cwnd = ssthresh   (Reno β = 0.5, CUBIC β = 0.7)
-  RTO timeout:           ssthresh = cwnd × β; cwnd = 1 segment and slow start again
-```
+![Loss-based congestion control, Reno illustration: the congestion window grows in slow start, doubling per RTT, until a loss; it is halved, then grows by one segment per RTT in congestion avoidance until the next loss halves it again, a sawtooth over time. On a fast-retransmit loss, ssthresh = cwnd × β and cwnd = ssthresh (Reno β = 0.5, CUBIC β = 0.7); on an RTO timeout, ssthresh = cwnd × β, cwnd = 1 segment and slow start begins again.](./img/11/cwnd-sawtooth.svg)
 
 - **Reno** grows by one segment per RTT and halves on loss.
 - **CUBIC** (RFC 9438; Linux's default since 2.6.19, and still the default on Ubuntu) grows along a cubic curve in time — fast while far below the window where the last loss happened, cautiously near it — and backs off to 70%. It is far better than Reno on long fat paths.
@@ -549,28 +440,7 @@ ECN (Explicit Congestion Notification, RFC 3168) lets routers mark packets inste
 
 ## 11.8 TCP States
 
-```
-TCP STATE MACHINE (the paths you will see)
-
-                          ┌──────────── CLOSED ────────────┐
-                 listen() │                                │ connect(): send SYN
-                          ▼                                ▼
-                       LISTEN                          SYN_SENT
-            recv SYN,     │                                │ recv SYN-ACK,
-            send SYN-ACK  ▼                                │ send ACK
-                       SYN_RECV ── recv ACK ──▶ ESTABLISHED ◀┘
-                                                    │
-                       active close: close()        │       passive close: recv FIN
-                       send FIN   ┌─────────────────┴─────────────────┐ send ACK
-                                  ▼                                   ▼
-                             FIN_WAIT_1                           CLOSE_WAIT
-               recv ACK of FIN │     │ recv FIN (simultaneous)         │ close(): send FIN
-                               ▼     ▼                                 ▼
-                         FIN_WAIT_2  CLOSING                       LAST_ACK
-                     recv FIN │        │ recv ACK                      │ recv ACK
-                              ▼        ▼                               ▼
-                             TIME_WAIT (60 s on Linux) ──▶ CLOSED   CLOSED
-```
+![The TCP state machine: from CLOSED, listen() leads to LISTEN and connect() (send SYN) to SYN_SENT; LISTEN goes to SYN_RECV on receiving a SYN and sending a SYN-ACK, and SYN_RECV to ESTABLISHED on receiving the ACK; SYN_SENT goes to ESTABLISHED on receiving the SYN-ACK and sending an ACK. An active close (close(), send FIN) leads from ESTABLISHED to FIN_WAIT_1, then to FIN_WAIT_2 on the ACK of the FIN or to CLOSING on receiving a FIN (simultaneous close), and from either to TIME_WAIT (60 s on Linux) and CLOSED. A passive close (receive FIN, send ACK) leads to CLOSE_WAIT, then on close() (send FIN) to LAST_ACK, and on the final ACK to CLOSED.](./img/11/tcp-states.svg)
 
 `ss` prints these with hyphens (`SYN-SENT`, `CLOSE-WAIT`, `TIME-WAIT`), `tcp_info` and the RFC with underscores.
 
@@ -706,15 +576,7 @@ The lab uses [`tcplab`](../labs/go/cmd/tcplab), a Go tool written for it. `tcpla
 
 [`tcp.json`](../labs/netlab/tcp.json):
 
-```
-  client 198.18.42.10 ──── router ──── server 198.18.43.10
-
-  client: tcp_syn_retries = 2
-  router: DROP :8085 · REJECT tcp-reset :8086 · REJECT (ICMP port unreachable) :8087
-          REJECT icmp-host-prohibited :8088
-  server: tcplab serve  :8080 discard  :8081 hold  :8082 noread (4 KB buffer)
-                        :8083 noaccept (backlog 2)  :8084 reset  :8089 close
-```
+![The TCP lab: client 198.18.42.10, a router and server 198.18.43.10 in a line. The client has tcp_syn_retries = 2. The router drops port 8085, rejects 8086 with a TCP reset, rejects 8087 with ICMP port unreachable and rejects 8088 with icmp-host-prohibited. The server runs tcplab serve: 8080 discard, 8081 hold, 8082 noread with a 4 KB buffer, 8083 noaccept with backlog 2, 8084 reset and 8089 close.](./img/11/tcp-lab.svg)
 
 ```bash
 cd labs/go

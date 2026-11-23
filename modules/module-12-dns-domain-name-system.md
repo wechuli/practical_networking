@@ -49,25 +49,7 @@ That ordering is why a forgotten line in `/etc/hosts` (a test entry, or one writ
 
 ## 12.2 DNS Architecture
 
-```
-DNS RESOLUTION — WHO TALKS TO WHOM
-
-  application ── getaddrinfo() ──▶ STUB RESOLVER (in the OS or the runtime)
-                                    reads /etc/hosts, /etc/resolv.conf;
-                                    sends ONE recursive query (RD=1)
-                                            │
-                                            ▼
-                                   RECURSIVE RESOLVER (caching, often validating)
-                                    systemd-resolved → corporate/ISP/cloud resolver,
-                                    8.8.8.8, 1.1.1.1, 9.9.9.9 …
-                                    answers from cache, or asks iteratively (RD=0):
-              ┌─────────────────────────────┼─────────────────────────────┐
-              ▼                             ▼                             ▼
-         ROOT SERVERS                   TLD SERVERS                 AUTHORITATIVE
-         "test. is served by           "shop.test. is served       "app.shop.test is
-          ns.tld.test, here is          by ns.shop.test, here       198.18.70.10, TTL 10"
-          its address (glue)"           is its address (glue)"      (aa: authoritative answer)
-```
+![An application calls getaddrinfo() on the stub resolver, which reads /etc/hosts and /etc/resolv.conf and sends one recursive query (RD=1) to a caching, often validating recursive resolver such as systemd-resolved, a corporate, ISP or cloud resolver, 8.8.8.8, 1.1.1.1 or 9.9.9.9; the recursive resolver answers from cache or asks iteratively (RD=0): the root servers refer it to ns.tld.test for test. with glue, the TLD servers refer it to ns.shop.test for shop.test. with glue, and the authoritative server answers app.shop.test is 198.18.70.10, TTL 10, with aa set.](./img/12/dns-resolution-roles.svg)
 
 - **Stub resolver.** The DNS client library: glibc's resolver, musl's (Alpine), systemd-resolved behind its 127.0.0.53 stub listener on Ubuntu, Go's built-in resolver, the JVM's. It sends a recursive query and waits; glibc and musl cache nothing.
 - **Recursive (caching) resolver.** Does the work: walks the hierarchy, caches every answer it gets (positive, negative and referrals) for the TTL, and — if validating — checks DNSSEC signatures. In clouds this is the platform resolver (AWS VPC base + 2 / 169.254.169.253, Azure 168.63.129.16, GCP's metadata server); in Kubernetes it is CoreDNS forwarding to the node's resolver.
@@ -110,38 +92,23 @@ A real validating resolver does not ask exactly these questions. The lab capture
 
 ## 12.3 DNS Record Types
 
-```
-RECORD  WHAT IT HOLDS                                EXAMPLE
-──────  ───────────────────────────────────────────  ──────────────────────────────────────────────
-A       IPv4 address                                 app.shop.test.     10  A      198.18.70.10
-AAAA    IPv6 address                                 app.example.       300 AAAA   2001:db8::10
-CNAME   "this name is an alias for that one"         www.shop.test.     10  CNAME  edge.shop.test.
-        A name with a CNAME may have NO other data (RFC 1034/2181) — so not at a zone apex,
-        which must have SOA and NS. Providers offer ALIAS/ANAME/"CNAME flattening" there instead:
-        the provider resolves the target and serves A/AAAA records.
-        Each CNAME hop can be another lookup, possibly in another zone (12.5).
-MX      Mail exchanger, with preference              shop.test.         MX     10 mx1.shop.test.
-        (lower is preferred); must point at a name with A/AAAA, never a CNAME (RFC 2181)
-NS      The zone's (or a delegated child's) servers  shop.test.         NS     ns.shop.test.
-SOA     Zone metadata: primary server, contact,      shop.test. 20 SOA  ns.shop.test. hostmaster.shop.test.
-        serial, refresh, retry, expire, MINIMUM         3 3600 900 604800 3600
-        (MINIMUM is now only the negative-caching cap; see 12.4)
-PTR     Reverse lookup: address → name, under        10.70.18.198.in-addr.arpa. PTR app.shop.test.
-        in-addr.arpa / ip6.arpa; set by whoever controls the address block (often your cloud/ISP)
-TXT     Free text: SPF, DKIM, DMARC, domain          _dmarc.shop.test.  TXT    "v=DMARC1; p=reject"
-        verification, ACME challenges (_acme-challenge)
-SRV     Service location: priority weight port      _sip._tcp.shop.test. SRV 10 60 5060 sip1.shop.test.
-        target — used by Kubernetes (_port._proto.svc.ns.svc.cluster.local), AD, SIP, XMPP
-CAA     Which certificate authorities may issue     shop.test.         CAA    0 issue "letsencrypt.org"
-        for the name (CAs must check, RFC 8659)
-HTTPS / Endpoint and protocol hints for a service:  shop.test. HTTPS 1 . alpn="h2,h3"
-SVCB    ALPN (h2, h3), ports, address hints, ECH keys (RFC 9460); browsers query them alongside A/AAAA
-DS      In the PARENT zone: hash of the child's key  secure.test.       DS     40728 13 2 …
-DNSKEY  In the zone: its public keys                 secure.test.       DNSKEY 257 3 13 …
-RRSIG   A signature over one record set              www.secure.test.   RRSIG  A 13 3 300 …
-NSEC/   Signed proof that a name or type does not exist (NSEC3 hashes the names)
-NSEC3
-```
+| Record | What it holds | Example |
+| --- | --- | --- |
+| A | IPv4 address | `app.shop.test. 10 A 198.18.70.10` |
+| AAAA | IPv6 address | `app.example. 300 AAAA 2001:db8::10` |
+| CNAME | "this name is an alias for that one". A name with a CNAME may have NO other data (RFC 1034/2181) — so not at a zone apex, which must have SOA and NS. Providers offer ALIAS/ANAME/"CNAME flattening" there instead: the provider resolves the target and serves A/AAAA records. Each CNAME hop can be another lookup, possibly in another zone (12.5). | `www.shop.test. 10 CNAME edge.shop.test.` |
+| MX | Mail exchanger, with preference (lower is preferred); must point at a name with A/AAAA, never a CNAME (RFC 2181) | `shop.test. MX 10 mx1.shop.test.` |
+| NS | The zone's (or a delegated child's) servers | `shop.test. NS ns.shop.test.` |
+| SOA | Zone metadata: primary server, contact, serial, refresh, retry, expire, MINIMUM (MINIMUM is now only the negative-caching cap; see 12.4) | `shop.test. 20 SOA ns.shop.test. hostmaster.shop.test. 3 3600 900 604800 3600` |
+| PTR | Reverse lookup: address → name, under in-addr.arpa / ip6.arpa; set by whoever controls the address block (often your cloud/ISP) | `10.70.18.198.in-addr.arpa. PTR app.shop.test.` |
+| TXT | Free text: SPF, DKIM, DMARC, domain verification, ACME challenges (`_acme-challenge`) | `_dmarc.shop.test. TXT "v=DMARC1; p=reject"` |
+| SRV | Service location: priority weight port target — used by Kubernetes (`_port._proto.svc.ns.svc.cluster.local`), AD, SIP, XMPP | `_sip._tcp.shop.test. SRV 10 60 5060 sip1.shop.test.` |
+| CAA | Which certificate authorities may issue for the name (CAs must check, RFC 8659) | `shop.test. CAA 0 issue "letsencrypt.org"` |
+| HTTPS / SVCB | Endpoint and protocol hints for a service: ALPN (h2, h3), ports, address hints, ECH keys (RFC 9460); browsers query them alongside A/AAAA | `shop.test. HTTPS 1 . alpn="h2,h3"` |
+| DS | In the PARENT zone: hash of the child's key | `secure.test. DS 40728 13 2 …` |
+| DNSKEY | In the zone: its public keys | `secure.test. DNSKEY 257 3 13 …` |
+| RRSIG | A signature over one record set | `www.secure.test. RRSIG A 13 3 300 …` |
+| NSEC / NSEC3 | Signed proof that a name or type does not exist (NSEC3 hashes the names) | |
 
 ```bash
 dig app.shop.test                 # A by default
@@ -159,23 +126,13 @@ Every record has a **TTL**: how many seconds a resolver may keep it. A cache ret
 
 ### Where answers are cached
 
-```
-LAYER                        CACHES?                                   FLUSH / INSPECT
-───────────────────────────  ────────────────────────────────────────  ─────────────────────────────────
-Application / runtime        JVM: positive 30 s, negative 10 s by      restart, or the runtime's settings
-                             default (networkaddress.cache.ttl);       (Java security properties, etc.)
-                             browsers keep their own short-lived cache; chrome://net-internals/#dns
-                             many HTTP clients reuse connections and
-                             never re-resolve while they are open
-Stub resolver                glibc, musl, Go: NO cache                 —
-OS caching service           systemd-resolved (Ubuntu), nscd,           resolvectl flush-caches /
-                             Windows DNS Client, macOS mDNSResponder    statistics; ipconfig /flushdns;
-                                                                        sudo dscacheutil -flushcache
-Node-local / sidecar cache   NodeLocal DNSCache, dnsmasq, CoreDNS       per product
-Recursive resolver           yes — positive, negative, referrals,       only its operator can flush
-                             failures (RFC 9520), sometimes stale       (public resolvers have purge pages)
-                             data (serve-stale, RFC 8767)
-```
+| Layer | Caches? | Flush / inspect |
+| --- | --- | --- |
+| Application / runtime | JVM: positive 30 s, negative 10 s by default (`networkaddress.cache.ttl`); browsers keep their own short-lived cache; many HTTP clients reuse connections and never re-resolve while they are open | restart, or the runtime's settings (Java security properties, etc.); `chrome://net-internals/#dns` |
+| Stub resolver | glibc, musl, Go: NO cache | — |
+| OS caching service | systemd-resolved (Ubuntu), nscd, Windows DNS Client, macOS mDNSResponder | `resolvectl flush-caches` / `statistics`; `ipconfig /flushdns`; `sudo dscacheutil -flushcache` |
+| Node-local / sidecar cache | NodeLocal DNSCache, dnsmasq, CoreDNS | per product |
+| Recursive resolver | yes — positive, negative, referrals, failures (RFC 9520), sometimes stale data (serve-stale, RFC 8767) | only its operator can flush (public resolvers have purge pages) |
 
 ### A change, followed through the caches
 
@@ -215,22 +172,7 @@ NXDOMAIN applies to the name and every type; NODATA is cached per type. The lab'
 
 ### Changing records safely
 
-```
-MIGRATION WITH CACHES IN MIND
-  T−(old TTL + margin)  Lower the record's TTL (say 3600 → 60). Caches holding the old
-                        record keep the OLD TTL until it expires, so wait at least the old
-                        TTL before relying on the new one.
-  T                     Change the record. Keep the old endpoint serving: some caches,
-                        long-lived connections and misbehaving clients will still use it.
-  T + new TTL           Most clients have moved. Verify from several resolvers and networks
-                        (dnslab watch, dig @…), and watch the old endpoint's traffic drain.
-  Later                 Raise the TTL again.
-  Mistake to avoid      Changing the address and lowering the TTL at the same time: caches
-                        already holding the record ignore the new TTL until theirs expires.
-  Also remember         Resolvers may clamp TTLs (cache-min-ttl, cache-max-ttl), serve stale
-                        data when the authority is unreachable (RFC 8767), and a JVM caches
-                        independently. Low TTLs cost queries; they do not guarantee speed.
-```
+![A migration timeline: at T minus (old TTL plus a margin), lower the record's TTL, say 3600 to 60, and wait at least the old TTL; at T, change the record and keep the old endpoint serving; at T plus the new TTL most clients have moved, so verify from several resolvers and watch the old endpoint drain; later, raise the TTL again. Mistake to avoid: changing the address and lowering the TTL at the same time. Also remember resolvers may clamp TTLs or serve stale data, a JVM caches independently, and low TTLs cost queries without guaranteeing speed.](./img/12/ttl-migration.svg)
 
 ---
 
@@ -274,30 +216,15 @@ Three things a trace shows that a recursive query hides: **which server failed**
 
 ## 12.6 DNS over UDP, TCP and Encrypted Transports
 
-```
-DNS TRANSPORT
-  UDP 53      The default: one datagram each way, no handshake.
-              Without EDNS a UDP answer is limited to 512 bytes (RFC 1035).
-              EDNS(0) (RFC 6891) lets the client advertise a bigger buffer. The DNS Flag Day
-              2020 recommendation is 1232 bytes — small enough to avoid IP fragmentation on
-              almost any path — and it is now the default in BIND, Unbound, Knot and PowerDNS
-              (every response in the lab shows "udp: 1232").
-  TCP 53      Mandatory to support (RFC 7766), not a fallback for the odd case:
-              - a UDP answer that does not fit comes back truncated (TC flag) and the client
-                repeats the question over TCP — the lab's 1662-byte TXT record does this;
-              - zone transfers (AXFR, and large IXFR) use TCP;
-              - resolvers may switch to TCP when they suspect spoofing.
-              Firewalls that allow UDP 53 but not TCP 53 break large answers (DNSSEC, many
-              TXT/MX records, long CNAME chains) and nothing else — a confusing partial outage.
-  DoT  TCP 853  DNS over TLS (RFC 7858): encrypted stub ↔ resolver.
-  DoH  TCP 443  DNS over HTTPS (RFC 8484): DNS messages in HTTPS requests to a URL
-              (https://dns.google/dns-query). Indistinguishable from web traffic, which is the
-              point for privacy and the problem for enterprise policy and split-horizon names:
-              a browser using its own DoH resolver bypasses the corporate resolver.
-  DoQ  UDP 853  DNS over QUIC (RFC 9250).
-  Encryption between stub and resolver says nothing about resolver ↔ authoritative traffic,
-  and nothing about whether the answer is genuine — that is DNSSEC's job.
-```
+| Transport | Details |
+| --- | --- |
+| UDP 53 | The default: one datagram each way, no handshake. Without EDNS a UDP answer is limited to 512 bytes (RFC 1035). EDNS(0) (RFC 6891) lets the client advertise a bigger buffer. The DNS Flag Day 2020 recommendation is 1232 bytes — small enough to avoid IP fragmentation on almost any path — and it is now the default in BIND, Unbound, Knot and PowerDNS (every response in the lab shows "udp: 1232"). |
+| TCP 53 | Mandatory to support (RFC 7766), not a fallback for the odd case: a UDP answer that does not fit comes back truncated (TC flag) and the client repeats the question over TCP — the lab's 1662-byte TXT record does this; zone transfers (AXFR, and large IXFR) use TCP; resolvers may switch to TCP when they suspect spoofing. Firewalls that allow UDP 53 but not TCP 53 break large answers (DNSSEC, many TXT/MX records, long CNAME chains) and nothing else — a confusing partial outage. |
+| DoT, TCP 853 | DNS over TLS (RFC 7858): encrypted stub ↔ resolver. |
+| DoH, TCP 443 | DNS over HTTPS (RFC 8484): DNS messages in HTTPS requests to a URL (`https://dns.google/dns-query`). Indistinguishable from web traffic, which is the point for privacy and the problem for enterprise policy and split-horizon names: a browser using its own DoH resolver bypasses the corporate resolver. |
+| DoQ, UDP 853 | DNS over QUIC (RFC 9250). |
+
+Encryption between stub and resolver says nothing about resolver ↔ authoritative traffic, and nothing about whether the answer is genuine — that is DNSSEC's job.
 
 Module 10's lab measured UDP vs TCP for the same lookup (2 packets vs 10) and the TC retry; this module's lab repeats the truncation through a recursive resolver: `UDP truncated (tc), then TCP in 1.9 ms, 1662 bytes`.
 
@@ -329,25 +256,20 @@ If `+cd` works and the normal query fails, the problem is validation — expired
 
 Split-horizon DNS returns different answers depending on who asks — typically a private address to clients inside a network and a public one (or nothing) outside. The lab's `corp.test` server has two BIND **views**, matched on the resolver's source address:
 
-```
-office (internal resolver 198.18.60.2)          cloud (public resolver 198.18.62.2)
-  api.corp.test → 10.20.0.10                      api.corp.test → 192.0.2.10
-  git.corp.test → 10.20.0.20                      git.corp.test → NXDOMAIN (internal only)
-```
+| Name | office (internal resolver 198.18.60.2) | cloud (public resolver 198.18.62.2) |
+| --- | --- | --- |
+| `api.corp.test` | 10.20.0.10 | 192.0.2.10 |
+| `git.corp.test` | 10.20.0.20 | NXDOMAIN (internal only) |
 
 The answer depends on **which resolver asked the authoritative server**, not where the client is — which is why a VPN that does not change the client's resolver, or a container that uses a different resolver than its host, gets the "wrong" view. The office resolver also only serves its own subnet: the cloud client asking it directly gets `status: REFUSED` with `EDE: 18 (Prohibited)` — an access-control decision, not a missing name.
 
 Cloud platforms implement the same idea as **private zones attached to networks**:
 
-```
-AWS    Route 53 private hosted zone, associated with specific VPCs; answered by the VPC
-       resolver (VPC base + 2, or 169.254.169.253). A VPC not associated with the zone falls
-       through to public DNS — NXDOMAIN or the public record.
-Azure  Private DNS zone with virtual network links; the platform resolver 168.63.129.16
-       answers for linked VNets only.
-GCP    Cloud DNS private zone authorised for VPC networks; the metadata server
-       (169.254.169.254) resolves for instances.
-```
+| Cloud | Private zones |
+| --- | --- |
+| AWS | Route 53 private hosted zone, associated with specific VPCs; answered by the VPC resolver (VPC base + 2, or 169.254.169.253). A VPC not associated with the zone falls through to public DNS — NXDOMAIN or the public record. |
+| Azure | Private DNS zone with virtual network links; the platform resolver 168.63.129.16 answers for linked VNets only. |
+| GCP | Cloud DNS private zone authorised for VPC networks; the metadata server (169.254.169.254) resolves for instances. |
 
 Debug split horizon by asking each resolver explicitly, from each network: `dig @10.0.0.2 api.internal.example` from inside the VPC, `dig @8.8.8.8 …` from outside, and compare. If you need private answers from outside (a laptop on a VPN, another cloud), the resolver your client uses must forward that zone to a resolver that can see it — see 12.11.
 
@@ -355,24 +277,16 @@ Debug split horizon by asking each resolver explicitly, from each network: `dig 
 
 ## 12.9 DNS-Based Load Balancing and Failover
 
-```
-DNS TRAFFIC STEERING
-  Multiple records   Several A/AAAA records; resolvers rotate or shuffle their order (Unbound's
-                     rrset-roundrobin is on by default). The client usually tries the first address after
-                     sorting by RFC 6724 rules — which can undo the rotation, so the spread
-                     is often uneven.
-  Weighted           The provider returns record sets in proportion to weights (canaries,
-                     gradual migrations).
-  Latency / geo      The provider answers based on the RESOLVER's location — or the client
-                     subnet the resolver passes on (ECS, RFC 7871). A client using a distant
-                     public resolver can be sent to a distant region.
-  Health-checked     Unhealthy endpoints are withdrawn from answers.
-  Failover time ≈ health-check detection + record TTL + client-side caching and connection
-  reuse. Clients that resolve once at start-up never fail over at all.
-  DNS does not see load, does not keep sessions together, and cannot move an open
-  connection. Use it for coarse placement and failover; use load balancers (Module 23)
-  for balancing.
-```
+| Method | How it works |
+| --- | --- |
+| Multiple records | Several A/AAAA records; resolvers rotate or shuffle their order (Unbound's `rrset-roundrobin` is on by default). The client usually tries the first address after sorting by RFC 6724 rules — which can undo the rotation, so the spread is often uneven. |
+| Weighted | The provider returns record sets in proportion to weights (canaries, gradual migrations). |
+| Latency / geo | The provider answers based on the RESOLVER's location — or the client subnet the resolver passes on (ECS, RFC 7871). A client using a distant public resolver can be sent to a distant region. |
+| Health-checked | Unhealthy endpoints are withdrawn from answers. |
+
+Failover time ≈ health-check detection + record TTL + client-side caching and connection reuse. Clients that resolve once at start-up never fail over at all.
+
+DNS does not see load, does not keep sessions together, and cannot move an open connection. Use it for coarse placement and failover; use load balancers (Module 23) for balancing.
 
 ---
 
@@ -417,13 +331,7 @@ Managed services reached privately (Azure Private Link, AWS PrivateLink interfac
 
 To resolve private names from somewhere else — on-premises, another VPC, another cloud — the client's resolver must **conditionally forward** the private zone to a resolver inside the network that owns it:
 
-```
-on-prem / other cloud resolver   ── forward "internal.example" ──▶  inbound endpoint in the VPC/VNet
-                                                                       AWS: Route 53 Resolver inbound endpoint
-                                                                       Azure: DNS Private Resolver inbound endpoint
-                                                                       (GCP: inbound server policy)
-cloud workloads needing on-prem names ── outbound endpoint + forwarding rule ──▶ on-prem DNS servers
-```
+![An on-premises or other-cloud resolver forwards "internal.example" to an inbound endpoint in the VPC or VNet (AWS: Route 53 Resolver inbound endpoint; Azure: DNS Private Resolver inbound endpoint; GCP: inbound server policy); cloud workloads needing on-premises names use an outbound endpoint and a forwarding rule to reach the on-premises DNS servers.](./img/12/hybrid-dns-forwarding.svg)
 
 The platform resolvers (VPC base + 2, 168.63.129.16, 169.254.169.254) are reachable only from inside their own network, which is why the inbound endpoints exist. Two frequent mistakes: setting a VNet or VPC to use **custom DNS servers** that do not forward to the platform resolver (private zones and private endpoints stop resolving), and forwarding loops between two resolvers that each forward the zone to the other (SERVFAIL after a timeout).
 
@@ -539,20 +447,10 @@ The lab's namespaces get their own `/etc/resolv.conf`, `/etc/hosts` and BIND/Unb
 
 [`dns.json`](../labs/netlab/dns.json):
 
-```
-                                 ┌──────── net (router) ────────┐
-  root     198.18.50.2  "."       │                              │   resolver 198.18.60.2  Unbound, validating,
-  tld      198.18.51.2  "test."   │                              │            serves 198.18.61.0/24 only
-  auth1    198.18.52.2/.3         │   198.18.53.0/24 is          │   public   198.18.62.2  Unbound, serves anyone
-           corp.test (2 views),   │   black-holed (slow.test)    │   office   198.18.61.10 → resolver
-           secure.test, expired.test                             │   cloud    198.18.63.10 → public
-  auth2    198.18.54.2  shop.test │                              │
-                                 └──────────────────────────────┘
-  test. delegates: corp (auth1), shop (auth2), secure + expired (auth1, signed, with DS),
-                   broken (→ auth1, which does not serve it: lame), slow (→ 198.18.53.2: dead)
-  ".", "test.", secure.test and expired.test are signed at setup (expired.test with signatures
-  that expired yesterday); both resolvers trust the lab's own root key.
-```
+![The DNS lab: a router named net connects root 198.18.50.2 ("."), tld 198.18.51.2 ("test."), auth1 198.18.52.2/.3 (corp.test with two views, secure.test, expired.test) and auth2 198.18.54.2 (shop.test) on one side, and on the other the validating Unbound resolver 198.18.60.2 that serves 198.18.61.0/24 only, the public Unbound 198.18.62.2 that serves anyone, the office client 198.18.61.10 using the resolver and the cloud client 198.18.63.10 using public; 198.18.53.0/24 is black-holed for slow.test.](./img/12/dns-lab-topology.svg)
+
+- `test.` delegates: corp (auth1), shop (auth2), secure + expired (auth1, signed, with DS), broken (→ auth1, which does not serve it: lame), slow (→ 198.18.53.2: dead).
+- `.`, `test.`, `secure.test` and `expired.test` are signed at setup (`expired.test` with signatures that expired yesterday); both resolvers trust the lab's own root key.
 
 ```bash
 cd labs/go

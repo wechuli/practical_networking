@@ -4,4 +4,6 @@ __pycache__/
 artifacts/
 labs/go/bin/
 labs/go/rfc-index.xml
-book/
+node_modules/
+.vitepress/dist/
+.vitepress/cache/

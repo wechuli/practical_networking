@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" role="img" aria-labelledby="t d"><title id="t">Circuit switching versus packet switching</title><desc id="d">Circuit switching: a reserved path from caller to callee through Switch A, Switch B and Switch C (hops 1 to 3) is held for the duration of the call; the capacity reserved on it cannot be used by anyone else. Packet switching: packet 1 goes from the sender through Router A and Router B, packet 2 through Router A and Router C, and packet 3 through Router D and Router B, to the receiver. Each packet is forwarded independently; links are shared with other traffic and each router has a queue; if Router B fails, packets can be routed around it.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="518" rx="16"/>
+<text class="zl" x="24" y="34">CIRCUIT SWITCHING</text>
+<text class="l" x="400" y="62" text-anchor="middle">Reserved path — held for duration of call</text>
+<rect class="l3" x="100" y="104" width="600" height="32" rx="16"/>
+<rect class="net" x="24" y="100" width="110" height="40" rx="10"/>
+<text class="t" x="79.0" y="125.0" text-anchor="middle">Caller</text>
+<rect class="net" x="666" y="100" width="110" height="40" rx="10"/>
+<text class="t" x="721.0" y="125.0" text-anchor="middle">Callee</text>
+<text class="s" x="250" y="92" text-anchor="middle">Hop 1</text>
+<rect class="net" x="200" y="102" width="100" height="36" rx="10"/>
+<text class="l" x="250.0" y="124.0" text-anchor="middle">Switch A</text>
+<text class="s" x="400" y="92" text-anchor="middle">Hop 2</text>
+<rect class="net" x="350" y="102" width="100" height="36" rx="10"/>
+<text class="l" x="400.0" y="124.0" text-anchor="middle">Switch B</text>
+<text class="s" x="550" y="92" text-anchor="middle">Hop 3</text>
+<rect class="net" x="500" y="102" width="100" height="36" rx="10"/>
+<text class="l" x="550.0" y="124.0" text-anchor="middle">Switch C</text>
+<text class="s" x="250" y="170" text-anchor="middle">Capacity reserved</text>
+<text class="s" x="250" y="187" text-anchor="middle">Can’t be used</text>
+<text class="s" x="250" y="204" text-anchor="middle">by anyone else</text>
+<text class="s" x="550" y="170" text-anchor="middle">Capacity reserved</text>
+<text class="s" x="550" y="187" text-anchor="middle">Can’t be used</text>
+<text class="s" x="550" y="204" text-anchor="middle">by anyone else</text>
+<path class="line" d="M24 240 H776"/>
+<text class="zl" x="24" y="272">PACKET SWITCHING</text>
+<rect class="net" x="24" y="290" width="110" height="140" rx="10"/>
+<text class="t" x="79.0" y="365.0" text-anchor="middle">Sender</text>
+<rect class="net" x="666" y="290" width="110" height="140" rx="10"/>
+<text class="t" x="721.0" y="365.0" text-anchor="middle">Receiver</text>
+<path class="arrow" d="M134 328 H254"/>
+<text class="l" x="194" y="322" text-anchor="middle">Packet 1</text>
+<rect class="net" x="256" y="310" width="120" height="36" rx="10"/>
+<text class="l" x="316.0" y="332.0" text-anchor="middle">Router A</text>
+<path class="arrow" d="M376 328 H434"/>
+<rect class="net" x="436" y="310" width="120" height="36" rx="10"/>
+<text class="l" x="496.0" y="332.0" text-anchor="middle">Router B</text>
+<path class="arrow" d="M556 328 H664"/>
+<path class="arrow" d="M134 372 H254"/>
+<text class="l" x="194" y="366" text-anchor="middle">Packet 2</text>
+<rect class="net" x="256" y="354" width="120" height="36" rx="10"/>
+<text class="l" x="316.0" y="376.0" text-anchor="middle">Router A</text>
+<path class="arrow" d="M376 372 H434"/>
+<rect class="net" x="436" y="354" width="120" height="36" rx="10"/>
+<text class="l" x="496.0" y="376.0" text-anchor="middle">Router C</text>
+<path class="arrow" d="M556 372 H664"/>
+<path class="arrow" d="M134 416 H254"/>
+<text class="l" x="194" y="410" text-anchor="middle">Packet 3</text>
+<rect class="net" x="256" y="398" width="120" height="36" rx="10"/>
+<text class="l" x="316.0" y="420.0" text-anchor="middle">Router D</text>
+<path class="arrow" d="M376 416 H434"/>
+<rect class="net" x="436" y="398" width="120" height="36" rx="10"/>
+<text class="l" x="496.0" y="420.0" text-anchor="middle">Router B</text>
+<path class="arrow" d="M556 416 H664"/>
+<text class="s" x="24" y="456">Each packet forwarded independently.</text>
+<text class="s" x="24" y="475">Links shared with other traffic; each router has a queue.</text>
+<text class="s" x="24" y="494">If Router B fails, packets can be routed around it.</text>
+</svg>

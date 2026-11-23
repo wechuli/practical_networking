@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 672" role="img" aria-labelledby="t d"><title id="t">Encapsulation on the sending side and decapsulation on the receiving side</title><desc id="d">Sending side, top-down: at layer 7 the application data is HTTP GET /index.html. Layer 4 adds a TCP header with source port, destination port and sequence and acknowledgment numbers, making a segment. Layer 3 adds an IP header with source IP, destination IP and TTL, making a packet. Layer 2 adds an Ethernet header with source MAC, destination MAC and type, plus an FCS trailer, making a frame. Layer 1 sends the frame as bits: electrical signals, light pulses or radio waves on the medium. Receiving side, bottom-up: the exact reverse, each layer strips its header, processes it and hands the payload up: bits, frame, packet, segment, application data.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="670" rx="16"/>
+<text class="zl" x="24" y="32">Encapsulation — sending side (top-down)</text>
+<text class="t" x="24" y="66">Layer 7</text><text class="s" x="24" y="83">Application</text>
+<rect class="l7" x="390" y="48" width="190" height="40" rx="10"/><text class="m" x="485" y="72" text-anchor="middle">HTTP GET /index.html</text>
+<text class="l" x="650" y="73">Application data</text>
+<path class="arrow" d="M485 90 V120"/><text class="s" x="497" y="110">Pass down</text>
+<text class="t" x="24" y="160">Layer 4</text><text class="s" x="24" y="177">Transport</text>
+<rect class="l4" x="300" y="122" width="90" height="84" rx="10"/><text class="l" x="345" y="142" text-anchor="middle">TCP Hdr</text><text class="m" x="345" y="160" text-anchor="middle">SrcPort</text><text class="m" x="345" y="178" text-anchor="middle">DstPort</text><text class="m" x="345" y="196" text-anchor="middle">Seq/Ack</text>
+<rect class="l7" x="390" y="122" width="190" height="84" rx="10"/><text class="m" x="485" y="168" text-anchor="middle">HTTP GET /index.html</text>
+<text class="l" x="650" y="169">Segment</text>
+<path class="arrow" d="M485 208 V240"/><text class="s" x="497" y="229">Pass down</text>
+<text class="t" x="24" y="280">Layer 3</text><text class="s" x="24" y="297">Network</text>
+<rect class="l3" x="210" y="242" width="90" height="84" rx="10"/><text class="l" x="255" y="262" text-anchor="middle">IP Hdr</text><text class="m" x="255" y="280" text-anchor="middle">SrcIP</text><text class="m" x="255" y="298" text-anchor="middle">DstIP</text><text class="m" x="255" y="316" text-anchor="middle">TTL</text>
+<rect class="l4" x="300" y="242" width="90" height="84" rx="10"/><text class="l" x="345" y="288" text-anchor="middle">TCP Hdr</text>
+<rect class="l7" x="390" y="242" width="190" height="84" rx="10"/><text class="m" x="485" y="288" text-anchor="middle">HTTP GET /index.html</text>
+<text class="l" x="650" y="289">Packet</text>
+<path class="arrow" d="M485 328 V360"/><text class="s" x="497" y="349">Pass down</text>
+<text class="t" x="24" y="400">Layer 2</text><text class="s" x="24" y="417">Data Link</text>
+<rect class="l2" x="120" y="362" width="90" height="84" rx="10"/><text class="l" x="165" y="382" text-anchor="middle">Eth Hdr</text><text class="m" x="165" y="400" text-anchor="middle">SrcMAC</text><text class="m" x="165" y="418" text-anchor="middle">DstMAC</text><text class="m" x="165" y="436" text-anchor="middle">Type</text>
+<rect class="l3" x="210" y="362" width="90" height="84" rx="10"/><text class="l" x="255" y="408" text-anchor="middle">IP Hdr</text>
+<rect class="l4" x="300" y="362" width="90" height="84" rx="10"/><text class="l" x="345" y="408" text-anchor="middle">TCP Hdr</text>
+<rect class="l7" x="390" y="362" width="190" height="84" rx="10"/><text class="m" x="485" y="408" text-anchor="middle">HTTP GET /index.html</text>
+<rect class="l2" x="580" y="362" width="50" height="84" rx="10"/><text class="l" x="605" y="408" text-anchor="middle">FCS</text>
+<text class="l" x="650" y="409">Frame</text>
+<path class="arrow" d="M485 448 V480"/><text class="s" x="497" y="469">Pass down</text>
+<text class="t" x="24" y="498">Layer 1</text><text class="s" x="24" y="515">Physical</text>
+<rect class="box" x="120" y="482" width="510" height="36" rx="10"/><text class="m" x="375" y="505" text-anchor="middle">1 0 1 1 0 0 1 0 0 1 1 1 0 1 0 0 1 0 1 1 0 0 1 0 1 1 0 1</text>
+<text class="l" x="650" y="505">Bits</text>
+<text class="s" x="375" y="542" text-anchor="middle">Electrical signals / light pulses / radio waves on the medium</text>
+<text class="zl" x="24" y="582">Decapsulation — receiving side (bottom-up)</text>
+<text class="s" x="24" y="604">The exact reverse: each layer strips its header, processes it, and hands the payload to the layer above.</text>
+<rect class="box" x="43" y="618" width="90" height="36" rx="10"/><text class="l" x="88" y="641" text-anchor="middle">Bits</text>
+<path class="arrow" d="M135 636 H167"/>
+<rect class="l2" x="169" y="618" width="100" height="36" rx="10"/><text class="l" x="219" y="641" text-anchor="middle">Frame</text>
+<path class="arrow" d="M271 636 H303"/>
+<rect class="l3" x="305" y="618" width="100" height="36" rx="10"/><text class="l" x="355" y="641" text-anchor="middle">Packet</text>
+<path class="arrow" d="M407 636 H439"/>
+<rect class="l4" x="441" y="618" width="110" height="36" rx="10"/><text class="l" x="496" y="641" text-anchor="middle">Segment</text>
+<path class="arrow" d="M553 636 H585"/>
+<rect class="l7" x="587" y="618" width="170" height="36" rx="10"/><text class="l" x="672" y="641" text-anchor="middle">Application Data</text>
+</svg>

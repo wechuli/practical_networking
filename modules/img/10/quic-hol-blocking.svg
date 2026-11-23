@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 410" role="img" aria-labelledby="t d"><title id="t">Head-of-line blocking: HTTP/2 over TCP versus HTTP/3 over QUIC</title><desc id="d">HTTP/2 over TCP: a lost TCP segment on stream 1 blocks streams 2 and 3 as well, because they wait for stream 1's retransmission. HTTP/3 over QUIC over UDP: only stream 1 waits while its packet is retransmitted; streams 2 and 3 continue unblocked. Loss on one stream does not block the others.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="408" rx="16"/>
+<rect class="zone" x="20" y="20" width="760" height="180" rx="12"/>
+<text class="zl" x="36" y="44">HTTP/2 over TCP</text>
+<rect class="warn" x="620" y="32" width="16" height="16" rx="4"/>
+<text class="s" x="644" y="45">lost segment</text>
+<text class="l" x="40" y="80">Stream 1</text>
+<rect class="l7" x="130" y="62" width="160" height="24" rx="4"/>
+<rect class="warn" x="294" y="62" width="22" height="24" rx="4"/>
+<rect class="l7" x="320" y="62" width="140" height="24" rx="4"/>
+<text class="l" x="40" y="116">Stream 2</text>
+<rect class="l7" x="130" y="98" width="160" height="24" rx="4"/>
+<text class="s" x="304" y="115">← BLOCKED (waiting for Stream 1 retransmission)</text>
+<text class="l" x="40" y="152">Stream 3</text>
+<rect class="l7" x="130" y="134" width="160" height="24" rx="4"/>
+<text class="s" x="304" y="151">← BLOCKED (waiting for Stream 1 retransmission)</text>
+<text class="l" x="299" y="184">↑ Lost TCP segment affects ALL streams</text>
+<rect class="zone" x="20" y="215" width="760" height="180" rx="12"/>
+<text class="zl" x="36" y="239">HTTP/3 over QUIC over UDP</text>
+<rect class="warn" x="620" y="227" width="16" height="16" rx="4"/>
+<text class="s" x="644" y="240">lost packet</text>
+<text class="l" x="40" y="275">Stream 1</text>
+<rect class="l7" x="130" y="257" width="160" height="24" rx="4"/>
+<rect class="warn" x="294" y="257" width="22" height="24" rx="4"/>
+<text class="s" x="330" y="274">← retransmitting, only this waits</text>
+<text class="l" x="40" y="311">Stream 2</text>
+<rect class="l7" x="130" y="293" width="470" height="24" rx="4"/>
+<text class="s" x="614" y="310">← unblocked</text>
+<text class="l" x="40" y="347">Stream 3</text>
+<rect class="l7" x="130" y="329" width="470" height="24" rx="4"/>
+<text class="s" x="614" y="346">← unblocked</text>
+<text class="l" x="305" y="379" text-anchor="middle">Loss on one stream does NOT block others</text>
+</svg>

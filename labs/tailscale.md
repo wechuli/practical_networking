@@ -101,19 +101,10 @@ A **tailnet** is your Tailscale network of enrolled devices and access policy.
 Joining it authenticates a device; it does not mean every application on every
 device should be reachable.
 
-```text
-                     Identity provider
-                            |
-                  Tailscale coordination
-                    /                 \
-             identity, keys, endpoints, policy
-                  /                     \
-       A: ts-client ===== encrypted ===== B: ts-server
-                     direct or relayed
+![An identity provider sits above Tailscale coordination, which gives identity, keys, endpoints and policy to A (ts-client) and B (ts-server); A and B exchange encrypted packets directly or relayed.](./img/tailscale-planes.svg)
 
-       Coordination is not the ordinary application packet path.
-       A relay forwards encrypted packets; it is not their decrypting endpoint.
-```
+Coordination is not the ordinary application packet path.
+A relay forwards encrypted packets; it is not their decrypting endpoint.
 
 The control plane remains a trust and availability dependency. An established
 data path may survive a temporary coordination outage, but new enrollment, policy
@@ -383,15 +374,7 @@ selector, even if the same person originally enrolled both VMs.
 
 ### Two Different Routing Jobs
 
-```text
-Private service:
-A -- WireGuard --> B -- isolated veth --> C:192.0.2.2:8080
-                    subnet router          no Tailscale client
-
-Internet egress:
-A -- WireGuard --> B -- ordinary internet route --> public HTTPS service
-                    exit node
-```
+![For a private service, A reaches B over WireGuard and B, as a subnet router, forwards over an isolated veth to C at 192.0.2.2:8080, which has no Tailscale client; for internet egress, A reaches B over WireGuard and B, as an exit node, forwards over its ordinary internet route to a public HTTPS service.](./img/tailscale-routing-jobs.svg)
 
 Subnet routing makes a specific destination prefix reachable. An exit node
 provides internet egress using default-route behavior, subject to more-specific

@@ -1,0 +1,14 @@
+{
+  "name": "practical-networking",
+  "private": true,
+  "type": "module",
+  "description": "A hands-on networking course: from Ethernet and IP to TCP, DNS, TLS, HTTP/2-3, containers, Kubernetes and incident diagnosis",
+  "scripts": {
+    "docs:dev": "vitepress dev .",
+    "docs:build": "vitepress build .",
+    "docs:preview": "vitepress preview ."
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4"
+  }
+}

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 640" role="img" aria-labelledby="t d"><title id="t">The TCP state machine: the paths you will see</title><desc id="d">From CLOSED, listen() leads to LISTEN, and connect() sends a SYN and leads to SYN_SENT. LISTEN goes to SYN_RECV on receiving a SYN and sending a SYN-ACK; SYN_RECV goes to ESTABLISHED on receiving the ACK. SYN_SENT goes to ESTABLISHED on receiving the SYN-ACK and sending an ACK. From ESTABLISHED, an active close (close(), send FIN) leads to FIN_WAIT_1, and a passive close (receive FIN, send ACK) leads to CLOSE_WAIT. FIN_WAIT_1 goes to FIN_WAIT_2 on receiving the ACK of its FIN, or to CLOSING on receiving a FIN (simultaneous close). FIN_WAIT_2 goes to TIME_WAIT on receiving a FIN, and CLOSING on receiving an ACK. TIME_WAIT lasts 60 s on Linux, then CLOSED. CLOSE_WAIT goes to LAST_ACK when the application calls close() and sends FIN, and LAST_ACK goes to CLOSED on receiving the ACK.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+<rect class="bg" x="1" y="1" width="798" height="638" rx="16"/>
+<text class="zl" x="24" y="28">TCP state machine (the paths you will see)</text>
+<rect class="box" x="325" y="40" width="150" height="40" rx="10"/><text class="t" x="400" y="65" text-anchor="middle">CLOSED</text>
+<path class="arrow" d="M325 60 H160 V128"/><text class="s" x="245" y="52" text-anchor="middle">listen()</text>
+<path class="arrow" d="M475 60 H640 V128"/><text class="s" x="558" y="52" text-anchor="middle">connect(): send SYN</text>
+<rect class="l4" x="85" y="130" width="150" height="40" rx="10"/><text class="t" x="160" y="155" text-anchor="middle">LISTEN</text>
+<rect class="l4" x="565" y="130" width="150" height="40" rx="10"/><text class="t" x="640" y="155" text-anchor="middle">SYN_SENT</text>
+<path class="arrow" d="M160 170 V228"/><text class="s" x="170" y="195">recv SYN,</text><text class="s" x="170" y="211">send SYN-ACK</text>
+<rect class="l4" x="85" y="230" width="150" height="40" rx="10"/><text class="t" x="160" y="255" text-anchor="middle">SYN_RECV</text>
+<path class="arrow" d="M235 250 H313"/><text class="s" x="275" y="242" text-anchor="middle">recv ACK</text>
+<rect class="ok" x="315" y="230" width="170" height="40" rx="10"/><text class="t" x="400" y="255" text-anchor="middle">ESTABLISHED</text>
+<path class="arrow" d="M640 170 V250 H487"/><text class="s" x="650" y="200">recv SYN-ACK,</text><text class="s" x="650" y="216">send ACK</text>
+<path class="arrow" d="M400 270 V300 H190 V348"/><text class="s" x="295" y="320" text-anchor="middle">active close: close()</text><text class="s" x="295" y="336" text-anchor="middle">send FIN</text>
+<path class="arrow" d="M400 300 H620 V348"/><text class="s" x="510" y="320" text-anchor="middle">passive close: recv FIN</text><text class="s" x="510" y="336" text-anchor="middle">send ACK</text>
+<rect class="l4" x="100" y="350" width="180" height="40" rx="10"/><text class="t" x="190" y="375" text-anchor="middle">FIN_WAIT_1</text>
+<rect class="l4" x="545" y="350" width="150" height="40" rx="10"/><text class="t" x="620" y="375" text-anchor="middle">CLOSE_WAIT</text>
+<path class="arrow" d="M130 390 V468"/><text class="s" x="122" y="424" text-anchor="end">recv ACK</text><text class="s" x="122" y="440" text-anchor="end">of FIN</text>
+<path class="arrow" d="M250 390 V468"/><text class="s" x="260" y="424">recv FIN</text><text class="s" x="260" y="440">(simultaneous)</text>
+<path class="arrow" d="M620 390 V468"/><text class="s" x="630" y="434">close(): send FIN</text>
+<rect class="l4" x="35" y="470" width="150" height="40" rx="10"/><text class="t" x="110" y="495" text-anchor="middle">FIN_WAIT_2</text>
+<rect class="l4" x="225" y="470" width="150" height="40" rx="10"/><text class="t" x="300" y="495" text-anchor="middle">CLOSING</text>
+<rect class="l4" x="545" y="470" width="150" height="40" rx="10"/><text class="t" x="620" y="495" text-anchor="middle">LAST_ACK</text>
+<path class="arrow" d="M130 510 V563"/><text class="s" x="122" y="542" text-anchor="end">recv FIN</text>
+<path class="arrow" d="M260 510 V563"/><text class="s" x="270" y="542">recv ACK</text>
+<path class="arrow" d="M620 510 V568"/><text class="s" x="630" y="544">recv ACK</text>
+<rect class="l4" x="100" y="565" width="200" height="50" rx="10"/><text class="t" x="200" y="586" text-anchor="middle">TIME_WAIT</text><text class="s" x="200" y="604" text-anchor="middle">60 s on Linux</text>
+<path class="arrow" d="M300 590 H373"/>
+<rect class="box" x="375" y="570" width="120" height="40" rx="10"/><text class="t" x="435" y="595" text-anchor="middle">CLOSED</text>
+<rect class="box" x="560" y="570" width="120" height="40" rx="10"/><text class="t" x="620" y="595" text-anchor="middle">CLOSED</text>
+</svg>

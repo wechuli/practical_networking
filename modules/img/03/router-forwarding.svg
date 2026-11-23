@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 440" role="img" aria-labelledby="t d"><title id="t">Router forwarding between two networks</title><desc id="d">Network A, 10.0.1.0/24, holds host 10.0.1.5 behind Switch A; network B, 10.0.2.0/24, holds host 10.0.2.7 behind Switch B. A router joins them with eth0 on network A and eth1 on network B. Its routing table sends 10.0.1.0/24 to eth0, 10.0.2.0/24 to eth1 and the default route 0.0.0.0/0 to 203.0.113.1 (the internet). A packet from 10.0.1.5 to 10.0.2.7 arrives on eth0; the router reads the destination 10.0.2.7, matches 10.0.2.0/24 to eth1, decrements the TTL and forwards it out eth1 toward 10.0.2.7.</desc><style>.bg{fill:#f8fafc;stroke:#e2e8f0}.box{fill:#fff;stroke:#94a3b8;stroke-width:1.5}.net{fill:#e6f4f1;stroke:#0f766e;stroke-width:1.5}.warn{fill:#fdecec;stroke:#dc2626;stroke-width:1.5}.ok{fill:#ecfdf3;stroke:#16a34a;stroke-width:1.5}.l2{fill:#fef3c7;stroke:#d97706;stroke-width:1.5}.l3{fill:#e0ecff;stroke:#2563eb;stroke-width:1.5}.l4{fill:#cffafe;stroke:#0891b2;stroke-width:1.5}.l7{fill:#f3e8ff;stroke:#9333ea;stroke-width:1.5}.zone{fill:none;stroke:#94a3b8;stroke-dasharray:6 4;stroke-width:1.5}text{font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;fill:#0f172a}.t{font-size:15px;font-weight:600}.s{font-size:12.5px;fill:#475569}.l{font-size:12.5px;fill:#334155;font-weight:600}.m{font-family:Menlo,Consolas,"DejaVu Sans Mono",monospace;font-size:12px;fill:#0f172a}.zl{font-size:13px;fill:#475569;font-weight:600}.arrow{stroke:#334155;stroke-width:1.6;fill:none;marker-end:url(#a)}.dash{stroke:#b91c1c;stroke-width:1.5;fill:none;stroke-dasharray:5 4;marker-end:url(#ar)}.line{stroke:#334155;stroke-width:1.6;fill:none}</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#334155"/></marker><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b91c1c"/></marker></defs>
+
+<rect class="bg" x="1" y="1" width="798" height="438" rx="16"/>
+<text class="zl" x="24" y="30">Router — Layer 3, IP-based forwarding</text>
+<rect class="zone" x="16" y="44" width="262" height="106" rx="12"/><text class="zl" x="30" y="66">Network A:</text><text class="m" x="114" y="66">10.0.1.0/24</text>
+<rect class="zone" x="522" y="44" width="262" height="106" rx="12"/><text class="zl" x="536" y="66">Network B:</text><text class="m" x="620" y="66">10.0.2.0/24</text>
+<path class="line" d="M124 110 H160 M260 110 H340 M460 110 H540 M640 110 H676 M400 130 V170"/>
+<rect class="net" x="28" y="90" width="96" height="40" rx="10"/><text class="m" x="76" y="114" text-anchor="middle">10.0.1.5</text>
+<rect class="net" x="160" y="90" width="100" height="40" rx="10"/><text class="l" x="210" y="114" text-anchor="middle">Switch A</text>
+<rect class="net" x="340" y="90" width="120" height="40" rx="10"/><text class="t" x="400" y="115" text-anchor="middle">ROUTER</text>
+<rect class="net" x="540" y="90" width="100" height="40" rx="10"/><text class="l" x="590" y="114" text-anchor="middle">Switch B</text>
+<rect class="net" x="676" y="90" width="96" height="40" rx="10"/><text class="m" x="724" y="114" text-anchor="middle">10.0.2.7</text>
+<text class="m" x="306" y="102" text-anchor="middle">eth0</text>
+<text class="m" x="494" y="102" text-anchor="middle">eth1</text>
+<rect class="l3" x="250" y="170" width="300" height="98" rx="10"/>
+<text class="l" x="266" y="192">Routing Table:</text>
+<text class="m" x="266" y="214">10.0.1.0/24 → eth0</text>
+<text class="m" x="266" y="234">10.0.2.0/24 → eth1</text>
+<text class="m" x="266" y="254">0.0.0.0/0   → 203.0.113.1 (internet)</text>
+<rect class="box" x="20" y="290" width="760" height="134" rx="10"/>
+<text class="l" x="36" y="314">Packet from 10.0.1.5 to 10.0.2.7:</text>
+<text class="s" x="36" y="336">1. Arrives at router's eth0</text>
+<text class="s" x="36" y="354">2. Router reads destination: 10.0.2.7</text>
+<text class="s" x="36" y="372">3. Routing table: 10.0.2.0/24 → eth1</text>
+<text class="s" x="36" y="390">4. Router decrements TTL</text>
+<text class="s" x="36" y="408">5. Router forwards out eth1 toward 10.0.2.7</text>
+</svg>
